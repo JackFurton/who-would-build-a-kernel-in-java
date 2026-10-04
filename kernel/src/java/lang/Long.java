@@ -2,14 +2,61 @@ package java.lang;
 
 import duke.kernel.Panic;
 
-/** Static helpers only: no boxing yet (#39). */
-public final class Long {
+public final class Long extends Number implements Comparable<Long> {
 
     public static final long MIN_VALUE = 0x8000000000000000L;
     public static final long MAX_VALUE = 0x7fffffffffffffffL;
     public static final int SIZE = 64;
 
-    private Long() {
+    private static final Long[] CACHE = new Long[256];
+
+    static {
+        for (int i = 0; i < CACHE.length; i++) {
+            CACHE[i] = new Long(i - 128);
+        }
+    }
+
+    private final long value;
+
+    public Long(long value) {
+        this.value = value;
+    }
+
+    public static Long valueOf(long l) {
+        if (l >= -128 && l <= 127) {
+            return CACHE[(int) l + 128];
+        }
+        return new Long(l);
+    }
+
+    @Override
+    public int intValue() {
+        return (int) value;
+    }
+
+    @Override
+    public long longValue() {
+        return value;
+    }
+
+    @Override
+    public boolean equals(Object other) {
+        return other instanceof Long l && l.value == value;
+    }
+
+    @Override
+    public int hashCode() {
+        return hashCode(value);
+    }
+
+    @Override
+    public String toString() {
+        return toString(value);
+    }
+
+    @Override
+    public int compareTo(Long other) {
+        return compare(value, other.value);
     }
 
     public static String toString(long value) {

@@ -140,7 +140,9 @@ class CompilerTest {
         Path extraDir = tmp.resolve("extra");
         // javac rejects module source path entries that do not exist.
         String sourcePath = "java.base=" + KERNEL_SOURCES + (extra.length == 0 ? "" : java.io.File.pathSeparator + extraDir);
-        List<String> args = new ArrayList<>(List.of("--system", "none", "--module-source-path", sourcePath, "-d", out.toString()));
+        // Same flags as KERNEL_JAVAC in the Makefile.
+        List<String> args = new ArrayList<>(List.of("--system", "none", "-XDstringConcat=inline",
+                "--module-source-path", sourcePath, "-d", out.toString()));
         try (Stream<Path> files = Files.walk(KERNEL_SOURCES)) {
             files.filter(p -> p.toString().endsWith(".java")).forEach(p -> args.add(p.toString()));
         }

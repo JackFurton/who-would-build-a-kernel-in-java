@@ -124,13 +124,17 @@ forms), raw memory access (`peek*`/`poke*`), `addressOf`, `halt`, `disableInterr
 
 ## What compiles today
 
-Static, instance, virtual and interface methods (including defaults), type checks and casts, object and array allocation
+Static, instance, virtual and interface methods (including defaults), type checks and casts, boxing, string concatenation, object and array allocation
 (including multi-dimensional), constructors, int/long/boolean/byte/char/short arithmetic with Java semantics, all control flow
 including both switch forms, static and instance fields, array loads and stores, string literals
 and `String.length`/`charAt`.
 
-Not yet, and each a clear compile error: exceptions,
-floating point, `invokedynamic` (lambdas, string concatenation), monitors.
+Not yet, and each a clear compile error: exceptions, floating point, lambdas and method
+references (`invokedynamic`), monitors.
+
+String concatenation works because the kernel compiles with `javac -XDstringConcat=inline`, which
+turns `+` into `StringBuilder` calls instead of an `invokedynamic`. Every place that compiles
+kernel sources has to pass it: the Makefile, `tools/Harness.java` and `CompilerTest`.
 
 ## Testing
 

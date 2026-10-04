@@ -4,12 +4,17 @@ package java.lang;
  * Latin-1 only for now. Literals are laid out by the compiler, so {@code value} being the only
  * reference field is part of its contract with this class.
  */
-public final class String {
+public final class String implements Comparable<String> {
 
     private final byte[] value;
 
     String(byte[] value) {
         this.value = value;
+    }
+
+    /** For StringBuilder: copies this string's bytes into {@code destination} at {@code offset}. */
+    void copyBytes(byte[] destination, int offset) {
+        System.arraycopy(value, 0, destination, offset, value.length);
     }
 
     public int length() {
@@ -55,6 +60,7 @@ public final class String {
         return this;
     }
 
+    @Override
     public int compareTo(String other) {
         int n = Math.min(value.length, other.value.length);
         for (int i = 0; i < n; i++) {

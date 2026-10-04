@@ -2,14 +2,66 @@ package java.lang;
 
 import duke.kernel.Panic;
 
-/** Static helpers only: no boxing yet (#39). */
-public final class Integer {
+public final class Integer extends Number implements Comparable<Integer> {
 
     public static final int MIN_VALUE = 0x80000000;
     public static final int MAX_VALUE = 0x7fffffff;
     public static final int SIZE = 32;
 
-    private Integer() {
+    // Same range as the JDK's default cache: code can observe it through ==.
+    private static final Integer[] CACHE = new Integer[256];
+
+    static {
+        for (int i = 0; i < CACHE.length; i++) {
+            CACHE[i] = new Integer(i - 128);
+        }
+    }
+
+    private final int value;
+
+    public Integer(int value) {
+        this.value = value;
+    }
+
+    public static Integer valueOf(int i) {
+        if (i >= -128 && i <= 127) {
+            return CACHE[i + 128];
+        }
+        return new Integer(i);
+    }
+
+    public static Integer valueOf(String s) {
+        return valueOf(parseInt(s));
+    }
+
+    @Override
+    public int intValue() {
+        return value;
+    }
+
+    @Override
+    public long longValue() {
+        return value;
+    }
+
+    @Override
+    public boolean equals(Object other) {
+        return other instanceof Integer i && i.value == value;
+    }
+
+    @Override
+    public int hashCode() {
+        return value;
+    }
+
+    @Override
+    public String toString() {
+        return toString(value);
+    }
+
+    @Override
+    public int compareTo(Integer other) {
+        return compare(value, other.value);
     }
 
     public static String toString(int i) {

@@ -15,7 +15,7 @@ final class Strings {
     }
 
     static int latin1CharIsUnsigned() {
-        return "ÿ".charAt(0);
+        return "\u00ff".charAt(0);
     }
 
     static int checksum() {

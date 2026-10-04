@@ -117,7 +117,7 @@ final class JavaLang {
     }
 
     static int stringHashMatchesJdk() {
-        return "The quick brown fox".hashCode() ^ "".hashCode() ^ "ÿ\u0080".hashCode();
+        return "The quick brown fox".hashCode() ^ "".hashCode() ^ "\u00ff\u0080".hashCode();
     }
 
     static int stringCompareTo() {
