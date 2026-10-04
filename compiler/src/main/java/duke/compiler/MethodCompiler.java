@@ -531,9 +531,6 @@ final class MethodCompiler {
                 call(m, type, argSlots(type));
             }
             case INVOKESPECIAL -> {
-                if (inv.isInterface()) {
-                    throw error("interface methods are not supported yet");
-                }
                 ClassPool.ResolvedMethod m = pool.resolveMethod(owner, name, descriptor);
                 program.requireClass(m.ownerName());
                 call(m, type, argSlots(type) + 1);
@@ -542,6 +539,11 @@ final class MethodCompiler {
                 ClassPool.ResolvedMethod m = pool.resolveMethod(owner, name, descriptor);
                 if (m.is(AccessFlag.STATIC)) {
                     throw error(m.ownerName() + "." + name + " is static");
+                }
+                if (m.owner().flags().has(AccessFlag.INTERFACE)) {
+                    // Inherited default method: only the itable knows which one this receiver runs.
+                    interfaceCall(m.ownerName(), name, descriptor, type);
+                    return;
                 }
                 boolean exact = m.is(AccessFlag.PRIVATE) || m.is(AccessFlag.FINAL)
                         || m.owner().flags().has(AccessFlag.FINAL) || !pool.isOverridden(m);
@@ -559,8 +561,19 @@ final class MethodCompiler {
                     afterCall(type, args + 1);
                 }
             }
+            case INVOKEINTERFACE -> {
+                ClassPool.ResolvedMethod m = pool.resolveMethod(owner, name, descriptor);
+                if (m.is(AccessFlag.PRIVATE)) {
+                    int args = argSlots(type);
+                    a.load(8, false, RAX, Mem.at(RSP, 8 * args));
+                    nullCheck(RAX);
+                    call(m, type, args + 1);
+                } else {
+                    interfaceCall(owner, name, descriptor, type);
+                }
+            }
             default -> throw error("unsupported call " + inv.opcode().name().toLowerCase() + " to " + owner + "." + name
-                    + " (interfaces, lambdas and string concatenation are not supported yet)");
+                    + " (lambdas and string concatenation are not supported yet)");
         }
     }
 
@@ -658,6 +671,18 @@ final class MethodCompiler {
         a.call(program.requireMethod(allocate));
         a.aluImm(Alu.ADD, true, RSP, 8 * (4 + dimensions));
         a.push(RAX);
+    }
+
+    /** Receiver's TIB, then its itable, then the selector's slot. */
+    private void interfaceCall(String iface, String name, String descriptor, MethodTypeDesc type) {
+        int selector = program.requireInterfaceCall(iface, name, descriptor);
+        int args = argSlots(type);
+        a.load(8, false, RAX, Mem.at(RSP, 8 * args));
+        nullCheck(RAX);
+        a.load(8, false, RAX, Mem.at(RAX));
+        a.load(8, false, RAX, Mem.at(RAX, Layouts.TIB_ITABLE));
+        a.call(Mem.at(RAX, 8 * selector));
+        afterCall(type, args + 1);
     }
 
     private void call(ClassPool.ResolvedMethod m, MethodTypeDesc type, int slots) {

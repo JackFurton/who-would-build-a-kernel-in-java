@@ -9,6 +9,7 @@ import java.lang.classfile.MethodModel;
 import java.lang.reflect.AccessFlag;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -141,9 +142,51 @@ public final class ClassPool {
     public ResolvedMethod resolveMethod(String owner, String name, String descriptor) {
         ResolvedMethod m = findMethod(owner, name, descriptor);
         if (m == null) {
+            m = maximallySpecific(owner, name, descriptor, true);
+        }
+        if (m == null) {
             throw new CompileException("no method " + owner + "." + name + descriptor);
         }
         return m;
+    }
+
+    /**
+     * JVMS 5.4.6 selection: the method an object of class {@code type} runs for a call to
+     * {@code name descriptor}. The superclass chain wins; otherwise the most specific default method.
+     */
+    public ResolvedMethod selectMethod(String type, String name, String descriptor) {
+        ResolvedMethod m = findMethod(type, name, descriptor);
+        if (m != null && !m.is(AccessFlag.STATIC) && !m.is(AccessFlag.PRIVATE)) {
+            return m;
+        }
+        return maximallySpecific(type, name, descriptor, false);
+    }
+
+    /**
+     * Among the superinterfaces of {@code type}, the declarations of the method not overridden by
+     * another candidate's interface. Ambiguity is a compile error, as it would be in javac.
+     */
+    private ResolvedMethod maximallySpecific(String type, String name, String descriptor, boolean includeAbstract) {
+        List<ResolvedMethod> candidates = new ArrayList<>();
+        for (String iface : allInterfaces(type)) {
+            MethodModel m = declaredMethod(get(iface), name, descriptor);
+            if (m == null || m.flags().has(AccessFlag.STATIC) || m.flags().has(AccessFlag.PRIVATE)) {
+                continue;
+            }
+            if (!includeAbstract && m.flags().has(AccessFlag.ABSTRACT)) {
+                continue;
+            }
+            candidates.add(new ResolvedMethod(get(iface), m));
+        }
+        candidates.removeIf(c -> candidates.stream().anyMatch(other ->
+                other != c && allInterfaces(other.ownerName()).contains(c.ownerName())));
+        if (candidates.size() > 1) {
+            candidates.removeIf(c -> c.is(AccessFlag.ABSTRACT));
+        }
+        if (candidates.size() > 1) {
+            throw new CompileException("ambiguous default methods for " + type + "." + name + descriptor);
+        }
+        return candidates.isEmpty() ? null : candidates.getFirst();
     }
 
     public ResolvedMethod findMethod(String owner, String name, String descriptor) {
