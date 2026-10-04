@@ -36,6 +36,7 @@ public final class Kernel {
         PhysicalMemory.init();
         KernelAddressSpace.activate();
         KernelHeap.init();
+        FramebufferConsole.init();
         // After paging and the GDT: until here the CPU could still be reading Limine's.
         reclaimed = PhysicalMemory.reclaimBootloaderMemory();
         Acpi.init();
@@ -81,6 +82,8 @@ public final class Kernel {
         Console.println("gc: allocated 512 MiB on a 256 MiB machine; " + Heap.collections() + " collections, heap "
                 + (Heap.committed() >> 20) + " MiB committed");
         printPlatform();
+        Console.println("framebuffer: " + Limine.framebufferWidth() + "x" + Limine.framebufferHeight() + ", "
+                + FramebufferConsole.columns() + "x" + FramebufferConsole.rows() + " text");
         long before = Timer.uptimeMillis();
         Timer.sleep(100);
         Console.println("timer: local APIC timer at " + Timer.apicFrequency() / 1000 + " kHz (calibrated against the HPET), "

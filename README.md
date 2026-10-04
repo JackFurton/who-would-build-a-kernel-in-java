@@ -76,6 +76,11 @@ The first build downloads a pinned Limine release into `build/limine`.
 | `tools/` | ESP layout, QEMU launch, test harnesses, metrics and the progress chart |
 | `boot/` | Limine config |
 
+## Credits
+
+The framebuffer font is [Spleen](https://github.com/fcambus/spleen) 8x16 by Frederic Cambus,
+BSD-2-Clause; the license travels with it in `kernel/src/duke/kernel/Font.java`.
+
 ## Contributing
 
 Issues are grouped into milestones. Look for
