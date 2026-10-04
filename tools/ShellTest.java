@@ -27,7 +27,8 @@ public class ShellTest {
     public static void main(String[] args) throws Exception {
         Harness.deleteRecursively(OUT);
         Files.createDirectories(OUT);
-        Path monitor = OUT.resolve("monitor.sock");
+        // Unix socket paths max out at 108 bytes, which a CI checkout path alone can come close to.
+        Path monitor = Files.createTempDirectory("duke").resolve("monitor.sock");
         Process qemu = new ProcessBuilder("tools/qemu.sh", ESP.toString(), "-serial", "stdio",
                 "-monitor", "unix:" + monitor + ",server=on,wait=off")
                 .directory(Harness.ROOT.toFile())
@@ -39,7 +40,12 @@ public class ShellTest {
         OutputStream serial = qemu.getOutputStream();
         int failures = 0;
         try {
-            await("duke> ", 0);
+            if (!await("duke> ", 0)) {
+                qemu.destroy();
+                qemu.waitFor(10, TimeUnit.SECONDS);
+                System.out.println("shell-test: the kernel never reached its prompt; QEMU said:\n" + clean(output.toString()).indent(4));
+                System.exit(1);
+            }
             failures += check("serial", () -> type(serial, "echo hello over serial\n"), "hello over serial");
             failures += check("serial editing", () -> type(serial, "ecxx\u007f\u007fho fixed\n"), "fixed");
             failures += check("unknown command", () -> type(serial, "frobnicate\n"), "unknown command: frobnicate (try help)");
