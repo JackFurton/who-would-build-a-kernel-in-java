@@ -106,6 +106,10 @@ class X64Test {
                 c("call qword ptr [rax + 48]", "ff 50 30", a -> a.call(Mem.at(RAX, 48))),
                 c("call qword ptr [rax + 0x1000]", "ff 90 00 10 00 00", a -> a.call(Mem.at(RAX, 0x1000))),
                 c("call qword ptr [r11 + 8]", "41 ff 53 08", a -> a.call(Mem.at(R11, 8))),
+                c("std", "fd", X64::std),
+                c("cld", "fc", X64::cld),
+                c("rep movsb", "f3 a4", X64::repMovsb),
+                c("lea rsi, [rsi + rcx - 1]", "48 8d 74 0e ff", a -> a.lea(RSI, Mem.at(RSI, RCX, 1, -1))),
                 c("leave", "c9", X64::leave),
                 c("ret", "c3", X64::ret));
     }

@@ -37,6 +37,9 @@ public final class Magic {
 
     public static native void pokeLong(long address, long value);
 
+    /** memmove: correct for overlapping ranges in either direction. */
+    public static native void copyMemory(long destination, long source, long bytes);
+
     public static native long addressOf(Object object);
 
     public static native Object toObject(long address);

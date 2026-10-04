@@ -86,6 +86,12 @@ public final class Heap {
         return address;
     }
 
+    /** Address-derived. A moving collector (#17) will have to store it in the header first. */
+    public static int identityHash(Object object) {
+        long address = Magic.addressOf(object);
+        return (int) (address >>> 3) ^ (int) (address >>> 35);
+    }
+
     public static long used() {
         return next == 0 ? 0 : next - Magic.heapArenaStart();
     }

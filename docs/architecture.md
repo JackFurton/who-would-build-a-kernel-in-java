@@ -67,15 +67,15 @@ Results come back in `rax`. All registers are caller-saved. Symbols are
 ```
 object:  [0] TIB pointer   [8...] fields (superclass first, then largest-first)
 array:   [0] TIB pointer   [8] int length   [12] padding   [16...] elements
-TIB:     [0] super TIB   [8] size   [12] flags   [16] element TIB   [24] name (a String)
-         [32] interface list   [40] itable   [48...] vtable
+TIB:     [0] header (Class's TIB)   [8] super TIB   [16] size   [20] flags   [24] element TIB
+         [32] name (a String)   [40] interface list   [48] itable   [56...] vtable
 ```
 
 ### Dispatch
 
 `invokevirtual` compiles to a direct call whenever class hierarchy analysis proves a single
 target (the method is private or final, its class is final, or nothing overrides it). Otherwise
-it loads the receiver's TIB and calls through `[tib + 48 + 8*slot]`. Slots come from `Vtables`:
+it loads the receiver's TIB and calls through `[tib + 56 + 8*slot]`. Slots come from `Vtables`:
 superclass slots first, overrides reuse the inherited slot.
 
 Vtables don't defeat tree-shaking. The compiler records every dispatched `(owner, name,
@@ -92,6 +92,10 @@ take the same path.
 
 `new C` compiles to a call to `duke.rt.Heap.allocateObject(tib, size)`, plain Java bumping a
 pointer through a 16 MiB arena in `.bss`. Nothing is freed yet.
+
+A TIB is also its type's `java.lang.Class` object: word 0 is an ordinary object header pointing
+at `Class`'s own TIB. So `getClass()` is one load, `Foo.class` is the TIB's address, and
+`java.lang.Class` has no fields. It reads everything through `duke.rt.Tib`.
 
 String literals are prebuilt objects in `.data`, Latin-1 only for now. `String`'s `value` field
 layout is part of the contract between `dukec` and `kernel/src/java/lang/String.java`.
