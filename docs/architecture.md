@@ -67,8 +67,21 @@ Results come back in `rax`. All registers are caller-saved. Symbols are
 ```
 object:  [0] TIB pointer   [8...] fields (superclass first, then largest-first)
 array:   [0] TIB pointer   [8] int length   [12] padding   [16...] elements
-TIB:     [0] super TIB     [8] instance size (element size for arrays)   [12] flags (bit 0: array)
+TIB:     [0] super TIB   [8] size   [12] flags   [16] element TIB   [24] name (a String)
+         [32] interfaces (reserved)   [40] itable (reserved)   [48...] vtable
 ```
+
+### Dispatch
+
+`invokevirtual` compiles to a direct call whenever class hierarchy analysis proves a single
+target (the method is private or final, its class is final, or nothing overrides it). Otherwise
+it loads the receiver's TIB and calls through `[tib + 48 + 8*slot]`. Slots come from `Vtables`:
+superclass slots first, overrides reuse the inherited slot.
+
+Vtables don't defeat tree-shaking. The compiler records every dispatched `(owner, name,
+descriptor)` and, after each round of compilation, compiles the implementation every reachable
+subclass would select, repeating until nothing new turns up. Slots nothing dispatches through stay
+0.
 
 `new C` compiles to a call to `duke.rt.Heap.allocateObject(tib, size)`, plain Java bumping a
 pointer through a 16 MiB arena in `.bss`. Nothing is freed yet.
@@ -89,12 +102,12 @@ forms), raw memory access (`peek*`/`poke*`), `addressOf`, `halt`, `disableInterr
 
 ## What compiles today
 
-Static and instance methods (non-virtual or devirtualizable), object and array allocation
+Static, instance and virtual methods, object and array allocation
 (including multi-dimensional), constructors, int/long/boolean/byte/char/short arithmetic with Java semantics, all control flow
 including both switch forms, static and instance fields, array loads and stores, string literals
 and `String.length`/`charAt`.
 
-Not yet, and each a clear compile error: virtual dispatch, interfaces, exceptions,
+Not yet, and each a clear compile error: interfaces, exceptions,
 floating point, `invokedynamic` (lambdas, string concatenation), monitors, `checkcast`/`instanceof`.
 
 ## Testing

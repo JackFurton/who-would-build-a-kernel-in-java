@@ -52,6 +52,8 @@ public final class ClassPool {
         }
     }
 
+    public static final String OBJECT = "java/lang/Object";
+
     private final Map<String, ClassModel> classes = new LinkedHashMap<>();
 
     public static ClassPool load(Path root) {
@@ -111,6 +113,14 @@ public final class ClassPool {
 
     /** JVMS 5.4.3.3 for classes, minus interfaces: walk up the superclass chain. */
     public ResolvedMethod resolveMethod(String owner, String name, String descriptor) {
+        ResolvedMethod m = findMethod(owner, name, descriptor);
+        if (m == null) {
+            throw new CompileException("no method " + owner + "." + name + descriptor);
+        }
+        return m;
+    }
+
+    public ResolvedMethod findMethod(String owner, String name, String descriptor) {
         for (String c = owner; c != null; ) {
             ClassModel model = get(c);
             MethodModel m = declaredMethod(model, name, descriptor);
@@ -119,7 +129,7 @@ public final class ClassPool {
             }
             c = superName(model);
         }
-        throw new CompileException("no method " + owner + "." + name + descriptor);
+        return null;
     }
 
     public ResolvedField resolveField(String owner, String name, String descriptor) {
