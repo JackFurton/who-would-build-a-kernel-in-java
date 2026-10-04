@@ -55,6 +55,32 @@ public class KernelTests {
             System.out.println("ktest failed: QEMU exit status " + status + (exited ? "" : " (timed out)"));
             System.exit(1);
         }
+        checkConsoleOutput(output);
+    }
+
+    static void checkConsoleOutput(String output) {
+        String begin = "\nCONSOLE-HEX-BEGIN\n";
+        String end = "CONSOLE-HEX-END\n";
+        int start = output.indexOf(begin);
+        int finish = start < 0 ? -1 : output.indexOf(end, start + begin.length());
+        String expected = """
+                0x0000000000000000
+                0x0000000000000001
+                0x0123456789abcdef
+                0xfedcba9876543210
+                0xffffffffffffffff
+                0x8000000000000000
+                0x7fffffffffffffff
+                """;
+        if (start < 0 || finish < 0) {
+            throw new AssertionError("Console.printHex output markers missing");
+        }
+        String actual = output.substring(start + begin.length(), finish);
+        if (!expected.equals(actual)) {
+            throw new AssertionError("Console.printHex output mismatch: expected\n" + expected
+                    + "got\n" + actual);
+        }
+        System.out.println("Console.printHex serial output: passed");
     }
 
     static List<String> discover(Path dir) throws Exception {

@@ -21,18 +21,6 @@ final class LongArithmetic {
     static int lcmpEqual() { return opaque(7L) == 7L ? 1 : 0; }
     static int lcmpGreaterAcrossSign() { return opaque(Long_MAX) > Long_MIN ? 1 : 0; }
 
-    static long hexDigits() {
-        long value = opaque(0x1234_5678_9abc_def0L);
-        long result = 0;
-
-        for (int shift = 60; shift >= 0; shift -= 4) {
-            long digit = (value >>> shift) & 0xF;
-            result = result * 16 + digit;
-        }
-
-        return result;
-    }
-
     static long opaque(long v) { return v; }
 
     static int opaque(int v) { return v; }
