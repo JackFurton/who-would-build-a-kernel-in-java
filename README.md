@@ -57,7 +57,7 @@ Homebrew's `qemu` ships the firmware. On Debian or Ubuntu, `apt install qemu-sys
 covers both. Put the firmware somewhere unusual? Set `OVMF=/path/to/OVMF_CODE.fd`.
 
 ```sh
-make run          # build and boot; serial output in your terminal, Ctrl-A X to quit
+make run          # build and boot to a shell on your terminal (try help); Ctrl-A X quits
 make test         # compiler unit tests, boot test, conformance, panic and kernel suites
 make disasm       # objdump the kernel (symbols included)
 ```

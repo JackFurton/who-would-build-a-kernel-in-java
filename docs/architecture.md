@@ -103,6 +103,15 @@ Java handler that counts ticks and sends EOI. `Kernel.init()` ends by enabling i
 suite runs with the tick live. The GC-stress conformance run takes about 6,000 timer interrupts at
 arbitrary instructions, in the middle of about 53,000 collections.
 
+## Input and the shell
+
+`IoApic` routes ISA IRQs to the boot CPU, applying the MADT's polarity and trigger overrides. The
+PS/2 keyboard (IRQ 1, scan code set 1, US layout) and COM1's receive interrupt (IRQ 4) both push
+characters into `Input`, a ring buffer of image arrays, so handlers never allocate. After the boot
+log, `Kernel.main` runs `Shell`: line editing plus `help`, `uptime`, `mem`, `gc`, `cpus`, `echo`
+and `panic`. `make shell-test` boots the real kernel with serial on pipes and the QEMU monitor on a
+socket. It types over serial and as PS/2 keystrokes (`sendkey`) and checks the replies.
+
 ## Compiler pipeline
 
 ```
