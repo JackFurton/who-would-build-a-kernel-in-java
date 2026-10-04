@@ -18,6 +18,9 @@ You need JDK 25, `make`, `git`, `qemu-system-x86_64`, and x86_64 UEFI firmware.
 
 - macOS: `brew install openjdk qemu` (Homebrew's QEMU includes the firmware).
 - Debian/Ubuntu: `apt install openjdk-25-jdk qemu-system-x86 ovmf`.
+- Anywhere else, or if you'd rather not install anything: open the repo in GitHub Codespaces
+  (Code, then Codespaces) or in VS Code's "Reopen in Container". `.devcontainer/` sets up the same
+  toolchain CI uses.
 
 ```sh
 make run     # boot to the shell (type help); Ctrl-A X quits QEMU
