@@ -99,6 +99,12 @@ public final class Magic {
      */
     public static native long imageLayout();
 
+    /** Addresses of every static reference field: a count, then the addresses (Compiler.emitRootTable). */
+    public static native long gcStaticRoots();
+
+    /** Build-time reference arrays, which the heap can't see but which may point into it. */
+    public static native long gcImageRoots();
+
     /** The compiler's method table; layout documented on Compiler.emitMethodTable. */
     public static native long methodTable();
 

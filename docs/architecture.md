@@ -47,7 +47,34 @@ continues. Bootloader-reclaimable memory is still reserved (#55).
 virtual region of its own. `Heap` stays a bump allocator, but when it runs off the committed end
 it asks its `Backing` to map 2 MiB more of zeroed frames. The backing reports failure rather than
 throwing: building an `OutOfMemoryError` would itself need the allocator. Nothing is freed until
-there's a collector (#17).
+there's a collector, below.
+
+### Garbage collection
+
+`duke.rt.Collector` is a non-moving mark-sweep, written in Java that never allocates while it
+runs. Non-moving keeps identity hashes (address-derived) and `Magic.addressOf` results valid, and
+needs no pointer fix-ups.
+
+Roots are static reference fields and build-time reference arrays (both listed in tables the
+compiler emits), plus the stack. Stacks are walked through the rbp chain with **precise stack
+maps**. Every value a template-compiled method holds is in its frame at a call, never only in a
+register, so every call site is a safepoint. At each call the compiler records which rbp-relative
+slots hold references. The types come from `FrameTypes`, the JVM verifier's type pass reduced to
+reference/non-reference, seeded by the class file's StackMapTable. Templates often pop operands
+into registers before calling a helper, so each call also records how many operand slots it
+already consumed. Those slots aren't in the frame any more.
+
+Marking uses one bit per 8 heap bytes (a build-time array for the early arena, a committed side
+table for the growable region) and an explicit mark stack. Sweeping walks objects by their
+headers, coalesces dead runs into holes, chains them into an address-ordered free list, and hands
+a dead tail back to the bump pointer. Free space is always walkable: holes carry a small marker
+word that can't be a TIB address. Allocation bumps first, then takes holes, then collects once
+committed memory passes twice the last live size (32 MiB minimum), and only then commits more.
+
+`make conformance-gc` runs the whole conformance suite with a collection at every allocation
+(about 50,000 collections). A slot missing from a stack map shows up there as a wrong result or a
+GC panic. Interrupt handlers still must not allocate, and threads (M5) will need a safepoint
+protocol.
 Java objects still come from the fixed bump arena in `.bss` (see Objects below).
 
 ## Compiler pipeline
@@ -102,14 +129,15 @@ Results come back in `rax`. All registers are caller-saved. Symbols are
 object:  [0] TIB pointer   [8...] fields (superclass first, then largest-first)
 array:   [0] TIB pointer   [8] int length   [12] padding   [16...] elements
 TIB:     [0] header (Class's TIB)   [8] super TIB   [16] size   [20] flags   [24] element TIB
-         [32] name (a String)   [40] interface list   [48] itable   [56...] vtable
+         [32] name (a String)   [40] interface list   [48] itable   [56] reference field offsets
+         [64...] vtable
 ```
 
 ### Dispatch
 
 `invokevirtual` compiles to a direct call whenever class hierarchy analysis proves a single
 target (the method is private or final, its class is final, or nothing overrides it). Otherwise
-it loads the receiver's TIB and calls through `[tib + 56 + 8*slot]`. Slots come from `Vtables`:
+it loads the receiver's TIB and calls through `[tib + 64 + 8*slot]`. Slots come from `Vtables`:
 superclass slots first, overrides reuse the inherited slot.
 
 Vtables don't defeat tree-shaking. The compiler records every dispatched `(owner, name,

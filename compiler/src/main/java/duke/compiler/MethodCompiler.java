@@ -86,6 +86,15 @@ final class MethodCompiler {
     private int argSlots;
     private int line = -1;
     private final List<ExceptionCatch> catches = new ArrayList<>();
+    private int extraLocals;
+    private List<CodeElement> elements;
+    private FrameTypes.State[] states;
+    /** Slot kinds before the instruction being compiled; the prologue sees the entry state. */
+    private FrameTypes.State state;
+    /** Operand slots the current template has popped into registers before its next call. */
+    private int consumed;
+    private int methodStart;
+    private final List<Compiler.Safepoint> safepoints = new ArrayList<>();
     /** (code offset, source line) pairs, in code order. */
     private final List<int[]> lines = new ArrayList<>();
     MethodCompiler(Compiler program, ClassPool.ResolvedMethod method) {
@@ -107,11 +116,20 @@ final class MethodCompiler {
         }
         CodeAttribute code = (CodeAttribute) method.method().code().orElseThrow();
         argSlots = argSlots(method.method().methodTypeSymbol()) + (method.is(AccessFlag.STATIC) ? 0 : 1);
-        int extraLocals = code.maxLocals() - argSlots;
+        extraLocals = code.maxLocals() - argSlots;
+        elements = code.elementList();
+        states = FrameTypes.analyze(code, elements, method.method().methodTypeSymbol(), method.is(AccessFlag.STATIC));
+        for (FrameTypes.State s : states) {
+            if (s != null) {
+                state = s;
+                break;
+            }
+        }
 
         Section text = program.image().text;
         text.align(16);
         int start = a.position();
+        methodStart = start;
         a.push(RBP);
         a.mov(RBP, RSP);
         if (extraLocals > 0) {
@@ -119,15 +137,19 @@ final class MethodCompiler {
         }
         stackCheck();
 
-        for (CodeElement e : code) {
-            switch (e) {
+        for (int index = 0; index < elements.size(); index++) {
+            switch (elements.get(index)) {
                 case ExceptionCatch c -> catches.add(c);
                 case LabelTarget t -> a.bind(label(t.label()));
                 case LineNumber n -> {
                     line = n.line();
                     lines.add(new int[] {a.position() - start, line});
                 }
-                case Instruction i -> instruction(i);
+                case Instruction i -> {
+                    state = states[index];
+                    consumed = 0;
+                    instruction(i);
+                }
                 default -> { }
             }
         }
@@ -139,6 +161,7 @@ final class MethodCompiler {
                 .map(f -> f.sourceFile().stringValue()).orElse(null);
         program.recordLines(symbol, sourceFile, lines);
         recordExceptionTable(symbol, start, extraLocals);
+        program.recordSafepoints(symbol, safepoints);
     }
 
     private CompileException error(String message) {
@@ -206,10 +229,11 @@ final class MethodCompiler {
             case ArrayStoreInstruction s -> arrayStore(s.typeKind());
             case ThrowInstruction t -> {
                 a.pop(RAX);
+                consumed = 1;
                 nullCheck(RAX);
                 a.push(RAX);
                 ensureInitialized(EXCEPTIONS);
-                a.call(program.requireMethod(EXCEPTIONS, "raise", "(Ljava/lang/Throwable;)V"));
+                emitCall(program.requireMethod(EXCEPTIONS, "raise", "(Ljava/lang/Throwable;)V"));
                 a.ud2();
             }
             case NewObjectInstruction n -> newObject(n.className().asInternalName());
@@ -307,6 +331,7 @@ final class MethodCompiler {
             }
             case ARRAYLENGTH -> {
                 a.pop(RAX);
+                consumed = 1;
                 nullCheck(RAX);
                 a.load(4, false, RAX, Mem.at(RAX, Layouts.ARRAY_LENGTH_OFFSET));
                 a.push(RAX);
@@ -352,10 +377,11 @@ final class MethodCompiler {
             a.pop(RCX);
             a.pop(RAX);
         }
+        consumed = wide ? 4 : 2;
         X64.Label nonZero = new X64.Label();
         a.test(wide, RCX, RCX);
         a.jcc(Cond.NE, nonZero);
-        a.call(program.requireMethod(RUNTIME, "divideByZero", "()V"));
+        emitCall(program.requireMethod(RUNTIME, "divideByZero", "()V"));
         a.bind(nonZero);
         X64.Label normal = new X64.Label();
         X64.Label done = new X64.Label();
@@ -513,6 +539,7 @@ final class MethodCompiler {
             case GETFIELD -> {
                 int offset = program.layouts().of(field.ownerName()).offsetOf(field.name());
                 a.pop(RAX);
+                consumed = 1;
                 nullCheck(RAX);
                 a.load(width, signed, RAX, Mem.at(RAX, offset));
                 pushValue(RAX, wide);
@@ -521,6 +548,7 @@ final class MethodCompiler {
                 int offset = program.layouts().of(field.ownerName()).offsetOf(field.name());
                 popValue(RDX, wide);
                 a.pop(RAX);
+                consumed = 1 + (wide ? 2 : 1);
                 nullCheck(RAX);
                 a.store(width, Mem.at(RAX, offset), RDX);
             }
@@ -589,7 +617,7 @@ final class MethodCompiler {
                     int slot = program.vtables().slot(owner, name, descriptor);
                     program.requireVirtual(owner, name, descriptor);
                     a.load(8, false, RAX, Mem.at(RAX));
-                    a.call(Mem.at(RAX, Layouts.TIB_VTABLE + 8 * slot));
+                    emitCall(Mem.at(RAX, Layouts.TIB_VTABLE + 8 * slot));
                     afterCall(type, args + 1);
                 }
             }
@@ -622,7 +650,7 @@ final class MethodCompiler {
         X64.Label done = new X64.Label();
         a.cmpByte(Mem.rip("initialized:" + type), 0);
         a.jcc(Cond.NE, done);
-        a.call(initializer);
+        emitCall(initializer);
         a.bind(done);
     }
 
@@ -700,6 +728,7 @@ final class MethodCompiler {
 
     private void newArray(String type) {
         a.pop(RCX);
+        consumed = 1;
         a.lea(RAX, Mem.rip(program.requireArrayTib(type)));
         pushLong(RAX);
         a.push(RCX);
@@ -717,7 +746,7 @@ final class MethodCompiler {
         pushLong(RAX);
         ClassPool.ResolvedMethod allocate = pool.resolveMethod(HEAP, "allocateMultiArray", "(JJ)Ljava/lang/Object;");
         ensureInitialized(HEAP);
-        a.call(program.requireMethod(allocate));
+        emitCall(program.requireMethod(allocate));
         a.aluImm(Alu.ADD, true, RSP, 8 * (4 + dimensions));
         a.push(RAX);
     }
@@ -748,7 +777,7 @@ final class MethodCompiler {
         nullCheck(RAX);
         a.load(8, false, RAX, Mem.at(RAX));
         a.load(8, false, RAX, Mem.at(RAX, Layouts.TIB_ITABLE));
-        a.call(Mem.at(RAX, 8 * selector));
+        emitCall(Mem.at(RAX, 8 * selector));
         afterCall(type, args + 1);
     }
 
@@ -756,8 +785,40 @@ final class MethodCompiler {
         if (m.is(AccessFlag.NATIVE)) {
             throw error("call to native method " + m.ownerName() + "." + m.name() + "; only " + MAGIC + " intrinsics may be native");
         }
-        a.call(program.requireMethod(m));
+        emitCall(program.requireMethod(m));
         afterCall(type, slots);
+    }
+
+    private void emitCall(String symbol) {
+        a.call(symbol);
+        safepoint();
+    }
+
+    private void emitCall(Mem target) {
+        a.call(target);
+        safepoint();
+    }
+
+    /**
+     * Records which frame slots hold references at the return address of the call just emitted:
+     * the reference locals, plus the reference operand slots still on the machine stack (the
+     * current state's stack minus what the template already popped). Anything the template pushed
+     * for the call itself sits above those and is the callee's concern.
+     */
+    private void safepoint() {
+        List<Integer> refs = new ArrayList<>();
+        for (int slot = 0; slot < state.locals().length; slot++) {
+            if (state.locals()[slot] == FrameTypes.REF) {
+                refs.add(local(slot).disp());
+            }
+        }
+        int onStack = state.stack().length - consumed;
+        for (int i = 0; i < onStack; i++) {
+            if (state.stack()[i] == FrameTypes.REF) {
+                refs.add(-8 * Math.max(extraLocals, 0) - 8 * (i + 1));
+            }
+        }
+        safepoints.add(new Compiler.Safepoint(a.position() - methodStart, refs));
     }
 
     /** Pops the arguments and pushes the result. */
@@ -890,6 +951,14 @@ final class MethodCompiler {
                 a.push(RBP);
                 a.push(RBP);
             }
+            case "gcStaticRoots" -> {
+                a.lea(RAX, Mem.rip(Compiler.GC_STATIC_ROOTS));
+                pushLong(RAX);
+            }
+            case "gcImageRoots" -> {
+                a.lea(RAX, Mem.rip(Compiler.GC_IMAGE_ROOTS));
+                pushLong(RAX);
+            }
             case "imageLayout" -> {
                 a.lea(RAX, Mem.rip(Compiler.IMAGE_LAYOUT));
                 pushLong(RAX);
@@ -974,17 +1043,21 @@ final class MethodCompiler {
         };
     }
 
-    /** Leaves the array in rax and the bounds-checked, zero-extended index in rcx. */
-    private void checkedArrayAccess() {
+    /**
+     * Leaves the array in rax and the bounds-checked, zero-extended index in rcx. {@code popped}
+     * is how many slots the caller already popped (the value, for stores).
+     */
+    private void checkedArrayAccess(int popped) {
         a.pop(RCX);
         a.pop(RAX);
+        consumed = popped + 2;
         nullCheck(RAX);
         X64.Label inBounds = new X64.Label();
         a.alu(Alu.CMP, false, Mem.at(RAX, Layouts.ARRAY_LENGTH_OFFSET), RCX);
         a.jcc(Cond.A, inBounds);
         a.push(RCX);
         a.push(Mem.at(RAX, Layouts.ARRAY_LENGTH_OFFSET));
-        a.call(program.requireMethod(RUNTIME, "arrayIndexOutOfBounds", "(II)V"));
+        emitCall(program.requireMethod(RUNTIME, "arrayIndexOutOfBounds", "(II)V"));
         a.bind(inBounds);
         a.mov32(RCX, RCX);
     }
@@ -994,7 +1067,7 @@ final class MethodCompiler {
         if (width == 0) {
             throw error("unsupported array element type " + kind);
         }
-        checkedArrayAccess();
+        checkedArrayAccess(0);
         a.load(width, kind == TypeKind.BYTE || kind == TypeKind.SHORT, RAX,
                 Mem.at(RAX, RCX, width, Layouts.ARRAY_DATA_OFFSET));
         pushValue(RAX, kind == TypeKind.LONG);
@@ -1009,7 +1082,7 @@ final class MethodCompiler {
             arrayStoreCheck();
         }
         popValue(RDX, kind == TypeKind.LONG);
-        checkedArrayAccess();
+        checkedArrayAccess(kind == TypeKind.LONG ? 2 : 1);
         a.store(width, Mem.at(RAX, RCX, width, Layouts.ARRAY_DATA_OFFSET), RDX);
     }
 
@@ -1022,7 +1095,7 @@ final class MethodCompiler {
         X64.Label ok = new X64.Label();
         a.alu(Alu.CMP, true, Mem.rip(Compiler.STACK_LIMIT), RSP);
         a.jcc(Cond.BE, ok);
-        a.call(Compiler.STACK_OVERFLOW);
+        emitCall(Compiler.STACK_OVERFLOW);
         a.bind(ok);
     }
 
@@ -1034,7 +1107,7 @@ final class MethodCompiler {
         X64.Label ok = new X64.Label();
         a.test(true, r, r);
         a.jcc(Cond.NE, ok);
-        a.call(program.requireMethod(RUNTIME, "nullPointer", "()V"));
+        emitCall(program.requireMethod(RUNTIME, "nullPointer", "()V"));
         a.bind(ok);
     }
 

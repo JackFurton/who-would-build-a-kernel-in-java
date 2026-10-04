@@ -57,6 +57,8 @@ public final class Compiler {
     static final String HEAP_ARENA = "heap.arena";
     static final String METHOD_TABLE = "method.table";
     static final String IMAGE_LAYOUT = "image.layout";
+    static final String GC_STATIC_ROOTS = "gc.static.roots";
+    static final String GC_IMAGE_ROOTS = "gc.image.roots";
     /** Early-boot allocation only; KernelHeap takes over once paging is up. */
     static final int HEAP_ARENA_SIZE = 4 * 1024 * 1024;
 
@@ -95,6 +97,11 @@ public final class Compiler {
     private record ExceptionTable(int frameBytes, List<Handler> handlers) {}
 
     private final Map<String, ExceptionTable> exceptionTables = new LinkedHashMap<>();
+
+    /** A call site's return offset in its method, and the rbp-relative slots holding references there. */
+    record Safepoint(int offset, List<Integer> refSlots) {}
+
+    private final Map<String, List<Safepoint>> safepoints = new LinkedHashMap<>();
 
     public Compiler(ClassPool pool) {
         this.pool = pool;
@@ -185,6 +192,10 @@ public final class Compiler {
 
     private static String interfacesSymbol(String type) {
         return "interfaces:" + type;
+    }
+
+    private static String referencesSymbol(String type) {
+        return "references:" + type;
     }
 
     private static String itableSymbol(String type) {
@@ -296,6 +307,9 @@ public final class Compiler {
             int start = text.size();
             X64 a = new X64(text);
             X64.Label done = new X64.Label();
+            // A real frame, so stack walks (GC, exceptions) step through the stub to its caller.
+            a.push(Reg.RBP);
+            a.mov(Reg.RBP, Reg.RSP);
             a.cmpByte(Mem.rip(flagSymbol), 0);
             a.jcc(Cond.NE, done);
             a.movByte(Mem.rip(flagSymbol), 1);
@@ -308,6 +322,7 @@ public final class Compiler {
                 a.call(methodSymbol(type, "<clinit>", "()V"));
             }
             a.bind(done);
+            a.leave();
             a.ret();
             image.define(initializerSymbol(type), text, start, text.size() - start, Image.SymbolType.FUNC);
         }
@@ -370,6 +385,14 @@ public final class Compiler {
         return staticSymbol(f.ownerName(), f.name());
     }
 
+    List<Safepoint> safepoints(String methodSymbol) {
+        return safepoints.get(methodSymbol);
+    }
+
+    void recordSafepoints(String methodSymbol, List<Safepoint> sites) {
+        safepoints.put(methodSymbol, sites);
+    }
+
     void recordExceptionTable(String methodSymbol, int frameBytes, List<Handler> handlers) {
         exceptionTables.put(methodSymbol, new ExceptionTable(frameBytes, handlers));
     }
@@ -380,9 +403,11 @@ public final class Compiler {
 
     /**
      * For backtraces and exception dispatch (duke.rt.Backtrace, duke.rt.Exceptions). Header: entry
-     * count (u64). Each 56-byte entry, sorted by address: start, size (u32), line count (u32), name
+     * count (u64). Each 64-byte entry, sorted by address: start, size (u32), line count (u32), name
      * String, source file String or 0, line table or 0, exception table or 0, flags (u32, see
-     * methodFlags) and padding. A line table is
+     * methodFlags) and padding, GC map or 0. A GC map is a safepoint count (u32), then per call
+     * site its return offset (u32), a slot count (u32) and that many rbp-relative offsets (i32) of
+     * slots holding references, in code order. A line table is
      * (code offset u32, line u32) pairs in code order. An exception table is a row count (u32) and
      * the frame's local-variable bytes below rbp (u32), then 24-byte rows: start, end, handler
      * (u32 code offsets, plus u32 padding) and the catch type's TIB, 0 meaning any.
@@ -407,6 +432,20 @@ public final class Compiler {
                     rodata.emit32(pair[1]);
                 }
                 image.define("lines:" + f.name(), rodata, start, rodata.size() - start, Image.SymbolType.OBJECT);
+            }
+            List<Safepoint> sites = safepoints.get(f.name());
+            if (sites != null) {
+                rodata.align(8);
+                int start = rodata.size();
+                rodata.emit32(sites.size());
+                for (Safepoint site : sites) {
+                    rodata.emit32(site.offset());
+                    rodata.emit32(site.refSlots().size());
+                    for (int slot : site.refSlots()) {
+                        rodata.emit32(slot);
+                    }
+                }
+                image.define("gcmap:" + f.name(), rodata, start, rodata.size() - start, Image.SymbolType.OBJECT);
             }
             ExceptionTable exceptions = exceptionTables.get(f.name());
             if (exceptions != null) {
@@ -441,6 +480,7 @@ public final class Compiler {
             emitPointer(rodata, exceptionTables.containsKey(f.name()) ? "exceptions:" + f.name() : null);
             rodata.emit32(methodFlags(f.name()));
             rodata.emit32(0);
+            emitPointer(rodata, safepoints.containsKey(f.name()) ? "gcmap:" + f.name() : null);
         }
         image.define(METHOD_TABLE, rodata, table, rodata.size() - table, Image.SymbolType.OBJECT);
     }
@@ -625,6 +665,7 @@ public final class Compiler {
         for (Map.Entry<BuildTimeInit.Arr, String> e : arrays.entrySet()) {
             emitImageArray(e.getKey(), e.getValue(), arrays);
         }
+        List<String> staticRefs = new ArrayList<>();
         for (String name : classes) {
             Map<String, BuildTimeInit.Value> statics = buildTimeStatics.get(name);
             for (FieldModel f : pool.get(name).fields()) {
@@ -633,6 +674,10 @@ public final class Compiler {
                 }
                 data.align(8);
                 int offset = data.size();
+                String descriptor = f.fieldType().stringValue();
+                if (descriptor.startsWith("L") || descriptor.startsWith("[")) {
+                    staticRefs.add(staticSymbol(name, f.fieldName().stringValue()));
+                }
                 BuildTimeInit.Value computed = statics == null ? null : statics.get(f.fieldName().stringValue());
                 if (computed != null) {
                     emitImageValue(data, computed, 8, arrays);
@@ -650,6 +695,31 @@ public final class Compiler {
                 image.define(staticSymbol(name, f.fieldName().stringValue()), data, offset, 8, Image.SymbolType.OBJECT);
             }
         }
+        emitRootTable(GC_STATIC_ROOTS, staticRefs);
+        List<String> imageArrays = new ArrayList<>();
+        for (Map.Entry<BuildTimeInit.Arr, String> e : arrays.entrySet()) {
+            char element = e.getKey().type.charAt(1);
+            if (element == 'L' || element == '[') {
+                imageArrays.add(e.getValue());
+            }
+        }
+        emitRootTable(GC_IMAGE_ROOTS, imageArrays);
+    }
+
+    /**
+     * A count (u64) and that many addresses. Static roots point at reference fields; image roots
+     * at build-time reference arrays, whose elements can point into the heap once code stores to
+     * them.
+     */
+    private void emitRootTable(String symbol, List<String> addresses) {
+        Section rodata = image.rodata;
+        rodata.align(8);
+        int start = rodata.size();
+        rodata.emit64(addresses.size());
+        for (String address : addresses) {
+            rodata.emitReloc(Reloc.Kind.ABS64, address, 0);
+        }
+        image.define(symbol, rodata, start, rodata.size() - start, Image.SymbolType.OBJECT);
     }
 
     /** Same layout as a heap array: TIB, length, padding, elements. In .data, so it stays mutable. */
@@ -784,12 +854,25 @@ public final class Compiler {
      * [32] name, a String
      * [40] 0-terminated list of every interface the type implements, or 0 if none
      * [48] itable: one code pointer per interface selector, or 0 for classes without interfaces
-     * [56] vtable: one code pointer per Vtables slot, 0 where nothing dispatches to it
+     * [56] reference field offsets for the GC: a count (u32) then offsets (u32), or 0 if none
+     * [64] vtable: one code pointer per Vtables slot, 0 where nothing dispatches to it
      * </pre>
      */
     private void emitTibs() {
         Section rodata = image.rodata;
         for (String type : tibs) {
+            if (!type.startsWith("[") && !pool.get(type).flags().has(AccessFlag.INTERFACE)) {
+                List<Integer> references = layouts.of(type).referenceOffsets();
+                if (!references.isEmpty()) {
+                    rodata.align(8);
+                    int start = rodata.size();
+                    rodata.emit32(references.size());
+                    for (int offset : references) {
+                        rodata.emit32(offset);
+                    }
+                    image.define(referencesSymbol(type), rodata, start, rodata.size() - start, Image.SymbolType.OBJECT);
+                }
+            }
             if (type.startsWith("[") || pool.allInterfaces(type).isEmpty()) {
                 continue;
             }
@@ -823,6 +906,7 @@ public final class Compiler {
             emitPointer(rodata, strings.get(javaName(type)));
             emitPointer(rodata, image.isDefined(interfacesSymbol(type)) ? interfacesSymbol(type) : null);
             emitPointer(rodata, image.isDefined(itableSymbol(type)) ? itableSymbol(type) : null);
+            emitPointer(rodata, image.isDefined(referencesSymbol(type)) ? referencesSymbol(type) : null);
             String dispatchType = array || isInterface ? ClassPool.OBJECT : type;
             for (Vtables.Key key : vtables.layout(dispatchType)) {
                 ClassPool.ResolvedMethod impl = pool.findMethod(dispatchType, key.name(), key.descriptor());

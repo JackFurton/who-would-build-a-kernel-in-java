@@ -19,7 +19,7 @@ KERNEL_SRCS   := $(shell find kernel/src -name '*.java')
 KERNEL_JAVAC  := javac --system none -XDstringConcat=inline
 COMPILER_SRCS := $(shell find compiler/src/main -name '*.java') compiler/build.gradle.kts
 
-.PHONY: all compiler run test unit-test boot-test conformance panic-tests ktest disasm clean
+.PHONY: all compiler run test unit-test boot-test conformance conformance-gc panic-tests ktest disasm clean
 
 all: $(BUILD)/esp/boot/kernel.elf
 
@@ -59,6 +59,12 @@ boot-test: all
 
 conformance: $(DUKEC) $(BUILD)/limine/BOOTX64.EFI
 	java tools/Conformance.java
+
+# The suite again with a collection every GC_STRESS allocations: missing stack-map slots show up
+# as wrong results or a GC panic.
+GC_STRESS ?= 1
+conformance-gc: $(DUKEC) $(BUILD)/limine/BOOTX64.EFI
+	java tools/Conformance.java --gc-stress $(GC_STRESS)
 
 panic-tests: $(DUKEC) $(BUILD)/limine/BOOTX64.EFI
 	java tools/PanicTests.java

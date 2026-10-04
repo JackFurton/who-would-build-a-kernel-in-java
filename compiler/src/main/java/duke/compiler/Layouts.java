@@ -28,13 +28,14 @@ public final class Layouts {
     public static final int TIB_NAME = 32;
     public static final int TIB_INTERFACES = 40;
     public static final int TIB_ITABLE = 48;
-    public static final int TIB_VTABLE = 56;
+    public static final int TIB_REFERENCE_FIELDS = 56;
+    public static final int TIB_VTABLE = 64;
 
     public static final int TIB_FLAG_ARRAY = 1;
     public static final int TIB_FLAG_INTERFACE = 2;
     public static final int TIB_FLAG_REFERENCE_ARRAY = 4;
 
-    public record ClassLayout(int size, Map<String, Integer> fieldOffsets) {
+    public record ClassLayout(int size, Map<String, Integer> fieldOffsets, List<Integer> referenceOffsets) {
 
         public int offsetOf(String field) {
             Integer offset = fieldOffsets.get(field);
@@ -64,10 +65,12 @@ public final class Layouts {
         ClassModel model = pool.get(className);
         String superName = pool.superName(model);
         Map<String, Integer> offsets = new LinkedHashMap<>();
+        List<Integer> references = new ArrayList<>();
         int size = HEADER_SIZE;
         if (superName != null) {
             ClassLayout sup = of(superName);
             offsets.putAll(sup.fieldOffsets());
+            references.addAll(sup.referenceOffsets());
             size = sup.size();
         }
         List<FieldModel> fields = new ArrayList<>();
@@ -81,9 +84,13 @@ public final class Layouts {
             int w = width(f.fieldType().stringValue());
             size = (size + w - 1) & -w;
             offsets.put(f.fieldName().stringValue(), size);
+            char kind = f.fieldType().stringValue().charAt(0);
+            if (kind == 'L' || kind == '[') {
+                references.add(size);
+            }
             size += w;
         }
-        ClassLayout layout = new ClassLayout((size + 7) & -8, offsets);
+        ClassLayout layout = new ClassLayout((size + 7) & -8, offsets, List.copyOf(references));
         cache.put(className, layout);
         return layout;
     }

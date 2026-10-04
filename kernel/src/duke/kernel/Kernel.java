@@ -50,6 +50,11 @@ public final class Kernel {
                 + " table frames, NX " + (KernelAddressSpace.noExecuteSupported() ? "on" : "unavailable"));
         Console.println("heap: growing on demand at 0x" + Long.toHexString(KernelHeap.BASE) + ", "
                 + (Heap.used() >> 10) + " KiB used, " + (Heap.committed() >> 10) + " KiB committed");
+        for (int i = 0; i < 512; i++) {
+            byte[] garbage = new byte[1 << 20];
+        }
+        Console.println("gc: allocated 512 MiB in a 188 MiB machine; " + Heap.collections() + " collections, heap "
+                + (Heap.committed() >> 20) + " MiB committed");
         Console.println("DUKE-BOOT-OK");
     }
 
