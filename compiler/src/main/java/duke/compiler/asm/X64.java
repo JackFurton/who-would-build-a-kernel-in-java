@@ -293,6 +293,20 @@ public final class X64 {
         out.emit8(0x90);
     }
 
+    public void std() {
+        out.emit8(0xFD);
+    }
+
+    public void cld() {
+        out.emit8(0xFC);
+    }
+
+    /** Copies rcx bytes from [rsi] to [rdi], in the direction the DF flag says. */
+    public void repMovsb() {
+        out.emit8(0xF3);
+        out.emit8(0xA4);
+    }
+
     public void ud2() {
         out.emit8(0x0F);
         out.emit8(0x0B);

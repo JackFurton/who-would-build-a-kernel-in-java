@@ -227,7 +227,14 @@ final class MethodCompiler {
                 a.lea(RAX, Mem.rip(program.requireString(s)));
                 a.push(RAX);
             }
-            default -> throw error("unsupported constant " + c.constantValue() + " (floating point and class literals are not supported yet)");
+            case ClassDesc type when !type.isPrimitive() -> {
+                // A TIB is its type's Class object.
+                String name = type.isArray() ? type.descriptorString() : type.descriptorString()
+                        .substring(1, type.descriptorString().length() - 1);
+                a.lea(RAX, Mem.rip(program.requireTib(name)));
+                a.push(RAX);
+            }
+            default -> throw error("unsupported constant " + c.constantValue() + " (floating point is not supported yet)");
         }
     }
 
@@ -721,6 +728,7 @@ final class MethodCompiler {
             case "pokeShort" -> poke(2);
             case "pokeInt" -> poke(4);
             case "pokeLong" -> poke(8);
+            case "copyMemory" -> copyMemory();
             case "addressOf" -> {
                 a.pop(RAX);
                 pushLong(RAX);
@@ -743,6 +751,26 @@ final class MethodCompiler {
             case "pause" -> a.pause();
             default -> throw error("unknown intrinsic " + MAGIC + "." + name);
         }
+    }
+
+    /** rep movsb, run backwards when the destination overlaps the end of the source. */
+    private void copyMemory() {
+        popLong(RCX);
+        popLong(RSI);
+        popLong(Reg.RDI);
+        X64.Label forward = new X64.Label();
+        X64.Label done = new X64.Label();
+        a.alu(Alu.CMP, true, Reg.RDI, RSI);
+        a.jcc(Cond.BE, forward);
+        a.lea(RSI, Mem.at(RSI, RCX, 1, -1));
+        a.lea(Reg.RDI, Mem.at(Reg.RDI, RCX, 1, -1));
+        a.std();
+        a.repMovsb();
+        a.cld();
+        a.jmp(done);
+        a.bind(forward);
+        a.repMovsb();
+        a.bind(done);
     }
 
     private void portOut(int width) {

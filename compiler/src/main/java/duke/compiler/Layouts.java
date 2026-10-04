@@ -20,15 +20,15 @@ public final class Layouts {
     public static final int ARRAY_LENGTH_OFFSET = 8;
     public static final int ARRAY_DATA_OFFSET = 16;
 
-    /** Type information block fields; Compiler.emitTibs documents each. */
-    public static final int TIB_SUPER = 0;
-    public static final int TIB_SIZE = 8;
-    public static final int TIB_FLAGS = 12;
-    public static final int TIB_ELEMENT = 16;
-    public static final int TIB_NAME = 24;
-    public static final int TIB_INTERFACES = 32;
-    public static final int TIB_ITABLE = 40;
-    public static final int TIB_VTABLE = 48;
+    /** Type information block fields; Compiler.emitTibs documents each. Mirrored in duke.rt.Tib. */
+    public static final int TIB_SUPER = 8;
+    public static final int TIB_SIZE = 16;
+    public static final int TIB_FLAGS = 20;
+    public static final int TIB_ELEMENT = 24;
+    public static final int TIB_NAME = 32;
+    public static final int TIB_INTERFACES = 40;
+    public static final int TIB_ITABLE = 48;
+    public static final int TIB_VTABLE = 56;
 
     public static final int TIB_FLAG_ARRAY = 1;
     public static final int TIB_FLAG_INTERFACE = 2;

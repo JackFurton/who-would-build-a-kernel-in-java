@@ -33,6 +33,7 @@ public final class Compiler {
     public static final long KERNEL_BASE = 0xffff_ffff_8000_0000L;
 
     static final String STRING_CLASS = "java/lang/String";
+    static final String CLASS_CLASS = "java/lang/Class";
     static final String BYTE_ARRAY = "[B";
 
     static final String HEAP_ARENA = "heap.arena";
@@ -71,7 +72,8 @@ public final class Compiler {
         if (!main.is(AccessFlag.STATIC)) {
             throw new CompileException("entry point " + entryClass + "." + entryMethod + " must be static");
         }
-        // Every TIB carries its name as a String, so String and its byte[] are always in the image.
+        // Every TIB is a Class object carrying its name as a String, so these are always in the image.
+        requireClass(CLASS_CLASS);
         requireClass(STRING_CLASS);
         tibs.add(BYTE_ARRAY);
         requireClass(entryClass);
@@ -370,16 +372,18 @@ public final class Compiler {
     }
 
     /**
-     * TIB layout (offsets in Layouts):
+     * TIB layout (offsets in Layouts). A TIB is also the type's java.lang.Class instance: word 0 is
+     * an ordinary object header. They live in .rodata, so Class can never have instance fields.
      * <pre>
-     * [0]  super TIB, or 0 for Object; Object for arrays
-     * [8]  instance size, or element size for arrays (u32)
-     * [12] flags: array, interface, reference array (u32)
-     * [16] element TIB for reference arrays, else 0
-     * [24] name, a String
-     * [32] 0-terminated list of every interface the type implements, or 0 if none
-     * [40] itable: one code pointer per interface selector, or 0 for classes without interfaces
-     * [48] vtable: one code pointer per Vtables slot, 0 where nothing dispatches to it
+     * [0]  object header: the TIB of java.lang.Class
+     * [8]  super TIB, or 0 for Object; Object for arrays
+     * [16] instance size, or element size for arrays (u32)
+     * [20] flags: array, interface, reference array (u32)
+     * [24] element TIB for reference arrays, else 0
+     * [32] name, a String
+     * [40] 0-terminated list of every interface the type implements, or 0 if none
+     * [48] itable: one code pointer per interface selector, or 0 for classes without interfaces
+     * [56] vtable: one code pointer per Vtables slot, 0 where nothing dispatches to it
      * </pre>
      */
     private void emitTibs() {
@@ -410,6 +414,7 @@ public final class Compiler {
 
             rodata.align(8);
             int start = rodata.size();
+            emitPointer(rodata, tibSymbol(CLASS_CLASS));
             emitPointer(rodata, superName == null ? null : tibSymbol(superName));
             rodata.emit32(array ? Layouts.width(type.substring(1)) : layouts.of(type).size());
             rodata.emit32(flags);

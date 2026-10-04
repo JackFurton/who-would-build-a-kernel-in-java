@@ -17,7 +17,8 @@ import java.util.regex.Pattern;
 /**
  * Differential test of the compiler: runs every test method in tests/conformance on the host JVM,
  * then compiles the same classes into a kernel, boots it in QEMU and checks it prints identical
- * results. A test is any non-private static method with no parameters and a non-void result.
+ * results. A test is any non-private static method with no parameters returning a primitive or a
+ * single-line String.
  *
  * <p>Run from the repository root with {@code make conformance}.
  */
@@ -35,7 +36,7 @@ public class Conformance {
         Path hostClasses = OUT.resolve("host");
         Harness.javac(List.of("-d", hostClasses.toString()), testSources);
         Map<String, Method> tests = new LinkedHashMap<>();
-        Map<String, Long> expected = new LinkedHashMap<>();
+        Map<String, String> expected = new LinkedHashMap<>();
         try (URLClassLoader loader = new URLClassLoader(new URL[] {hostClasses.toUri().toURL()})) {
             for (Path source : testSources) {
                 String simpleName = source.getFileName().toString().replace(".java", "");
@@ -66,14 +67,14 @@ public class Conformance {
         int boot = Harness.runStatus(OUT.resolve("boot.txt"), "tools/boot-test.sh", esp.toString(),
                 serial.toString(), DONE, "300");
 
-        Map<String, Long> actual = parse(serial);
+        Map<String, String> actual = parse(serial);
         List<String> failures = new ArrayList<>();
-        for (Map.Entry<String, Long> e : expected.entrySet()) {
-            Long got = actual.get(e.getKey());
+        for (Map.Entry<String, String> e : expected.entrySet()) {
+            String got = actual.get(e.getKey());
             if (got == null) {
                 failures.add(e.getKey() + ": no result (kernel stopped before reaching it)");
             } else if (!got.equals(e.getValue())) {
-                failures.add(e.getKey() + ": expected " + e.getValue() + ", got " + got);
+                failures.add(e.getKey() + ": expected \"" + e.getValue() + "\", got \"" + got + "\"");
             }
         }
 
@@ -88,11 +89,18 @@ public class Conformance {
         System.exit(failures.isEmpty() && boot == 0 ? 0 : 1);
     }
 
-    static long normalize(Object value) {
+    static String normalize(Object value) {
         return switch (value) {
-            case Boolean b -> b ? 1 : 0;
-            case Character c -> c;
-            case Number n -> n.longValue();
+            case null -> "null";
+            case Boolean b -> b ? "1" : "0";
+            case Character c -> Long.toString(c);
+            case Number n -> Long.toString(n.longValue());
+            case String s -> {
+                if (s.contains("\n")) {
+                    throw new IllegalArgumentException("string results must be single-line: " + s);
+                }
+                yield s;
+            }
             default -> throw new IllegalArgumentException("unsupported test result type " + value.getClass());
         };
     }
@@ -104,7 +112,15 @@ public class Conformance {
         src.append("final class Main {\n    static void main() {\n        Serial.init();\n");
         for (Map.Entry<String, Method> e : tests.entrySet()) {
             String call = e.getKey() + "()";
-            String value = e.getValue().getReturnType() == boolean.class ? "(" + call + " ? 1L : 0L)" : "(long) " + call;
+            Class<?> type = e.getValue().getReturnType();
+            String value;
+            if (type == boolean.class) {
+                value = "(" + call + " ? 1L : 0L)";
+            } else if (type == String.class) {
+                value = "String.valueOf((Object) " + call + ")";
+            } else {
+                value = "(long) " + call;
+            }
             src.append("        Console.print(\"").append(e.getKey()).append("=\");\n");
             src.append("        Console.print(").append(value).append(");\n");
             src.append("        Console.println(\"\");\n");
@@ -115,13 +131,13 @@ public class Conformance {
         Files.writeString(file, src);
     }
 
-    static Map<String, Long> parse(Path serial) throws IOException {
-        Map<String, Long> results = new LinkedHashMap<>();
-        Pattern line = Pattern.compile("([A-Za-z0-9_]+\\.[A-Za-z0-9_]+)=(-?\\d+)");
+    static Map<String, String> parse(Path serial) throws IOException {
+        Map<String, String> results = new LinkedHashMap<>();
+        Pattern line = Pattern.compile("([A-Za-z0-9_]+\\.[A-Za-z0-9_]+)=(.*)");
         for (String l : Harness.readSerial(serial).split("\n")) {
-            Matcher m = line.matcher(l.strip());
+            Matcher m = line.matcher(l);
             if (m.matches()) {
-                results.put(m.group(1), Long.parseLong(m.group(2)));
+                results.put(m.group(1), m.group(2));
             }
         }
         return results;
