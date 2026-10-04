@@ -1,29 +1,34 @@
 package duke.kernel;
 
+/** Kernel text output: the serial port always, the framebuffer once it's up. */
 public final class Console {
 
     private Console() {
     }
 
+    public static void write(int c) {
+        if (c == '\n') {
+            Serial.write('\r');
+        }
+        Serial.write(c);
+        FramebufferConsole.write(c);
+    }
+
     public static void print(String s) {
         for (int i = 0; i < s.length(); i++) {
-            char c = s.charAt(i);
-            if (c == '\n') {
-                Serial.write('\r');
-            }
-            Serial.write(c);
+            write(s.charAt(i));
         }
     }
 
     public static void println(String s) {
         print(s);
-        print("\n");
+        write('\n');
     }
 
     public static void print(long value) {
         // Work in negatives: Long.MIN_VALUE has no positive counterpart.
         if (value < 0) {
-            Serial.write('-');
+            write('-');
         } else {
             value = -value;
         }
@@ -32,7 +37,7 @@ public final class Console {
             divisor *= 10;
         }
         while (divisor > 0) {
-            Serial.write('0' - (int) (value / divisor));
+            write('0' - (int) (value / divisor));
             value %= divisor;
             divisor /= 10;
         }

@@ -42,7 +42,7 @@ public final class Shell {
                 }
             } else if (c >= ' ' && c < 0x7F) {
                 line.append((char) c);
-                Serial.write(c);
+                Console.write(c);
             }
         }
     }
@@ -53,7 +53,8 @@ public final class Shell {
             return;
         }
         switch (words.get(0)) {
-            case "help" -> Console.println("commands: help, uptime, mem, gc, cpus, echo <text>, panic");
+            case "help" -> Console.println("commands: help, uptime, mem, gc, cpus, echo <text>, clear, panic");
+            case "clear" -> FramebufferConsole.clear();
             case "uptime" -> Console.println("up " + Timer.uptimeMillis() + " ms (" + Timer.ticks() + " ticks)");
             case "mem" -> Console.println("frames: " + PhysicalMemory.freeFrames() + " free ("
                     + (PhysicalMemory.freeFrames() * PhysicalMemory.PAGE_SIZE >> 20) + " MiB); heap: "

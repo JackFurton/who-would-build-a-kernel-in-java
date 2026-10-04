@@ -103,6 +103,14 @@ Java handler that counts ticks and sends EOI. `Kernel.init()` ends by enabling i
 suite runs with the tick live. The GC-stress conformance run takes about 6,000 timer interrupts at
 arbitrary instructions, in the middle of about 53,000 collections.
 
+## Framebuffer console
+
+`Console` writes every character to the serial port and, once `FramebufferConsole` is up, to
+Limine's framebuffer as 8x16 glyphs (1280x800 gives 160x50 text under QEMU), scrolling by moving
+pixels up a row. The font is Spleen 8x16 (BSD-2-Clause, license in the file header), converted from
+its BDF by `tools/GenerateFont.java` into a string literal, so the glyphs are image data.
+`make shell-test` takes a QEMU screendump and checks rendered text pixel for pixel against the font.
+
 ## Input and the shell
 
 `IoApic` routes ISA IRQs to the boot CPU, applying the MADT's polarity and trigger overrides. The

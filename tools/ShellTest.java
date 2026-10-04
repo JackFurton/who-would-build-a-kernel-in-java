@@ -7,6 +7,7 @@ import java.nio.channels.SocketChannel;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -52,14 +53,81 @@ public class ShellTest {
             failures += check("ps/2 keyboard", () -> keys(monitor, "u p t i m e ret"), "up ");
             failures += check("ps/2 shift", () -> keys(monitor, "e c h o spc shift-d u k e shift-1 ret"), "Duke!");
             failures += check("mem", () -> type(serial, "mem\n"), "frames: ");
+            failures += framebuffer(serial, monitor);
             failures += check("panic", () -> type(serial, "panic\n"), "PANIC: requested from the shell");
         } finally {
             qemu.destroy();
             qemu.waitFor(10, TimeUnit.SECONDS);
             Files.writeString(OUT.resolve("serial.log"), output.toString());
         }
-        System.out.println("shell-test: " + (7 - failures) + "/7 passed");
+        System.out.println("shell-test: " + (8 - failures) + "/8 passed");
         System.exit(failures == 0 ? 0 : 1);
+    }
+
+    /**
+     * Clears the screen, echoes XYZ (which lands on text row 1, under the prompt) and checks the
+     * screendump pixel for pixel against the kernel's own font. The dump stays in build/shell-test.
+     */
+    static int framebuffer(OutputStream serial, Path monitor) throws Exception {
+        int from = output.length();
+        type(serial, "clear\necho XYZ\n");
+        if (!await("XYZ", from) || !await("duke> ", output.length() - 8)) {
+            System.out.println("FAIL framebuffer: echo never came back");
+            return 1;
+        }
+        Path ppm = OUT.resolve("screen.ppm");
+        command(monitor, "screendump " + ppm);
+        for (int i = 0; i < 100 && (!Files.exists(ppm) || Files.size(ppm) == 0); i++) {
+            Thread.sleep(50);
+        }
+        Thread.sleep(200);
+        byte[] image = Files.readAllBytes(ppm);
+        // P6 header: magic, width, height, max value, each followed by whitespace.
+        String[] header = new String(image, 0, 32, StandardCharsets.US_ASCII).split("\\s+");
+        int width = Integer.parseInt(header[1]);
+        int headerLength = String.join("\n", header[0], header[1] + " " + header[2], header[3]).length() + 1;
+        String glyphs = font();
+        int mismatches = 0;
+        for (int i = 0; i < 3; i++) {
+            int c = "XYZ".charAt(i);
+            for (int y = 0; y < 16; y++) {
+                int bits = glyphs.charAt(c * 16 + y);
+                for (int x = 0; x < 8; x++) {
+                    int px = i * 8 + x;
+                    int py = 16 + y;
+                    int red = image[headerLength + 3 * (py * width + px)] & 0xFF;
+                    boolean lit = red > 0x80;
+                    if (lit != ((bits & (0x80 >> x)) != 0)) {
+                        mismatches++;
+                    }
+                }
+            }
+        }
+        if (mismatches == 0) {
+            System.out.println("ok   framebuffer");
+            return 0;
+        }
+        System.out.println("FAIL framebuffer: " + mismatches + " of 384 pixels differ from the font (see " + ppm + ")");
+        return 1;
+    }
+
+    /** The glyph table from the kernel's own Font class, compiled for the host. */
+    static String font() throws Exception {
+        Path classes = OUT.resolve("font");
+        Harness.javac(List.of("-d", classes.toString()), List.of(Harness.KERNEL_SOURCES.resolve("duke/kernel/Font.java")));
+        try (var loader = new java.net.URLClassLoader(new java.net.URL[] {classes.toUri().toURL()})) {
+            var field = loader.loadClass("duke.kernel.Font").getDeclaredField("GLYPHS");
+            field.setAccessible(true);
+            return (String) field.get(null);
+        }
+    }
+
+    static void command(Path monitor, String line) throws Exception {
+        try (SocketChannel channel = SocketChannel.open(StandardProtocolFamily.UNIX)) {
+            channel.connect(UnixDomainSocketAddress.of(monitor));
+            channel.write(ByteBuffer.wrap((line + "\n").getBytes(StandardCharsets.US_ASCII)));
+            Thread.sleep(300);
+        }
     }
 
     interface Action {
