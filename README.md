@@ -10,15 +10,29 @@ machine code and a bootable ELF. Limine boots it. No C, no assembler, no linker.
 kernel/src/**/*.java ──javac --system none──▶ .class ──dukec──▶ kernel.elf ──Limine (UEFI)──▶ QEMU / hardware
 ```
 
-Right now it boots, talks over the serial port, and agrees with HotSpot on every test in the
-conformance suite. Objects, interrupts, memory management and the rest are on the
-[roadmap](https://github.com/JackFurton/who-would-build-a-kernel-in-java/milestones).
+Right now it boots, handles interrupts and exceptions in Java, and agrees with HotSpot on every
+test in the conformance suite: objects, virtual and interface dispatch, lambdas, boxing, string
+concatenation, try/catch/finally, stack overflow. Memory management, devices and threads are next on
+the [roadmap](https://github.com/JackFurton/who-would-build-a-kernel-in-java/milestones).
 
 ```
 Duke: hello from Java on bare metal
 bytecode arithmetic check: 6 * 7 = 42
+interrupts: IDT loaded, 2 breakpoints handled and resumed
+exceptions: caught java.lang.NumberFormatException: For input string: "forty-two"
 DUKE-BOOT-OK
 ```
+
+## Progress
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/JackFurton/who-would-build-a-kernel-in-java/metrics/progress-dark.svg">
+  <img alt="Tests in the suites, boot kernel code size and lines of Java over time" src="https://raw.githubusercontent.com/JackFurton/who-would-build-a-kernel-in-java/metrics/progress-light.svg">
+</picture>
+
+CI appends a row for every commit to main. The data is
+[metrics.csv](https://github.com/JackFurton/who-would-build-a-kernel-in-java/blob/metrics/metrics.csv)
+on the `metrics` branch.
 
 ## How it works
 
@@ -57,7 +71,8 @@ The first build downloads a pinned Limine release into `build/limine`.
 | `compiler/` | `dukec`: class loading, code generation (`MethodCompiler`), x86-64 encoder (`asm/`), ELF writer (`image/`) |
 | `kernel/src/` | The kernel's `java.base`: `java.lang`, `duke.rt` (runtime and intrinsics), `duke.kernel` |
 | `tests/conformance/` | Differential tests, run on HotSpot and in the kernel |
-| `tools/` | ESP layout, QEMU launch, boot test, conformance harness |
+| `tests/panics/` | Kernels that must die with a specific panic and backtrace |
+| `tools/` | ESP layout, QEMU launch, test harnesses, metrics and the progress chart |
 | `boot/` | Limine config |
 
 ## Contributing
