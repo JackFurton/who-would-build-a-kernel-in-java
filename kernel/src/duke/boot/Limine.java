@@ -41,6 +41,54 @@ public final class Limine {
     private Limine() {
     }
 
+    // Copies of the responses: Limine keeps them in bootloader-reclaimable memory, which the
+    // kernel frees once it runs on its own page tables and GDT (PhysicalMemory.reclaimBootloaderMemory).
+    private static boolean snapshotted;
+    private static long hhdmOffset;
+    private static long[] memmapBase;
+    private static long[] memmapLength;
+    private static int[] memmapType;
+    private static long kernelPhysicalBase;
+    private static long kernelVirtualBase;
+    private static long framebufferAddress;
+    private static long framebufferWidth;
+    private static long framebufferHeight;
+    private static long framebufferPitch;
+    private static int framebufferBitsPerPixel;
+    private static long rsdp;
+
+    /** Copies every response into the kernel's own memory. Must run before reclaiming. */
+    public static void snapshot() {
+        if (snapshotted) {
+            return;
+        }
+        hhdmOffset = Magic.peekLong(response(HHDM) + 8);
+        int count = (int) Magic.peekLong(response(MEMMAP) + 8);
+        memmapBase = new long[count];
+        memmapLength = new long[count];
+        memmapType = new int[count];
+        long entries = Magic.peekLong(response(MEMMAP) + 16);
+        for (int i = 0; i < count; i++) {
+            long entry = Magic.peekLong(entries + 8L * i);
+            memmapBase[i] = Magic.peekLong(entry);
+            memmapLength[i] = Magic.peekLong(entry + 8);
+            memmapType[i] = (int) Magic.peekLong(entry + 16);
+        }
+        kernelPhysicalBase = Magic.peekLong(response(EXECUTABLE_ADDRESS) + 8);
+        kernelVirtualBase = Magic.peekLong(response(EXECUTABLE_ADDRESS) + 16);
+        long fb = firstFramebuffer();
+        if (fb != 0) {
+            framebufferAddress = Magic.peekLong(fb);
+            framebufferWidth = Magic.peekLong(fb + 8);
+            framebufferHeight = Magic.peekLong(fb + 16);
+            framebufferPitch = Magic.peekLong(fb + 24);
+            framebufferBitsPerPixel = Magic.peekShort(fb + 32) & 0xFFFF;
+        }
+        long rsdpResponse = RSDP[RESPONSE];
+        rsdp = rsdpResponse == 0 ? 0 : Magic.peekLong(rsdpResponse + 8);
+        snapshotted = true;
+    }
+
     public static boolean baseRevisionSupported() {
         return BASE_REVISION[2] == 0;
     }
@@ -52,23 +100,28 @@ public final class Limine {
 
     /** Virtual address of physical address 0 in the higher-half direct map. */
     public static long hhdmOffset() {
-        return Magic.peekLong(response(HHDM) + 8);
+        snapshot();
+        return hhdmOffset;
     }
 
     public static int memoryMapSize() {
-        return (int) Magic.peekLong(response(MEMMAP) + 8);
+        snapshot();
+        return memmapBase.length;
     }
 
     public static long memoryMapBase(int index) {
-        return Magic.peekLong(memoryMapEntry(index));
+        snapshot();
+        return memmapBase[index];
     }
 
     public static long memoryMapLength(int index) {
-        return Magic.peekLong(memoryMapEntry(index) + 8);
+        snapshot();
+        return memmapLength[index];
     }
 
     public static int memoryMapType(int index) {
-        return (int) Magic.peekLong(memoryMapEntry(index) + 16);
+        snapshot();
+        return memmapType[index];
     }
 
     public static String memoryMapTypeName(int type) {
@@ -76,39 +129,45 @@ public final class Limine {
     }
 
     public static long kernelPhysicalBase() {
-        return Magic.peekLong(response(EXECUTABLE_ADDRESS) + 8);
+        snapshot();
+        return kernelPhysicalBase;
     }
 
     public static long kernelVirtualBase() {
-        return Magic.peekLong(response(EXECUTABLE_ADDRESS) + 16);
+        snapshot();
+        return kernelVirtualBase;
     }
 
     /** The first framebuffer's address, or 0 without one (QEMU's -display none still has one). */
     public static long framebufferAddress() {
-        long fb = firstFramebuffer();
-        return fb == 0 ? 0 : Magic.peekLong(fb);
+        snapshot();
+        return framebufferAddress;
     }
 
     public static long framebufferWidth() {
-        return Magic.peekLong(firstFramebuffer() + 8);
+        snapshot();
+        return framebufferWidth;
     }
 
     public static long framebufferHeight() {
-        return Magic.peekLong(firstFramebuffer() + 16);
+        snapshot();
+        return framebufferHeight;
     }
 
     public static long framebufferPitch() {
-        return Magic.peekLong(firstFramebuffer() + 24);
+        snapshot();
+        return framebufferPitch;
     }
 
     public static int framebufferBitsPerPixel() {
-        return Magic.peekShort(firstFramebuffer() + 32) & 0xFFFF;
+        snapshot();
+        return framebufferBitsPerPixel;
     }
 
     /** RSDP address as Limine reports it, or 0 without ACPI. */
     public static long rsdp() {
-        long response = RSDP[RESPONSE];
-        return response == 0 ? 0 : Magic.peekLong(response + 8);
+        snapshot();
+        return rsdp;
     }
 
     private static long firstFramebuffer() {
@@ -117,10 +176,6 @@ public final class Limine {
             return 0;
         }
         return Magic.peekLong(Magic.peekLong(response + 16));
-    }
-
-    private static long memoryMapEntry(int index) {
-        return Magic.peekLong(Magic.peekLong(response(MEMMAP) + 16) + 8L * index);
     }
 
     private static long response(long[] request) {

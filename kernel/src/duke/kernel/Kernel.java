@@ -20,15 +20,20 @@ public final class Kernel {
     /** Brings up the core subsystems. Shared with the ktest runner, so tests see a real kernel. */
     public static void init() {
         Serial.init();
-        Gdt.ensureLoaded();
-        Idt.load();
         if (!Limine.baseRevisionSupported()) {
             Panic.panic("Limine doesn't support base revision 6");
         }
+        Limine.snapshot();
+        Gdt.ensureLoaded();
+        Idt.load();
         PhysicalMemory.init();
         KernelAddressSpace.activate();
         KernelHeap.init();
+        // Last: until here the CPU could still be reading Limine's page tables or GDT.
+        reclaimed = PhysicalMemory.reclaimBootloaderMemory();
     }
+
+    private static long reclaimed;
 
     /** The entry point: the compiler's _start stub calls this. */
     public static void main() {
@@ -46,7 +51,8 @@ public final class Kernel {
         }
         printMemoryMap();
         Console.println("frames: " + PhysicalMemory.freeFrames() + " free ("
-                + (PhysicalMemory.freeFrames() * PhysicalMemory.PAGE_SIZE >> 20) + " MiB)");
+                + (PhysicalMemory.freeFrames() * PhysicalMemory.PAGE_SIZE >> 20) + " MiB), including "
+                + (reclaimed >> 20) + " MiB reclaimed from the bootloader");
         Console.println("paging: running on our own page tables, PML4 at physical 0x"
                 + Long.toHexString(KernelAddressSpace.table().root()) + ", " + KernelAddressSpace.table().tableFrames()
                 + " table frames, NX " + (KernelAddressSpace.noExecuteSupported() ? "on" : "unavailable"));

@@ -48,7 +48,11 @@ CR3. The kernel image is mapped from the compiler's section boundaries (`Magic.i
 text read-only and executable, rodata read-only, data and bss writable, and both NX when the CPU
 has it. The direct map covers every region type Limine maps, with 2 MiB pages where alignment
 allows, and uncached for the framebuffer. The virtual layout is unchanged, so execution simply
-continues. Bootloader-reclaimable memory is still reserved (#55).
+continues.
+
+Last in `Kernel.init()`, the bootloader-reclaimable regions (Limine's page tables, GDT, stack
+and responses) go to the frame allocator: 45 MiB under QEMU's 256M. `Limine.snapshot()` copies
+every response into Java objects first, and every `Limine` accessor reads the copies.
 
 `KernelHeap.init()` then moves Java allocation off the 4 MiB early arena in `.bss` into a 512 GiB
 virtual region of its own. `Heap` stays a bump allocator, but when it runs off the committed end
