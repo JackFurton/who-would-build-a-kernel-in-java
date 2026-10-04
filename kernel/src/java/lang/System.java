@@ -85,6 +85,10 @@ public final class System {
         return name.substring(0, name.length() - 1) + length + "]";
     }
 
+    public static void gc() {
+        Heap.collect();
+    }
+
     public static int identityHashCode(Object object) {
         return object == null ? 0 : Heap.identityHash(object);
     }

@@ -29,7 +29,13 @@ public class Conformance {
     static final String PACKAGE = "duke.conformance";
     static final String DONE = "DUKE-CONFORMANCE-DONE";
 
+    /** {@code --gc-stress N} collects every N allocations while the suite runs. */
+    static int gcStress;
+
     public static void main(String[] args) throws Exception {
+        if (args.length == 2 && args[0].equals("--gc-stress")) {
+            gcStress = Integer.parseInt(args[1]);
+        }
         Harness.deleteRecursively(OUT);
         List<Path> testSources = Harness.javaFiles(TESTS);
 
@@ -83,7 +89,8 @@ public class Conformance {
         if (boot != 0) {
             System.out.println(Files.readString(OUT.resolve("boot.txt")));
         }
-        String summary = "conformance: " + passed + "/" + expected.size() + " passed";
+        String summary = "conformance" + (gcStress > 0 ? " (GC every " + gcStress + " allocations)" : "") + ": "
+                + passed + "/" + expected.size() + " passed";
         System.out.println(summary);
         writeStepSummary(summary, failures);
         System.exit(failures.isEmpty() && boot == 0 ? 0 : 1);
@@ -111,6 +118,9 @@ public class Conformance {
         src.append("import duke.kernel.Console;\nimport duke.kernel.Kernel;\n\n");
         // Full bring-up, so the suite runs on the real memory system (paging, growable heap).
         src.append("final class Main {\n    static void main() {\n        Kernel.init();\n");
+        if (gcStress > 0) {
+            src.append("        duke.rt.Heap.stress(").append(gcStress).append(");\n");
+        }
         for (Map.Entry<String, Method> e : tests.entrySet()) {
             String call = e.getKey() + "()";
             Class<?> type = e.getValue().getReturnType();
@@ -126,6 +136,7 @@ public class Conformance {
             src.append("        Console.print(").append(value).append(");\n");
             src.append("        Console.println(\"\");\n");
         }
+        src.append("        Console.println(\"gc: \" + duke.rt.Heap.collections() + \" collections\");\n");
         src.append("        Console.println(\"").append(DONE).append("\");\n    }\n}\n");
         Path file = gen.resolve(PACKAGE.replace('.', '/')).resolve("Main.java");
         Files.createDirectories(file.getParent());

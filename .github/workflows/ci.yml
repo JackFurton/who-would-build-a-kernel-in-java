@@ -40,6 +40,9 @@ jobs:
       - name: Conformance (HotSpot vs Duke)
         run: make conformance
 
+      - name: Conformance with a GC at every allocation
+        run: make conformance-gc
+
       - name: Panic tests (runtime checks fail loudly)
         run: make panic-tests
 

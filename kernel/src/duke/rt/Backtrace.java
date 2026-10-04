@@ -9,7 +9,8 @@ import duke.kernel.Console;
  */
 public final class Backtrace {
 
-    static final int ENTRY_SIZE = 56;
+    static final int ENTRY_SIZE = 64;
+    static final int ENTRY_GC_MAP = 56;
     static final int ENTRY_EXCEPTIONS = 40;
     static final int ENTRY_FLAGS = 48;
     static final int HIDDEN = 1;

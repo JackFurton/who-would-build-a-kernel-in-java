@@ -13,6 +13,7 @@ public final class Tib {
     public static final int ELEMENT = 24;
     public static final int NAME = 32;
     public static final int INTERFACES = 40;
+    public static final int REFERENCE_FIELDS = 56;
 
     public static final int FLAG_ARRAY = 1;
     public static final int FLAG_INTERFACE = 2;

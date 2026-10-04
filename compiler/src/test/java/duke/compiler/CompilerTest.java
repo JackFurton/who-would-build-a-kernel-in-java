@@ -140,6 +140,33 @@ class CompilerTest {
     }
 
     @Test
+    void stackMapsListExactlyTheLiveReferenceSlots() throws IOException {
+        Path classes = compile("""
+                package duke.test;
+                public final class Entry {
+                    static int g(int x) { return x; }
+                    static int f(Object a, long b, Object c) {
+                        Object d = a;
+                        int unused = 3;
+                        return g(unused);
+                    }
+                    public static void main() {
+                        f(null, 0, null);
+                    }
+                }
+                """);
+        Compiler compiler = new Compiler(ClassPool.load(classes));
+        compiler.compile("duke/test/Entry", "main");
+        List<Compiler.Safepoint> sites = compiler.safepoints("duke/test/Entry.f(Ljava/lang/Object;JLjava/lang/Object;)I");
+        // Args a (slot 0), b (1-2), c (3) sit above rbp, last argument lowest: a at +16+8*3, c at +16.
+        // Locals d (4) and unused (5) sit below it: d at -8. The int arguments to g aren't references.
+        Compiler.Safepoint call = sites.get(sites.size() - 1);
+        assertEquals(List.of(40, 16, -8), call.refSlots());
+        Compiler.Safepoint prologue = sites.get(0);
+        assertEquals(List.of(40, 16), prologue.refSlots(), "before any local is assigned only arguments are live");
+    }
+
+    @Test
     void nonLatin1StringLiteralIsRejected() throws IOException {
         Path classes = compile("""
                 package duke.test;
