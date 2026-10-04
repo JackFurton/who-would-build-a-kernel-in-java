@@ -1,0 +1,52 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '25'
+
+      - uses: gradle/actions/setup-gradle@v6
+
+      - name: Install QEMU and OVMF
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends qemu-system-x86 ovmf
+
+      - name: Compiler unit tests
+        run: make unit-test
+
+      - name: Boot test
+        run: make boot-test
+
+      - name: Conformance (HotSpot vs Duke)
+        run: make conformance
+
+      - name: Upload kernel and logs
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: kernel-${{ github.sha }}
+          path: |
+            build/kernel.elf
+            build/kernel.map
+            build/serial.log
+            build/conformance/serial.log
+            build/conformance/boot.txt
+            compiler/build/reports/tests/
+          if-no-files-found: ignore

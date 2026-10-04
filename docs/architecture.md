@@ -1,0 +1,104 @@
+# Architecture
+
+## Boot
+
+1. UEFI firmware runs Limine from `EFI/BOOT/BOOTX64.EFI`. Limine reads `boot/limine/limine.conf`.
+2. Limine loads `kernel.elf`. Its segments sit in the higher half at `0xffffffff80000000`.
+   Limine finds the requests block (start marker, base revision 6 tag, end marker) in `.data`,
+   switches to long mode with paging on, and jumps to `_start`.
+3. `_start` comes from `Compiler.emitBootStub`. It switches to a 64 KiB stack in `.bss`, calls
+   every reachable `<clinit>` in order, then calls `Kernel.main()`. If `main` returns, the CPU
+   halts.
+
+Everything after step 2 is compiled Java except the dozen instructions of `_start`.
+
+At entry, interrupts are disabled and there is no IDT. Any fault triple-faults, and QEMU, run
+with `-no-reboot`, exits. SSE is disabled (Limine clears CR4 bits it doesn't need), so the
+compiler emits no SSE instructions.
+
+## Compiler pipeline
+
+```
+ClassPool ─▶ Compiler (worklist from Kernel.main) ─▶ MethodCompiler per method ─▶ X64 into Image sections ─▶ link ─▶ ElfWriter
+```
+
+- **ClassPool** holds every class in the image. The world is closed: anything missing from the
+  pool doesn't exist, which is what makes devirtualization by class hierarchy analysis sound.
+- **Compiler** drives reachability. A method is compiled only once something calls it. A class
+  becomes reachable when its statics, methods or literals are used, and that schedules its
+  `<clinit>`.
+- **MethodCompiler** is a template code generator. Each bytecode becomes a fixed instruction
+  sequence. That's slow code, but simple enough to trust while the rest of the system gets built.
+  An SSA IR with register allocation is on the roadmap.
+- **X64** encodes instructions. Each form is pinned to clang's output in `X64Test`.
+- **Image / ElfWriter** do layout and relocation (`PC32`, `ABS64`) and emit a static ELF with a
+  symbol table, so `objdump` and `gdb` show Java method names.
+
+### Execution model
+
+The machine stack is the JVM operand stack. Every JVM slot, local or stack, is one 8-byte machine
+slot. `long` takes two, exactly as in the JVM: the value sits in the lower-numbered local (the
+deeper stack slot), with a padding slot above it. This keeps `dup2`, `pop2` and the `dup_x`
+family trivially correct.
+
+Int values have undefined upper 32 bits in their slot. Any code that consumes an int as 64 bits
+(`i2l`, array indexing) extends it explicitly.
+
+### Calling convention
+
+```
+caller:  push arg0 ... push argN      ; first argument deepest
+         call Owner.name(desc)
+         add rsp, 8 * argSlots
+         push rax                      ; (twice for long results)
+
+callee frame:
+         [rbp + 16 + 8*(argSlots-1-i)]  argument / local slot i  (i < argSlots)
+         [rbp + 8]                      return address
+         [rbp]                          saved rbp
+         [rbp - 8*(j+1)]                local slot argSlots + j
+```
+
+Results come back in `rax`. All registers are caller-saved. Symbols are
+`owner.name(descriptor)`, for example `duke/kernel/Console.print(J)V`.
+
+### Objects
+
+```
+object:  [0] TIB pointer   [8...] fields (superclass first, then largest-first)
+array:   [0] TIB pointer   [8] int length   [12] padding   [16...] elements
+TIB:     [0] super TIB     [8] instance size (element size for arrays)   [12] flags (bit 0: array)
+```
+
+String literals are prebuilt objects in `.data`, Latin-1 only for now. `String`'s `value` field
+layout is part of the contract between `dukec` and `kernel/src/java/lang/String.java`.
+
+### Runtime checks
+
+Null dereferences, array bounds and division by zero are checked inline. Failures jump to
+per-method slow paths that call `duke.rt.Runtime`, which panics. There are no exceptions yet.
+
+### Intrinsics
+
+Native methods on `duke.rt.Magic` are compiled inline: port I/O (`outb`/`inb` and the wider
+forms), raw memory access (`peek*`/`poke*`), `addressOf`, `halt`, `disableInterrupts`,
+`enableInterrupts` and `pause`. A native method anywhere else is a compile error.
+
+## What compiles today
+
+Static and instance methods (non-virtual or devirtualizable), int/long/boolean/byte/char/short
+arithmetic with Java semantics, all control flow including both switch forms, static and
+instance fields, array loads and stores, string literals and `String.length`/`charAt`.
+
+Not yet, and each a clear compile error: `new`, virtual dispatch, interfaces, exceptions,
+floating point, `invokedynamic` (lambdas, string concatenation), monitors, `checkcast`/`instanceof`.
+
+## Testing
+
+- `make unit-test` runs encoder golden tests, ELF structure checks, and compiler error-message
+  tests.
+- `make boot-test` boots the real kernel and waits for `DUKE-BOOT-OK` on serial.
+- `make conformance` runs `tools/Conformance.java`, which executes every test in
+  `tests/conformance` on HotSpot, generates a kernel that runs the same tests, boots it and
+  compares the results. Add a test by adding a non-private, no-argument static method with a
+  primitive result.
