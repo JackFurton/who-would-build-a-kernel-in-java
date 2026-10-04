@@ -41,6 +41,10 @@ public final class Image {
         }
     }
 
+    public List<Symbol> symbols() {
+        return List.copyOf(symbols.values());
+    }
+
     public boolean isDefined(String name) {
         return symbols.containsKey(name);
     }

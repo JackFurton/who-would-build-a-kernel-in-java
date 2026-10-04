@@ -133,8 +133,25 @@ before `<clinit>` runs, so cycles and self-references see default values exactly
 
 ### Runtime checks
 
-Null dereferences, array bounds and division by zero are checked inline. Failures jump to
-per-method slow paths that call `duke.rt.Runtime`, which panics. There are no exceptions yet.
+Null dereferences, array bounds and division by zero are checked inline. Each check site jumps to
+its own out-of-line stub that calls `duke.rt.Runtime`, which panics. Per-site rather than
+per-method stubs cost a few bytes each, but the return address then pins down the exact site.
+There are no exceptions yet.
+
+### Backtraces
+
+The compiler emits a method table (start, size, name, source file, line table) for every function
+in `.text`, sorted by address. Line tables come from `LineNumber` entries seen during codegen,
+plus a row for each slow-path stub carrying its site's line. `duke.rt.Backtrace` walks the rbp
+chain (every method keeps a frame pointer, and `_start` zeroes rbp) and binary-searches the table.
+Panics and CPU exception reports print Java-style frames:
+
+```
+PANIC: ArithmeticException: / by zero
+  at duke.rt.Runtime.divideByZero(Runtime.java:23)
+  at duke.panics.DeepTrace.inner(DeepTrace.java:15)
+  at duke.panics.DeepTrace.middle(DeepTrace.java:19)
+```
 
 `checkcast`, `instanceof` and reference array stores decide exact TIB matches inline (plus null,
 and stores into `Object[]`) and otherwise call `duke.rt.Types`, which walks the super chain, the
@@ -168,6 +185,7 @@ kernel sources has to pass it: the Makefile, `tools/Harness.java` and `CompilerT
   `tests/conformance` on HotSpot, generates a kernel that runs the same tests, boots it and
   compares the results. Add a test by adding a non-private, no-argument static method with a
   primitive result.
-- `make panic-tests` boots one kernel per file in `tests/panics` and checks it dies with the
-  panic line named in the file's `// expect:` comment. This covers the failure side of every
+- `make panic-tests` boots one kernel per file in `tests/panics` and checks the output contains
+  the lines in the file's leading `// expect:` comments, in order: the panic line, then
+  optionally backtrace frames. This covers the failure side of every
   runtime check (null, bounds, division, casts, array stores, allocation).

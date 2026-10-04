@@ -2,6 +2,7 @@ package duke.kernel.x86;
 
 import duke.kernel.Console;
 import duke.kernel.Panic;
+import duke.rt.Backtrace;
 import duke.rt.Magic;
 
 /**
@@ -42,6 +43,7 @@ public final class Interrupts {
         String detail = vector == 14 ? " at address 0x" + Long.toHexString(Magic.readCr2()) : "";
         Panic.begin(name, " (vector ", Integer.toString(vector), ", error 0x", Long.toHexString(Frame.errorCode(frame)), ")", detail);
         dump(frame);
+        Backtrace.print(Frame.rip(frame), Frame.register(frame, Frame.RBP));
         Panic.haltForever();
     }
 

@@ -1,4 +1,5 @@
 // expect: PANIC: NullPointerException
+// expect:   at duke.panics.NullReceiver.main(NullReceiver.java:11)
 package duke.panics;
 
 import duke.kernel.Serial;
