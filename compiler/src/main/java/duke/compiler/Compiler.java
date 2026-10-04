@@ -42,6 +42,7 @@ public final class Compiler {
     static final String INTERRUPTS = "duke/kernel/x86/Interrupts";
     static final String INTERRUPT_STUBS = "interrupt.stubs";
     /** Vectors where the CPU pushes an error code; every other stub pushes a 0 in its place. */
+    private static final int DOUBLE_FAULT = 8;
     private static final Set<Integer> ERROR_CODE_VECTORS = Set.of(8, 10, 11, 12, 13, 14, 17, 21, 29, 30);
     private static final Reg[] SAVED_REGISTERS = {
             Reg.RAX, Reg.RCX, Reg.RDX, Reg.RBX, Reg.RBP, Reg.RSI, Reg.RDI,
@@ -589,6 +590,14 @@ public final class Compiler {
             if (!ERROR_CODE_VECTORS.contains(vector)) {
                 a.pushImm(0);
             }
+            if (vector == DOUBLE_FAULT) {
+                // Runs on its own IST stack, below the boot stack's limit, and only ever panics:
+                // switch the prologue stack checks off rather than have them fire right away.
+                a.push(Reg.RAX);
+                a.alu(X64.Alu.XOR, false, Reg.RAX, Reg.RAX);
+                a.store(8, Mem.rip(STACK_LIMIT), Reg.RAX);
+                a.pop(Reg.RAX);
+            }
             a.pushImm(vector);
             a.jmp("interrupt.common");
             image.define("interrupt." + vector, text, start, text.size() - start, Image.SymbolType.FUNC);
@@ -942,7 +951,11 @@ public final class Compiler {
 
     /** Switches to our own stack, initializes the entry class, then calls the entry point. */
     private void emitBootStub(String entryClass, String mainSymbol) {
-        image.bss.align(16);
+        // A page of nothing below the stack, which the kernel unmaps: running off the stack faults.
+        image.bss.align(4096);
+        int guard = image.bss.size();
+        image.bss.reserve(4096);
+        image.define("boot.stack.guard", image.bss, guard, 4096, Image.SymbolType.OBJECT);
         int stackOffset = image.bss.size();
         image.bss.reserve(BOOT_STACK_SIZE);
         image.define("boot.stack", image.bss, stackOffset, BOOT_STACK_SIZE, Image.SymbolType.OBJECT);
@@ -970,9 +983,9 @@ public final class Compiler {
     }
 
     /**
-     * Section boundaries for Magic.imageLayout(), so the kernel can map its own image: six
-     * addresses, text start/end, rodata start/end, data start, bss end. Emitted last, so the end
-     * symbols see the final sizes.
+     * Section boundaries for Magic.imageLayout(), so the kernel can map its own image: text
+     * start/end, rodata start/end, data start, bss end, then the boot stack's guard page. Emitted
+     * last, so the end symbols see the final sizes.
      */
     private void emitImageLayout() {
         Section rodata = image.rodata;
@@ -981,6 +994,7 @@ public final class Compiler {
         for (String bound : List.of("text.start", "text.end", "rodata.start", "rodata.end", "data.start", "bss.end")) {
             rodata.emitReloc(Reloc.Kind.ABS64, "image." + bound, 0);
         }
+        rodata.emitReloc(Reloc.Kind.ABS64, "boot.stack.guard", 0);
         image.define(IMAGE_LAYOUT, rodata, table, rodata.size() - table, Image.SymbolType.OBJECT);
         image.define("image.text.start", image.text, 0, 0, Image.SymbolType.OBJECT);
         image.define("image.text.end", image.text, image.text.size(), 0, Image.SymbolType.OBJECT);

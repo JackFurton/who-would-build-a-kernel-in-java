@@ -877,6 +877,32 @@ final class MethodCompiler {
                 a.lea(RAX, Mem.rip(program.requireInterruptStubs()));
                 pushLong(RAX);
             }
+            case "loadSegments" -> {
+                // loadSegments(code, data): data selectors directly, cs through a far return.
+                a.pop(RAX);
+                a.pop(RCX);
+                for (int sreg : new int[] {3, 0, 2, 4, 5}) {
+                    a.movToSegment(sreg, RAX);
+                }
+                X64.Label reloaded = new X64.Label();
+                a.push(RCX);
+                a.lea(RAX, reloaded);
+                a.push(RAX);
+                a.retfq();
+                a.bind(reloaded);
+            }
+            case "loadTaskRegister" -> {
+                a.pop(RAX);
+                a.ltr(RAX);
+            }
+            case "stackLimit" -> {
+                a.load(8, false, RAX, Mem.rip(Compiler.STACK_LIMIT));
+                pushLong(RAX);
+            }
+            case "setStackLimit" -> {
+                popLong(RAX);
+                a.store(8, Mem.rip(Compiler.STACK_LIMIT), RAX);
+            }
             case "loadIdt" -> {
                 popLong(RAX);
                 a.lidt(Mem.at(RAX));

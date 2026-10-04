@@ -314,6 +314,30 @@ public final class X64 {
         out.emit8(0x90);
     }
 
+    /** {@code mov sreg, src} with clang's 0x66 prefix; sreg is 0 es, 2 ss, 3 ds, 4 fs, 5 gs. */
+    public void movToSegment(int sreg, Reg src) {
+        out.emit8(0x66);
+        regOp(false, false, sreg, src.code(), 0x8E);
+    }
+
+    /** Far return: pops rip, then cs. The only way to reload cs in long mode without a far call. */
+    public void retfq() {
+        out.emit8(0x48);
+        out.emit8(0xCB);
+    }
+
+    public void ltr(Reg selector) {
+        regOp(false, false, 3, selector.code(), 0x0F, 0x00);
+    }
+
+    /** {@code lea dst, [rip + label]}. */
+    public void lea(Reg dst, Label target) {
+        rex(true, dst.code(), 0, 0, false);
+        out.emit8(0x8D);
+        out.emit8((dst.code() & 7) << 3 | 0b101);
+        rel32(target);
+    }
+
     public void lidt(Mem descriptor) {
         memOp(false, false, 3, descriptor, 0, 0x0F, 0x01);
     }

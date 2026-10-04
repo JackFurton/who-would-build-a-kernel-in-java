@@ -107,6 +107,13 @@ class X64Test {
                 c("call qword ptr [rax + 0x1000]", "ff 90 00 10 00 00", a -> a.call(Mem.at(RAX, 0x1000))),
                 c("call qword ptr [r11 + 8]", "41 ff 53 08", a -> a.call(Mem.at(R11, 8))),
                 c("cmp byte ptr [rax + 8], 0", "80 78 08 00", a -> a.cmpByte(Mem.at(RAX, 8), 0)),
+                c("mov ds, ax", "66 8e d8", a -> a.movToSegment(3, RAX)),
+                c("mov es, ax", "66 8e c0", a -> a.movToSegment(0, RAX)),
+                c("mov ss, ax", "66 8e d0", a -> a.movToSegment(2, RAX)),
+                c("mov fs, ax", "66 8e e0", a -> a.movToSegment(4, RAX)),
+                c("mov gs, ax", "66 8e e8", a -> a.movToSegment(5, RAX)),
+                c("retfq", "48 cb", X64::retfq),
+                c("ltr ax", "0f 00 d8", a -> a.ltr(RAX)),
                 c("lidt [rax]", "0f 01 18", a -> a.lidt(Mem.at(RAX))),
                 c("lgdt [rax]", "0f 01 10", a -> a.lgdt(Mem.at(RAX))),
                 c("invlpg byte ptr [rax]", "0f 01 38", a -> a.invlpg(Mem.at(RAX))),
@@ -159,6 +166,18 @@ class X64Test {
         a.bind(end);
         a.ret();              // 11
         assertEquals("0f8405000000" + "e9f5ffffff" + "c3", HexFormat.of().formatHex(s.toByteArray()));
+    }
+
+    @Test
+    void leaOfLabelIsRipRelative() {
+        Section s = new Section(".text", Section.Kind.TEXT);
+        X64 a = new X64(s);
+        X64.Label target = new X64.Label();
+        a.lea(RAX, target);   // 0: 48 8d 05 rel32, ends at 7
+        a.ret();              // 7
+        a.bind(target);       // 8
+        // clang: lea rax, [rip + 1] -> 48 8d 05 01 00 00 00
+        assertEquals("488d0501000000" + "c3", HexFormat.of().formatHex(s.toByteArray()));
     }
 
     @Test

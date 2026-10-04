@@ -4,6 +4,7 @@ import duke.boot.Limine;
 import duke.kernel.mm.KernelAddressSpace;
 import duke.kernel.mm.KernelHeap;
 import duke.kernel.mm.PhysicalMemory;
+import duke.kernel.x86.Gdt;
 import duke.kernel.x86.Idt;
 import duke.kernel.x86.Interrupts;
 import duke.rt.Heap;
@@ -19,6 +20,7 @@ public final class Kernel {
     /** Brings up the core subsystems. Shared with the ktest runner, so tests see a real kernel. */
     public static void init() {
         Serial.init();
+        Gdt.ensureLoaded();
         Idt.load();
         if (!Limine.baseRevisionSupported()) {
             Panic.panic("Limine doesn't support base revision 6");
