@@ -39,6 +39,12 @@ public final class Magic {
 
     public static native long addressOf(Object object);
 
+    public static native Object toObject(long address);
+
+    public static native long heapArenaStart();
+
+    public static native long heapArenaEnd();
+
     public static native void halt();
 
     public static native void disableInterrupts();

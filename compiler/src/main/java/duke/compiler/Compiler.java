@@ -35,6 +35,9 @@ public final class Compiler {
     static final String STRING_CLASS = "java/lang/String";
     static final String BYTE_ARRAY = "[B";
 
+    static final String HEAP_ARENA = "heap.arena";
+    static final int HEAP_ARENA_SIZE = 16 * 1024 * 1024;
+
     private static final int BOOT_STACK_SIZE = 64 * 1024;
     private static final int LIMINE_BASE_REVISION = 6;
 
@@ -71,6 +74,7 @@ public final class Compiler {
         emitStrings();
         emitTibs();
         emitBootStub(mainSymbol);
+        emitHeapArena();
         emitLimineRequests();
         return image;
     }
@@ -281,6 +285,14 @@ public final class Compiler {
         a.hlt();
         a.jmp(hang);
         image.define(ENTRY_SYMBOL, text, start, text.size() - start, Image.SymbolType.FUNC);
+    }
+
+    /** Costs nothing in the file: .bss is only memsz. Replaced by a real heap in #16. */
+    private void emitHeapArena() {
+        image.bss.align(4096);
+        int offset = image.bss.size();
+        image.bss.reserve(HEAP_ARENA_SIZE);
+        image.define(HEAP_ARENA, image.bss, offset, HEAP_ARENA_SIZE, Image.SymbolType.OBJECT);
     }
 
     /** See PROTOCOL.md in Limine-Bootloader/limine-protocol, "Requests Delimiters" and "Base Revisions". */
