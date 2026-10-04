@@ -33,7 +33,10 @@ import java.lang.classfile.instruction.LabelTarget;
 import java.lang.classfile.instruction.LineNumber;
 import java.lang.classfile.instruction.LoadInstruction;
 import java.lang.classfile.instruction.LookupSwitchInstruction;
+import java.lang.classfile.instruction.NewMultiArrayInstruction;
 import java.lang.classfile.instruction.NewObjectInstruction;
+import java.lang.classfile.instruction.NewPrimitiveArrayInstruction;
+import java.lang.classfile.instruction.NewReferenceArrayInstruction;
 import java.lang.classfile.instruction.NopInstruction;
 import java.lang.classfile.instruction.OperatorInstruction;
 import java.lang.classfile.instruction.ReturnInstruction;
@@ -188,6 +191,9 @@ final class MethodCompiler {
             case ArrayLoadInstruction l -> arrayLoad(l.typeKind());
             case ArrayStoreInstruction s -> arrayStore(s.typeKind());
             case NewObjectInstruction n -> newObject(n.className().asInternalName());
+            case NewPrimitiveArrayInstruction n -> newArray("[" + n.typeKind().upperBound().descriptorString());
+            case NewReferenceArrayInstruction n -> newArray("[" + descriptorOf(n.componentType().asInternalName()));
+            case NewMultiArrayInstruction n -> newMultiArray(n.arrayType().asInternalName(), n.dimensions());
             case NopInstruction n -> { }
             default -> throw error("unsupported bytecode " + i.opcode().name().toLowerCase());
         }
@@ -562,6 +568,35 @@ final class MethodCompiler {
         ClassPool.ResolvedMethod allocate = pool.resolveMethod(HEAP, "allocateObject", "(JI)Ljava/lang/Object;");
         program.requireClass(HEAP);
         call(allocate, allocate.method().methodTypeSymbol(), 3);
+    }
+
+    /** Class entries name arrays by descriptor and classes by internal name. */
+    private static String descriptorOf(String classEntryName) {
+        return classEntryName.startsWith("[") ? classEntryName : "L" + classEntryName + ";";
+    }
+
+    private void newArray(String type) {
+        a.pop(RCX);
+        a.lea(RAX, Mem.rip(program.requireArrayTib(type)));
+        pushLong(RAX);
+        a.push(RCX);
+        a.pushImm(Layouts.width(type.substring(1)));
+        ClassPool.ResolvedMethod allocate = pool.resolveMethod(HEAP, "allocateArray", "(JII)Ljava/lang/Object;");
+        program.requireClass(HEAP);
+        call(allocate, allocate.method().methodTypeSymbol(), 4);
+    }
+
+    /** The dimension counts stay on the operand stack; the runtime reads them in place through rsp. */
+    private void newMultiArray(String type, int dimensions) {
+        a.mov(RAX, RSP);
+        a.lea(RCX, Mem.rip(program.requireMultiArrayDescriptor(type, dimensions)));
+        pushLong(RCX);
+        pushLong(RAX);
+        ClassPool.ResolvedMethod allocate = pool.resolveMethod(HEAP, "allocateMultiArray", "(JJ)Ljava/lang/Object;");
+        program.requireClass(HEAP);
+        a.call(program.requireMethod(allocate));
+        a.aluImm(Alu.ADD, true, RSP, 8 * (4 + dimensions));
+        a.push(RAX);
     }
 
     private void call(ClassPool.ResolvedMethod m, MethodTypeDesc type, int slots) {
