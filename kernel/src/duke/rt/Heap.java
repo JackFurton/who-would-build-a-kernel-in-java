@@ -62,6 +62,12 @@ public final class Heap {
         return Magic.toObject(address);
     }
 
+    /** A new array of the same runtime type as {@code array}, for Arrays.copyOf. */
+    public static Object allocateLike(Object array, int length) {
+        long tib = Tib.of(array);
+        return allocateArray(tib, length, Tib.size(tib));
+    }
+
     /** Target of {@code newarray} and {@code anewarray}. */
     static Object allocateArray(long tib, int length, int elementSize) {
         if (length < 0) {

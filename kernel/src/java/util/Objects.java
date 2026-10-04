@@ -20,6 +20,14 @@ public final class Objects {
         return object;
     }
 
+    /** The JDK's bounds check and message, used by List implementations. */
+    public static int checkIndex(int index, int length) {
+        if (index < 0 || index >= length) {
+            throw new IndexOutOfBoundsException("Index " + index + " out of bounds for length " + length);
+        }
+        return index;
+    }
+
     public static boolean equals(Object a, Object b) {
         return a == b || a != null && a.equals(b);
     }
