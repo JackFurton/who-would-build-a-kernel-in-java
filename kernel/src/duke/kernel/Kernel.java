@@ -61,7 +61,7 @@ public final class Kernel {
         for (int i = 0; i < 512; i++) {
             byte[] garbage = new byte[1 << 20];
         }
-        Console.println("gc: allocated 512 MiB in a 188 MiB machine; " + Heap.collections() + " collections, heap "
+        Console.println("gc: allocated 512 MiB on a 256 MiB machine; " + Heap.collections() + " collections, heap "
                 + (Heap.committed() >> 20) + " MiB committed");
         Console.println("DUKE-BOOT-OK");
     }
