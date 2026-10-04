@@ -83,6 +83,6 @@ BSD-2-Clause; the license travels with it in `kernel/src/duke/kernel/Font.java`.
 
 ## Contributing
 
-Issues are grouped into milestones. Look for
-[`good first issue`](https://github.com/JackFurton/who-would-build-a-kernel-in-java/labels/good%20first%20issue).
-Run `make test` before opening a PR. CI runs the same targets.
+New contributors are welcome. [CONTRIBUTING.md](CONTRIBUTING.md) covers setup and how the tests
+work, and [`good first issue`](https://github.com/JackFurton/who-would-build-a-kernel-in-java/labels/good%20first%20issue)
+lists small, self-contained places to start.

@@ -1,0 +1,55 @@
+# Contributing
+
+Glad you're here. Duke is a kernel written in Java, compiled by its own ahead-of-time compiler,
+so a lot of everyday work is "make this piece of `java.lang` or `java.util` exist" or "teach the
+kernel one more thing". You don't need to know the whole system to help.
+
+## Finding something to work on
+
+- [`good first issue`](https://github.com/JackFurton/who-would-build-a-kernel-in-java/labels/good%20first%20issue)
+  issues are small and self-contained, and say how to prove they're done.
+- Comment on an issue to claim it before you start, so two people don't build the same thing.
+- Bigger work is grouped into [milestones](https://github.com/JackFurton/who-would-build-a-kernel-in-java/milestones).
+  Ask in the issue if you want to take one on.
+
+## Setup
+
+You need JDK 25, `make`, `git`, `qemu-system-x86_64`, and x86_64 UEFI firmware.
+
+- macOS: `brew install openjdk qemu` (Homebrew's QEMU includes the firmware).
+- Debian/Ubuntu: `apt install openjdk-25-jdk qemu-system-x86 ovmf`.
+
+```sh
+make run     # boot to the shell (type help); Ctrl-A X quits QEMU
+make test    # everything CI runs
+```
+
+## How the code fits together
+
+- `kernel/src` is the kernel *and* its own `java.lang`/`java.util`. There's no JDK underneath, so
+  if a class or method doesn't exist there, it doesn't exist.
+- `compiler/` is `dukec`, which turns the kernel's bytecode into x86-64.
+- [docs/architecture.md](docs/architecture.md) explains the details.
+
+## Tests
+
+| Suite | What it is | Add a test when |
+| --- | --- | --- |
+| `make conformance` | `tests/conformance`: each static method runs on HotSpot and in the kernel; results must match | You add or change library behaviour (`java.lang`, `java.util`) or compiler features |
+| `make ktest` | `tests/kernel`: tests that run inside the booted kernel | You touch memory, interrupts, devices |
+| `make panic-tests` | `tests/panics`: kernels that must die with a specific message | You add a failure path |
+| `make shell-test` | Types into the real shell over serial and PS/2 | You add a shell command |
+| `make unit-test` | JUnit tests for the compiler | You touch `compiler/` |
+
+A conformance test is a non-private, no-argument static method returning a primitive or a
+single-line `String`. Because HotSpot is the reference, behaviour and exception messages must match
+the JDK exactly. That's the point.
+
+Library code runs in a kernel: no floating point yet, Strings are Latin-1, and interrupt handlers
+must not allocate.
+
+## Pull requests
+
+- One issue per PR; put `Closes #N` in the description.
+- Run `make test` before pushing. CI runs the same targets.
+- Match the surrounding code: comments explain *why*, not *what*.
