@@ -88,6 +88,14 @@ GC panic. Interrupt handlers still must not allocate, and threads (M5) will need
 protocol.
 Java objects still come from the fixed bump arena in `.bss` (see Objects below).
 
+## Platform
+
+`duke.kernel.acpi` finds the RSDP through Limine and walks the XSDT, verifying every table's
+checksum. It parses the MADT (CPUs, I/O APICs, ISA interrupt overrides) and the HPET's address.
+Device registers live in reserved physical memory outside the direct map, so
+`KernelAddressSpace.mapDevice` maps them uncached into their own PML4 slot. QEMU runs with
+`-smp 2`, so the CPU count is a real check.
+
 ## Compiler pipeline
 
 ```
