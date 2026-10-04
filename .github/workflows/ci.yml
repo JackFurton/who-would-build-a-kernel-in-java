@@ -13,6 +13,9 @@ jobs:
   build:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
+    permissions:
+      # Pushing to the metrics branch on main; PR runs never get there.
+      contents: write
     steps:
       - uses: actions/checkout@v7
 
@@ -39,6 +42,10 @@ jobs:
 
       - name: Panic tests (runtime checks fail loudly)
         run: make panic-tests
+
+      - name: Record metrics
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: tools/record-metrics.sh
 
       - name: Upload kernel and logs
         if: always()
