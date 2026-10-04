@@ -784,6 +784,65 @@ final class MethodCompiler {
                 a.lea(RAX, Mem.rip(Compiler.HEAP_ARENA, Compiler.HEAP_ARENA_SIZE));
                 pushLong(RAX);
             }
+            case "interruptStubs" -> {
+                ensureInitialized(Compiler.INTERRUPTS);
+                a.lea(RAX, Mem.rip(program.requireInterruptStubs()));
+                pushLong(RAX);
+            }
+            case "loadIdt" -> {
+                popLong(RAX);
+                a.lidt(Mem.at(RAX));
+            }
+            case "loadGdt" -> {
+                popLong(RAX);
+                a.lgdt(Mem.at(RAX));
+            }
+            case "readCr0", "readCr2", "readCr3", "readCr4" -> {
+                a.readCr(name.charAt(6) - '0', RAX);
+                pushLong(RAX);
+            }
+            case "writeCr0", "writeCr3", "writeCr4" -> {
+                popLong(RAX);
+                a.writeCr(name.charAt(7) - '0', RAX);
+            }
+            case "invalidatePage" -> {
+                popLong(RAX);
+                a.invlpg(Mem.at(RAX));
+            }
+            case "readMsr" -> {
+                a.pop(RCX);
+                a.rdmsr();
+                combineEdxEax();
+            }
+            case "writeMsr" -> {
+                popLong(RAX);
+                a.pop(RCX);
+                a.mov(RDX, RAX);
+                a.push(RCX);
+                a.movImm32(RCX, 32);
+                a.shiftCl(Shift.SHR, true, RDX);
+                a.pop(RCX);
+                a.wrmsr();
+            }
+            case "readTimestamp" -> {
+                a.rdtsc();
+                combineEdxEax();
+            }
+            case "flags" -> {
+                a.pushfq();
+                a.push(RAX);
+            }
+            case "cpuid" -> {
+                popLong(RSI);
+                a.pop(RCX);
+                a.pop(RAX);
+                a.cpuid();
+                a.store(4, Mem.at(RSI), RAX);
+                a.store(4, Mem.at(RSI, 4), Reg.RBX);
+                a.store(4, Mem.at(RSI, 8), RCX);
+                a.store(4, Mem.at(RSI, 12), RDX);
+            }
+            case "breakpoint" -> a.int3();
             case "halt" -> a.hlt();
             case "disableInterrupts" -> a.cli();
             case "enableInterrupts" -> a.sti();
@@ -810,6 +869,15 @@ final class MethodCompiler {
         a.bind(forward);
         a.repMovsb();
         a.bind(done);
+    }
+
+    /** Pushes edx:eax as one long. */
+    private void combineEdxEax() {
+        a.mov32(RAX, RAX);
+        a.movImm32(RCX, 32);
+        a.shiftCl(Shift.SHL, true, RDX);
+        a.alu(Alu.OR, true, RAX, RDX);
+        pushLong(RAX);
     }
 
     private void portOut(int width) {

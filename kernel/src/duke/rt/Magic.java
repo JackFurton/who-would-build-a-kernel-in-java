@@ -48,6 +48,48 @@ public final class Magic {
 
     public static native long heapArenaEnd();
 
+    /**
+     * Address of 256 code pointers, one entry stub per interrupt vector. Each stub saves every
+     * general-purpose register and calls {@code duke.kernel.x86.Interrupts.dispatch(frame)}, where
+     * {@code frame} points at the saved registers (layout in duke.kernel.x86.Frame).
+     */
+    public static native long interruptStubs();
+
+    public static native void loadIdt(long descriptor);
+
+    public static native void loadGdt(long descriptor);
+
+    public static native long readCr0();
+
+    public static native long readCr2();
+
+    public static native long readCr3();
+
+    public static native long readCr4();
+
+    public static native void writeCr0(long value);
+
+    public static native void writeCr3(long value);
+
+    public static native void writeCr4(long value);
+
+    public static native void invalidatePage(long address);
+
+    public static native long readMsr(int msr);
+
+    public static native void writeMsr(int msr, long value);
+
+    public static native long readTimestamp();
+
+    /** RFLAGS, for saving and restoring the interrupt flag. */
+    public static native long flags();
+
+    /** Writes eax, ebx, ecx, edx as four ints at {@code out}. */
+    public static native void cpuid(int leaf, int subleaf, long out);
+
+    /** int3. */
+    public static native void breakpoint();
+
     public static native void halt();
 
     public static native void disableInterrupts();

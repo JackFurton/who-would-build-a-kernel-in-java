@@ -14,12 +14,17 @@ public final class Panic {
     }
 
     public static void panic(String... parts) {
+        begin(parts);
+        haltForever();
+    }
+
+    /** Prints the panic line but keeps running, so the caller can add detail before haltForever(). */
+    public static void begin(String... parts) {
         Console.print("\nPANIC: ");
         for (String part : parts) {
             Console.print(part);
         }
         Console.println("");
-        haltForever();
     }
 
     public static void panic(String message, int a, int b) {
