@@ -92,6 +92,10 @@ public final class ClassPool {
         return model;
     }
 
+    public ClassModel find(String name) {
+        return classes.get(name);
+    }
+
     public String superName(ClassModel model) {
         return model.superclass().map(c -> c.asInternalName()).orElse(null);
     }

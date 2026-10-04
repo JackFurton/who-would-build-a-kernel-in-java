@@ -1,7 +1,5 @@
 package java.lang;
 
-import duke.kernel.Panic;
-
 public final class Integer extends Number implements Comparable<Integer> {
 
     public static final int MIN_VALUE = 0x80000000;
@@ -83,7 +81,7 @@ public final class Integer extends Number implements Comparable<Integer> {
     public static int parseInt(String s, int radix) {
         long value = Long.parseLong(s, radix);
         if (value < MIN_VALUE || value > MAX_VALUE) {
-            Panic.panic("NumberFormatException: out of int range: ", s);
+            throw Long.forInputString(s, radix);
         }
         return (int) value;
     }

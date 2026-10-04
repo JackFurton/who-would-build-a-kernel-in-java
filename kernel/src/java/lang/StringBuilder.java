@@ -1,7 +1,5 @@
 package java.lang;
 
-import duke.kernel.Panic;
-
 /** Latin-1 like String. Also what javac emits for {@code +} on strings (-XDstringConcat=inline). */
 public final class StringBuilder {
 
@@ -38,7 +36,7 @@ public final class StringBuilder {
 
     public StringBuilder append(char c) {
         if (c > 0xFF) {
-            Panic.panic("StringBuilder: non-Latin-1 char", c, count);
+            throw new IllegalArgumentException("non-Latin-1 char " + (int) c + " (Strings are Latin-1 only for now)");
         }
         ensureCapacity(count + 1);
         value[count++] = (byte) c;
@@ -73,7 +71,7 @@ public final class StringBuilder {
 
     public void setLength(int length) {
         if (length < 0) {
-            Panic.panic("StringIndexOutOfBoundsException", length, count);
+            throw new StringIndexOutOfBoundsException("String index out of range: " + length);
         }
         ensureCapacity(length);
         for (int i = count; i < length; i++) {
@@ -100,7 +98,7 @@ public final class StringBuilder {
 
     private void checkIndex(int index) {
         if (index < 0 || index >= count) {
-            Panic.panic("StringIndexOutOfBoundsException", index, count);
+            throw new StringIndexOutOfBoundsException("Index " + index + " out of bounds for length " + count);
         }
     }
 

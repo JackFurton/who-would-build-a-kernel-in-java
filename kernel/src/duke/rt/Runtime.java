@@ -1,25 +1,20 @@
 package duke.rt;
 
-import duke.kernel.Panic;
-
-/**
- * Entry points the compiler calls when generated code detects a fault. There are no exceptions
- * yet, so each of these is fatal.
- */
+/** Entry points the compiler calls inline when a runtime check fails. Messages match HotSpot's. */
 public final class Runtime {
 
     private Runtime() {
     }
 
     static void nullPointer() {
-        Panic.panic("NullPointerException");
+        throw new NullPointerException();
     }
 
     static void arrayIndexOutOfBounds(int index, int length) {
-        Panic.panic("ArrayIndexOutOfBoundsException", index, length);
+        throw new ArrayIndexOutOfBoundsException("Index " + index + " out of bounds for length " + length);
     }
 
     static void divideByZero() {
-        Panic.panic("ArithmeticException: / by zero");
+        throw new ArithmeticException("/ by zero");
     }
 }

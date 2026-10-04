@@ -1,7 +1,5 @@
 package java.lang;
 
-import duke.kernel.Panic;
-
 public final class Long extends Number implements Comparable<Long> {
 
     public static final long MIN_VALUE = 0x8000000000000000L;
@@ -106,8 +104,14 @@ public final class Long extends Number implements Comparable<Long> {
 
     /** Accumulates negatively, like the JDK, so MIN_VALUE parses without overflow. */
     public static long parseLong(String s, int radix) {
-        if (s == null || s.isEmpty() || radix < 2 || radix > 16) {
-            Panic.panic("NumberFormatException: ", String.valueOf(s));
+        if (s == null) {
+            throw new NumberFormatException("Cannot parse null string: null");
+        }
+        if (radix < 2 || radix > 36) {
+            throw new NumberFormatException("radix " + radix + " out of range");
+        }
+        if (s.isEmpty()) {
+            throw forInputString(s, radix);
         }
         int i = 0;
         boolean negative = false;
@@ -116,7 +120,7 @@ public final class Long extends Number implements Comparable<Long> {
             negative = first == '-';
             i = 1;
             if (s.length() == 1) {
-                Panic.panic("NumberFormatException: ", s);
+                throw forInputString(s, radix);
             }
         }
         long limit = negative ? MIN_VALUE : -MAX_VALUE;
@@ -125,15 +129,20 @@ public final class Long extends Number implements Comparable<Long> {
         for (; i < s.length(); i++) {
             int digit = digit(s.charAt(i), radix);
             if (digit < 0 || result < multiplyLimit) {
-                Panic.panic("NumberFormatException: ", s);
+                throw forInputString(s, radix);
             }
             result *= radix;
             if (result < limit + digit) {
-                Panic.panic("NumberFormatException: ", s);
+                throw forInputString(s, radix);
             }
             result -= digit;
         }
         return negative ? result : -result;
+    }
+
+    static NumberFormatException forInputString(String s, int radix) {
+        String suffix = radix == 10 ? "" : " under radix " + radix;
+        return new NumberFormatException("For input string: \"" + s + "\"" + suffix);
     }
 
     private static int digit(char c, int radix) {

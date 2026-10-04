@@ -76,6 +76,13 @@ public final class Compiler {
 
     private record LineInfo(String sourceFile, List<int[]> lines) {}
 
+    /** One exception table row; offsets from the method start, catchTib null for catch-all. */
+    record Handler(int start, int end, int handler, String catchTib) {}
+
+    private record ExceptionTable(int frameBytes, List<Handler> handlers) {}
+
+    private final Map<String, ExceptionTable> exceptionTables = new LinkedHashMap<>();
+
     public Compiler(ClassPool pool) {
         this.pool = pool;
         this.layouts = new Layouts(pool);
@@ -310,14 +317,22 @@ public final class Compiler {
         return staticSymbol(f.ownerName(), f.name());
     }
 
+    void recordExceptionTable(String methodSymbol, int frameBytes, List<Handler> handlers) {
+        exceptionTables.put(methodSymbol, new ExceptionTable(frameBytes, handlers));
+    }
+
     void recordLines(String methodSymbol, String sourceFile, List<int[]> lines) {
         lineInfo.put(methodSymbol, new LineInfo(sourceFile, lines));
     }
 
     /**
-     * For symbolized backtraces (duke.rt.Backtrace). Header: entry count (u64). Each 40-byte entry,
-     * sorted by address: start, size (u32), line count (u32), name String, source file String or 0,
-     * line table or 0. A line table is (code offset u32, line u32) pairs in code order.
+     * For backtraces and exception dispatch (duke.rt.Backtrace, duke.rt.Exceptions). Header: entry
+     * count (u64). Each 56-byte entry, sorted by address: start, size (u32), line count (u32), name
+     * String, source file String or 0, line table or 0, exception table or 0, flags (u32, see
+     * methodFlags) and padding. A line table is
+     * (code offset u32, line u32) pairs in code order. An exception table is a row count (u32) and
+     * the frame's local-variable bytes below rbp (u32), then 24-byte rows: start, end, handler
+     * (u32 code offsets, plus u32 padding) and the catch type's TIB, 0 meaning any.
      */
     private void emitMethodTable() {
         List<Image.Symbol> functions = new ArrayList<>();
@@ -340,6 +355,21 @@ public final class Compiler {
                 }
                 image.define("lines:" + f.name(), rodata, start, rodata.size() - start, Image.SymbolType.OBJECT);
             }
+            ExceptionTable exceptions = exceptionTables.get(f.name());
+            if (exceptions != null) {
+                rodata.align(8);
+                int start = rodata.size();
+                rodata.emit32(exceptions.handlers().size());
+                rodata.emit32(exceptions.frameBytes());
+                for (Handler h : exceptions.handlers()) {
+                    rodata.emit32(h.start());
+                    rodata.emit32(h.end());
+                    rodata.emit32(h.handler());
+                    rodata.emit32(0);
+                    emitPointer(rodata, h.catchTib());
+                }
+                image.define("exceptions:" + f.name(), rodata, start, rodata.size() - start, Image.SymbolType.OBJECT);
+            }
         }
         rodata.align(8);
         int table = rodata.size();
@@ -355,8 +385,34 @@ public final class Compiler {
             emitPointer(rodata, requireString(javaName(paren < 0 ? f.name() : f.name().substring(0, paren))));
             emitPointer(rodata, info == null || info.sourceFile() == null ? null : requireString(info.sourceFile()));
             emitPointer(rodata, hasLines ? "lines:" + f.name() : null);
+            emitPointer(rodata, exceptionTables.containsKey(f.name()) ? "exceptions:" + f.name() : null);
+            rodata.emit32(methodFlags(f.name()));
+            rodata.emit32(0);
         }
         image.define(METHOD_TABLE, rodata, table, rodata.size() - table, Image.SymbolType.OBJECT);
+    }
+
+    /** Hidden from stack traces: runtime plumbing and the constructors of the exception being built. */
+    static final int METHOD_HIDDEN = 1;
+    /** Unwinding stops here: exceptions don't propagate out of interrupt handlers. */
+    static final int METHOD_INTERRUPT_ENTRY = 2;
+
+    private int methodFlags(String symbol) {
+        if (symbol.equals("interrupt.common")) {
+            return METHOD_INTERRUPT_ENTRY;
+        }
+        int dot = symbol.indexOf('.');
+        int paren = symbol.indexOf('(');
+        if (dot < 0 || paren < 0 || pool.find(symbol.substring(0, dot)) == null) {
+            return 0;
+        }
+        String owner = symbol.substring(0, dot);
+        String name = symbol.substring(dot + 1, paren);
+        boolean throwableSetup = pool.isSubclass(owner, "java/lang/Throwable")
+                && (name.equals("<init>") || name.equals("fillInStackTrace"));
+        boolean plumbing = owner.equals("duke/rt/Runtime") || owner.equals("duke/rt/Types")
+                || owner.equals("duke/rt/Backtrace") || owner.equals("duke/rt/Exceptions");
+        return throwableSetup || plumbing ? METHOD_HIDDEN : 0;
     }
 
     String requireInterruptStubs() {

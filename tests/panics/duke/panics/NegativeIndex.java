@@ -1,4 +1,4 @@
-// expect: PANIC: ArrayIndexOutOfBoundsException (-1, 3)
+// expect: PANIC: uncaught java.lang.ArrayIndexOutOfBoundsException: Index -1 out of bounds for length 3
 package duke.panics;
 
 import duke.kernel.Serial;

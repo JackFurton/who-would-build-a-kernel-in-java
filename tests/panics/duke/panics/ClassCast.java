@@ -1,4 +1,4 @@
-// expect: PANIC: ClassCastException: duke.panics.ClassCast$A cannot be cast to duke.panics.ClassCast$B
+// expect: PANIC: uncaught java.lang.ClassCastException: class duke.panics.ClassCast$A cannot be cast to class duke.panics.ClassCast$B
 package duke.panics;
 
 import duke.kernel.Serial;
