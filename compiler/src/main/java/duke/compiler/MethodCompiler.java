@@ -27,6 +27,7 @@ import java.lang.classfile.instruction.ArrayStoreInstruction;
 import java.lang.classfile.instruction.BranchInstruction;
 import java.lang.classfile.instruction.ConstantInstruction;
 import java.lang.classfile.instruction.ConvertInstruction;
+import java.lang.classfile.instruction.ExceptionCatch;
 import java.lang.classfile.instruction.FieldInstruction;
 import java.lang.classfile.instruction.IncrementInstruction;
 import java.lang.classfile.instruction.InvokeDynamicInstruction;
@@ -46,6 +47,7 @@ import java.lang.classfile.instruction.StackInstruction;
 import java.lang.classfile.instruction.StoreInstruction;
 import java.lang.classfile.instruction.SwitchCase;
 import java.lang.classfile.instruction.TableSwitchInstruction;
+import java.lang.classfile.instruction.ThrowInstruction;
 import java.lang.classfile.instruction.TypeCheckInstruction;
 import java.lang.constant.ClassDesc;
 import java.lang.constant.MethodTypeDesc;
@@ -74,6 +76,7 @@ final class MethodCompiler {
     private static final String MAGIC = "duke/rt/Magic";
     private static final String HEAP = "duke/rt/Heap";
     private static final String TYPES = "duke/rt/Types";
+    private static final String EXCEPTIONS = "duke/rt/Exceptions";
 
     private final Compiler program;
     private final ClassPool pool;
@@ -82,15 +85,9 @@ final class MethodCompiler {
     private final Map<Label, X64.Label> labels = new IdentityHashMap<>();
     private int argSlots;
     private int line = -1;
+    private final List<ExceptionCatch> catches = new ArrayList<>();
     /** (code offset, source line) pairs, in code order. */
     private final List<int[]> lines = new ArrayList<>();
-    private final List<SlowPath> slowPaths = new ArrayList<>();
-
-    private enum Fault { NULL_POINTER, OUT_OF_BOUNDS, DIVIDE_BY_ZERO }
-
-    /** An out-of-line failure path for one check site, remembering the site's source line. */
-    private record SlowPath(Fault fault, X64.Label label, int line) {}
-
     MethodCompiler(Compiler program, ClassPool.ResolvedMethod method) {
         this.program = program;
         this.pool = program.pool();
@@ -109,9 +106,6 @@ final class MethodCompiler {
             throw error("synchronized methods are not supported yet");
         }
         CodeAttribute code = (CodeAttribute) method.method().code().orElseThrow();
-        if (!code.exceptionHandlers().isEmpty()) {
-            throw error("exception handlers are not supported yet");
-        }
         argSlots = argSlots(method.method().methodTypeSymbol()) + (method.is(AccessFlag.STATIC) ? 0 : 1);
         int extraLocals = code.maxLocals() - argSlots;
 
@@ -126,6 +120,7 @@ final class MethodCompiler {
 
         for (CodeElement e : code) {
             switch (e) {
+                case ExceptionCatch c -> catches.add(c);
                 case LabelTarget t -> a.bind(label(t.label()));
                 case LineNumber n -> {
                     line = n.line();
@@ -135,13 +130,14 @@ final class MethodCompiler {
                 default -> { }
             }
         }
-        emitSlowPaths(start);
+        checkLabelsBound();
 
         String symbol = Compiler.methodSymbol(method.ownerName(), method.name(), method.descriptor());
         program.image().define(symbol, text, start, a.position() - start, Image.SymbolType.FUNC);
         String sourceFile = method.owner().findAttribute(Attributes.sourceFile())
                 .map(f -> f.sourceFile().stringValue()).orElse(null);
         program.recordLines(symbol, sourceFile, lines);
+        recordExceptionTable(symbol, start, extraLocals);
     }
 
     private CompileException error(String message) {
@@ -207,6 +203,14 @@ final class MethodCompiler {
             }
             case ArrayLoadInstruction l -> arrayLoad(l.typeKind());
             case ArrayStoreInstruction s -> arrayStore(s.typeKind());
+            case ThrowInstruction t -> {
+                a.pop(RAX);
+                nullCheck(RAX);
+                a.push(RAX);
+                ensureInitialized(EXCEPTIONS);
+                a.call(program.requireMethod(EXCEPTIONS, "raise", "(Ljava/lang/Throwable;)V"));
+                a.ud2();
+            }
             case NewObjectInstruction n -> newObject(n.className().asInternalName());
             case NewPrimitiveArrayInstruction n -> newArray("[" + n.typeKind().upperBound().descriptorString());
             case NewReferenceArrayInstruction n -> newArray("[" + descriptorOf(n.componentType().asInternalName()));
@@ -347,8 +351,11 @@ final class MethodCompiler {
             a.pop(RCX);
             a.pop(RAX);
         }
+        X64.Label nonZero = new X64.Label();
         a.test(wide, RCX, RCX);
-        a.jcc(Cond.E, divideByZero());
+        a.jcc(Cond.NE, nonZero);
+        a.call(program.requireMethod(RUNTIME, "divideByZero", "()V"));
+        a.bind(nonZero);
         X64.Label normal = new X64.Label();
         X64.Label done = new X64.Label();
         a.aluImm(Alu.CMP, wide, RCX, -1);
@@ -856,6 +863,18 @@ final class MethodCompiler {
                 a.store(4, Mem.at(RSI, 12), RDX);
             }
             case "breakpoint" -> a.int3();
+            case "resumeAt" -> {
+                // resumeAt(handler, rsp, rbp, exception): the JVM's handler entry state is an
+                // operand stack holding just the exception, on top of the frame's locals.
+                a.pop(RDX);
+                popLong(Reg.R8);
+                popLong(Reg.R9);
+                popLong(RAX);
+                a.mov(RBP, Reg.R8);
+                a.mov(RSP, Reg.R9);
+                a.push(RDX);
+                a.jmp(RAX);
+            }
             case "framePointer" -> {
                 a.push(RBP);
                 a.push(RBP);
@@ -945,8 +964,13 @@ final class MethodCompiler {
         a.pop(RCX);
         a.pop(RAX);
         nullCheck(RAX);
+        X64.Label inBounds = new X64.Label();
         a.alu(Alu.CMP, false, Mem.at(RAX, Layouts.ARRAY_LENGTH_OFFSET), RCX);
-        a.jcc(Cond.BE, outOfBounds());
+        a.jcc(Cond.A, inBounds);
+        a.push(RCX);
+        a.push(Mem.at(RAX, Layouts.ARRAY_LENGTH_OFFSET));
+        a.call(program.requireMethod(RUNTIME, "arrayIndexOutOfBounds", "(II)V"));
+        a.bind(inBounds);
         a.mov32(RCX, RCX);
     }
 
@@ -974,52 +998,35 @@ final class MethodCompiler {
         a.store(width, Mem.at(RAX, RCX, width, Layouts.ARRAY_DATA_OFFSET), RDX);
     }
 
+    /**
+     * Runtime checks call their throwing handler inline rather than from an out-of-line stub, so
+     * the return address sits inside the try range and the source line of the check.
+     */
     private void nullCheck(Reg r) {
+        X64.Label ok = new X64.Label();
         a.test(true, r, r);
-        a.jcc(Cond.E, nullPointer());
-    }
-
-    private X64.Label nullPointer() {
-        return slowPath(Fault.NULL_POINTER);
-    }
-
-    private X64.Label outOfBounds() {
-        return slowPath(Fault.OUT_OF_BOUNDS);
-    }
-
-    private X64.Label divideByZero() {
-        return slowPath(Fault.DIVIDE_BY_ZERO);
+        a.jcc(Cond.NE, ok);
+        a.call(program.requireMethod(RUNTIME, "nullPointer", "()V"));
+        a.bind(ok);
     }
 
     /**
-     * One stub per check site rather than one per method. Its return address then identifies the
-     * site, which backtraces need for the right line (and exception tables will need for the right
-     * handler).
+     * Rows of (start, end, handler, catch type TIB) over this method's code, in the order the class
+     * file lists them, which is the order the JVM tries them. Offsets are from the method start.
      */
-    private X64.Label slowPath(Fault fault) {
-        SlowPath path = new SlowPath(fault, new X64.Label(), line);
-        slowPaths.add(path);
-        return path.label();
+    private void recordExceptionTable(String symbol, int start, int extraLocals) {
+        List<Compiler.Handler> handlers = new ArrayList<>();
+        for (ExceptionCatch c : catches) {
+            String catchType = c.catchType().map(t -> program.requireTib(t.asInternalName())).orElse(null);
+            handlers.add(new Compiler.Handler(label(c.tryStart()).position() - start, label(c.tryEnd()).position() - start,
+                    label(c.handler()).position() - start, catchType));
+        }
+        if (!handlers.isEmpty()) {
+            program.recordExceptionTable(symbol, 8 * Math.max(extraLocals, 0), handlers);
+        }
     }
 
-    /** The runtime handlers never return. Each stub gets a line-table row for its site's line. */
-    private void emitSlowPaths(int start) {
-        for (SlowPath path : slowPaths) {
-            a.bind(path.label());
-            if (path.line() >= 0) {
-                lines.add(new int[] {a.position() - start, path.line()});
-            }
-            switch (path.fault()) {
-                case NULL_POINTER -> a.call(program.requireMethod(RUNTIME, "nullPointer", "()V"));
-                case OUT_OF_BOUNDS -> {
-                    a.push(RCX);
-                    a.push(Mem.at(RAX, Layouts.ARRAY_LENGTH_OFFSET));
-                    a.call(program.requireMethod(RUNTIME, "arrayIndexOutOfBounds", "(II)V"));
-                }
-                case DIVIDE_BY_ZERO -> a.call(program.requireMethod(RUNTIME, "divideByZero", "()V"));
-            }
-            a.ud2();
-        }
+    private void checkLabelsBound() {
         for (X64.Label l : labels.values()) {
             if (!l.isBound()) {
                 throw error("internal: branch target never bound");

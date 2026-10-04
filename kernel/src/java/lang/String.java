@@ -26,6 +26,9 @@ public final class String implements Comparable<String> {
     }
 
     public char charAt(int index) {
+        if (index < 0 || index >= value.length) {
+            throw new StringIndexOutOfBoundsException("Index " + index + " out of bounds for length " + value.length);
+        }
         return (char) (value[index] & 0xFF);
     }
 
@@ -120,7 +123,8 @@ public final class String implements Comparable<String> {
 
     public String substring(int beginIndex, int endIndex) {
         if (beginIndex < 0 || endIndex > value.length || beginIndex > endIndex) {
-            duke.kernel.Panic.panic("StringIndexOutOfBoundsException", beginIndex, endIndex);
+            throw new StringIndexOutOfBoundsException(
+                    "Range [" + beginIndex + ", " + endIndex + ") out of bounds for length " + value.length);
         }
         if (beginIndex == 0 && endIndex == value.length) {
             return this;

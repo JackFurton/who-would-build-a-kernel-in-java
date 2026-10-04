@@ -1,7 +1,5 @@
 package java.util;
 
-import duke.kernel.Panic;
-
 /** javac calls requireNonNull for bound method references, so this exists before the rest of java.util. */
 public final class Objects {
 
@@ -10,14 +8,14 @@ public final class Objects {
 
     public static <T> T requireNonNull(T object) {
         if (object == null) {
-            Panic.panic("NullPointerException");
+            throw new NullPointerException();
         }
         return object;
     }
 
     public static <T> T requireNonNull(T object, String message) {
         if (object == null) {
-            Panic.panic("NullPointerException: ", message);
+            throw new NullPointerException(message);
         }
         return object;
     }

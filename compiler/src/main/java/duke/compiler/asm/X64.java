@@ -18,6 +18,13 @@ public final class X64 {
         public boolean isBound() {
             return position >= 0;
         }
+
+        public int position() {
+            if (position < 0) {
+                throw new IllegalStateException("label not bound");
+            }
+            return position;
+        }
     }
 
     public enum Alu {
@@ -96,6 +103,10 @@ public final class X64 {
     public void jmp(String symbol) {
         out.emit8(0xE9);
         out.emitReloc(Reloc.Kind.PC32, symbol, -4);
+    }
+
+    public void jmp(Reg target) {
+        regOp(false, false, 4, target.code(), 0xFF);
     }
 
     public void ret() {

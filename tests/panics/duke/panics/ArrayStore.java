@@ -1,4 +1,4 @@
-// expect: PANIC: ArrayStoreException: java.lang.Object into [Ljava.lang.String;
+// expect: PANIC: uncaught java.lang.ArrayStoreException: java.lang.Object
 package duke.panics;
 
 import duke.kernel.Serial;

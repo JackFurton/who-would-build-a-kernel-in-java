@@ -1,4 +1,4 @@
-// expect: PANIC: ArithmeticException: / by zero
+// expect: PANIC: uncaught java.lang.ArithmeticException: / by zero
 // expect:   at duke.panics.DeepTrace.inner(DeepTrace.java:15)
 // expect:   at duke.panics.DeepTrace.middle(DeepTrace.java:19)
 // expect:   at duke.panics.DeepTrace.outer(DeepTrace.java:23)

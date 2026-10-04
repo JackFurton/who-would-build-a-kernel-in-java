@@ -1,4 +1,4 @@
-// expect: PANIC: ArrayIndexOutOfBoundsException (3, 3)
+// expect: PANIC: uncaught java.lang.ArrayIndexOutOfBoundsException: Index 3 out of bounds for length 3
 // expect:   at duke.panics.IndexOutOfBounds.main(IndexOutOfBounds.java:11)
 package duke.panics;
 

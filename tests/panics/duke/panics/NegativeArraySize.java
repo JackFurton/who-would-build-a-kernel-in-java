@@ -1,4 +1,4 @@
-// expect: PANIC: NegativeArraySizeException (-1, 0)
+// expect: PANIC: uncaught java.lang.NegativeArraySizeException: -1
 package duke.panics;
 
 import duke.kernel.Serial;

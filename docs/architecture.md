@@ -133,10 +133,24 @@ before `<clinit>` runs, so cycles and self-references see default values exactly
 
 ### Runtime checks
 
-Null dereferences, array bounds and division by zero are checked inline. Each check site jumps to
-its own out-of-line stub that calls `duke.rt.Runtime`, which panics. Per-site rather than
-per-method stubs cost a few bytes each, but the return address then pins down the exact site.
-There are no exceptions yet.
+Null dereferences, array bounds and division by zero are checked inline, and on failure call
+`duke.rt.Runtime` inline too, which throws the JDK's exception with the JDK's message. The call
+being inline matters: its return address sits inside the right `try` range and source line.
+
+### Exceptions
+
+`athrow` calls `duke.rt.Exceptions.raise`, plain Java. It walks the rbp chain and, for each
+frame, looks the return address up in the method table, then in that method's exception table:
+rows of (start, end, handler, catch TIB) in x86 code offsets, translated from the class file's
+exception table after codegen. On a match it calls the `resumeAt` intrinsic. That resets rsp to
+the frame's base (rbp minus its locals), sets rbp, pushes the exception (the JVM's handler entry
+state) and jumps. `finally`, multi-catch and try-with-resources are just javac's bytecode on top.
+Unwinding stops at an interrupt entry, since exceptions can't propagate out of an interrupt.
+
+An uncaught exception panics with `uncaught <toString>`, its stack trace and its causes.
+`Throwable` captures return addresses at construction. The compiler flags Throwable constructors
+and runtime plumbing as hidden so traces start where the JDK's would. `OutOfMemoryError` is still a
+panic: there's no memory left to build it in.
 
 ### Backtraces
 
@@ -165,12 +179,12 @@ forms), raw memory access (`peek*`/`poke*`), `addressOf`, `halt`, `disableInterr
 
 ## What compiles today
 
-Static, instance, virtual and interface methods (including defaults), type checks and casts, boxing, string concatenation, lambdas and method references, object and array allocation
+Static, instance, virtual and interface methods (including defaults), exceptions, type checks and casts, boxing, string concatenation, lambdas and method references, object and array allocation
 (including multi-dimensional), constructors, int/long/boolean/byte/char/short arithmetic with Java semantics, all control flow
 including both switch forms, static and instance fields, array loads and stores, string literals
 and `String.length`/`charAt`.
 
-Not yet, and each a clear compile error: exceptions, floating point, monitors.
+Not yet, and each a clear compile error: floating point and monitors.
 
 String concatenation works because the kernel compiles with `javac -XDstringConcat=inline`, which
 turns `+` into `StringBuilder` calls instead of an `invokedynamic`. Every place that compiles

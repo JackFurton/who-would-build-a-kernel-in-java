@@ -28,7 +28,7 @@ public final class Heap {
     /** Target of {@code newarray} and {@code anewarray}. */
     static Object allocateArray(long tib, int length, int elementSize) {
         if (length < 0) {
-            Panic.panic("NegativeArraySizeException", length, 0);
+            throw new NegativeArraySizeException(Integer.toString(length));
         }
         long address = allocate(ARRAY_DATA_OFFSET + (long) length * elementSize);
         Magic.pokeLong(address, tib);
@@ -46,7 +46,7 @@ public final class Heap {
         int dimensions = Magic.peekInt(descriptor);
         for (int i = 0; i < dimensions; i++) {
             if (count(counts, dimensions, i) < 0) {
-                Panic.panic("NegativeArraySizeException", count(counts, dimensions, i), i);
+                throw new NegativeArraySizeException(Integer.toString(count(counts, dimensions, i)));
             }
         }
         return allocateLevel(descriptor, counts, dimensions, 0);
@@ -80,6 +80,7 @@ public final class Heap {
         // The arena is in the top 2 GiB, negative as a signed long. The largest possible request
         // (2^31 longs) crosses zero into positive values, which still compare greater than end.
         if (bumped > end) {
+            // Fatal rather than thrown: there's no memory left to allocate the error object in.
             Panic.panic("OutOfMemoryError: kernel heap arena exhausted");
         }
         next = bumped;

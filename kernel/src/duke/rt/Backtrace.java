@@ -9,10 +9,41 @@ import duke.kernel.Console;
  */
 public final class Backtrace {
 
-    private static final int ENTRY_SIZE = 40;
+    static final int ENTRY_SIZE = 56;
+    static final int ENTRY_EXCEPTIONS = 40;
+    static final int ENTRY_FLAGS = 48;
+    static final int HIDDEN = 1;
+    static final int INTERRUPT_ENTRY = 2;
     private static final int MAX_FRAMES = 64;
 
     private Backtrace() {
+    }
+
+    /**
+     * Return addresses (minus one, ready to describe) of the caller's frames, skipping the leading
+     * frames the compiler flags as hidden: runtime plumbing and Throwable constructors.
+     */
+    public static long[] capture() {
+        long rbp = Magic.framePointer();
+        long[] frames = new long[MAX_FRAMES];
+        int count = 0;
+        boolean leading = true;
+        for (int depth = 0; rbp != 0 && depth < MAX_FRAMES; depth++) {
+            long returnAddress = Magic.peekLong(rbp + 8);
+            if (returnAddress == 0) {
+                break;
+            }
+            long entry = find(returnAddress - 1);
+            boolean hidden = entry != 0 && (Magic.peekInt(entry + ENTRY_FLAGS) & HIDDEN) != 0;
+            if (!(leading && hidden)) {
+                leading = false;
+                frames[count++] = returnAddress - 1;
+            }
+            rbp = Magic.peekLong(rbp);
+        }
+        long[] trimmed = new long[count];
+        System.arraycopy(frames, 0, trimmed, 0, count);
+        return trimmed;
     }
 
     /** Prints the frames above the method that called this one. */
@@ -45,19 +76,23 @@ public final class Backtrace {
 
     /** "pkg.Class.method(File.java:42)", or a hex address if it isn't compiled code. */
     public static String describe(long address) {
+        if (find(address) == 0) {
+            return "0x" + Long.toHexString(address);
+        }
+        return element(address).toString();
+    }
+
+    public static StackTraceElement element(long address) {
         long entry = find(address);
         if (entry == 0) {
-            return "0x" + Long.toHexString(address);
+            return new StackTraceElement("", "0x" + Long.toHexString(address), null, -1);
         }
         String name = string(Magic.peekLong(entry + 16));
         long file = Magic.peekLong(entry + 24);
         int line = line(entry, (int) (address - Magic.peekLong(entry)));
-        StringBuilder sb = new StringBuilder(name).append('(');
-        sb.append(file == 0 ? "Unknown Source" : string(file));
-        if (line > 0) {
-            sb.append(':').append(line);
-        }
-        return sb.append(')').toString();
+        int dot = name.lastIndexOf('.');
+        return new StackTraceElement(dot < 0 ? "" : name.substring(0, dot), name.substring(dot + 1),
+                file == 0 ? null : string(file), line > 0 ? line : -1);
     }
 
     /** Binary search for the entry whose [start, start + size) holds the address, or 0. */

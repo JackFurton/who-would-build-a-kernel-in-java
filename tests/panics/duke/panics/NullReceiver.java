@@ -1,4 +1,4 @@
-// expect: PANIC: NullPointerException
+// expect: PANIC: uncaught java.lang.NullPointerException
 // expect:   at duke.panics.NullReceiver.main(NullReceiver.java:11)
 package duke.panics;
 

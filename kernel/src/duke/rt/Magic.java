@@ -93,6 +93,12 @@ public final class Magic {
     /** The compiler's method table; layout documented on Compiler.emitMethodTable. */
     public static native long methodTable();
 
+    /**
+     * Abandons the current frames: sets rsp and rbp, pushes the exception and jumps to the handler.
+     * Only duke.rt.Exceptions should call this.
+     */
+    public static native void resumeAt(long handler, long rsp, long rbp, Throwable exception);
+
     /** int3. */
     public static native void breakpoint();
 

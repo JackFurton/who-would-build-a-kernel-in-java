@@ -1,4 +1,4 @@
-// expect: PANIC: ArithmeticException: / by zero
+// expect: PANIC: uncaught java.lang.ArithmeticException: / by zero
 package duke.panics;
 
 import duke.kernel.Serial;

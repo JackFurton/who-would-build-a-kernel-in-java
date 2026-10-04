@@ -21,6 +21,11 @@ public final class Kernel {
         Magic.breakpoint();
         Magic.breakpoint();
         Console.println("interrupts: IDT loaded, " + breakpoints + " breakpoints handled and resumed");
+        try {
+            Integer.parseInt("forty-two");
+        } catch (NumberFormatException e) {
+            Console.println("exceptions: caught " + e);
+        }
         Console.println("DUKE-BOOT-OK");
     }
 
