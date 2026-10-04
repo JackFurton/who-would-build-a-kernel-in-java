@@ -75,6 +75,7 @@ public final class Class<T> {
         return (Class<?>) Magic.toObject(tib);
     }
 
+    @SuppressWarnings("unchecked")
     private static <S> Class<S> castSuper(long tib) {
         return (Class<S>) toClass(tib);
     }

@@ -303,6 +303,61 @@ public final class X64 {
         out.emit8(0x90);
     }
 
+    public void lidt(Mem descriptor) {
+        memOp(false, false, 3, descriptor, 0, 0x0F, 0x01);
+    }
+
+    public void lgdt(Mem descriptor) {
+        memOp(false, false, 2, descriptor, 0, 0x0F, 0x01);
+    }
+
+    public void invlpg(Mem address) {
+        memOp(false, false, 7, address, 0, 0x0F, 0x01);
+    }
+
+    /** {@code mov dst, crN}; always 64-bit in long mode, no REX.W needed. */
+    public void readCr(int cr, Reg dst) {
+        regOp(false, false, cr, dst.code(), 0x0F, 0x20);
+    }
+
+    /** {@code mov crN, src}. */
+    public void writeCr(int cr, Reg src) {
+        regOp(false, false, cr, src.code(), 0x0F, 0x22);
+    }
+
+    public void rdmsr() {
+        out.emit8(0x0F);
+        out.emit8(0x32);
+    }
+
+    public void wrmsr() {
+        out.emit8(0x0F);
+        out.emit8(0x30);
+    }
+
+    public void iretq() {
+        out.emit8(0x48);
+        out.emit8(0xCF);
+    }
+
+    public void cpuid() {
+        out.emit8(0x0F);
+        out.emit8(0xA2);
+    }
+
+    public void rdtsc() {
+        out.emit8(0x0F);
+        out.emit8(0x31);
+    }
+
+    public void pushfq() {
+        out.emit8(0x9C);
+    }
+
+    public void popfq() {
+        out.emit8(0x9D);
+    }
+
     public void std() {
         out.emit8(0xFD);
     }

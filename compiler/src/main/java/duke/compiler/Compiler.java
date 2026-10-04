@@ -37,6 +37,14 @@ public final class Compiler {
     static final String CLASS_CLASS = "java/lang/Class";
     static final String BYTE_ARRAY = "[B";
 
+    static final String INTERRUPTS = "duke/kernel/x86/Interrupts";
+    static final String INTERRUPT_STUBS = "interrupt.stubs";
+    /** Vectors where the CPU pushes an error code; every other stub pushes a 0 in its place. */
+    private static final Set<Integer> ERROR_CODE_VECTORS = Set.of(8, 10, 11, 12, 13, 14, 17, 21, 29, 30);
+    private static final Reg[] SAVED_REGISTERS = {
+            Reg.RAX, Reg.RCX, Reg.RDX, Reg.RBX, Reg.RBP, Reg.RSI, Reg.RDI,
+            Reg.R8, Reg.R9, Reg.R10, Reg.R11, Reg.R12, Reg.R13, Reg.R14, Reg.R15};
+
     static final String HEAP_ARENA = "heap.arena";
     static final int HEAP_ARENA_SIZE = 16 * 1024 * 1024;
 
@@ -62,6 +70,7 @@ public final class Compiler {
     private final Vtables vtables;
     private final LambdaCompiler lambdas;
     private int multiArraySites;
+    private boolean interruptStubs;
 
     public Compiler(ClassPool pool) {
         this.pool = pool;
@@ -99,6 +108,9 @@ public final class Compiler {
         emitTibs();
         emitStrings();
         emitInitializers();
+        if (interruptStubs) {
+            emitInterruptStubs();
+        }
         emitBootStub(entryClass, mainSymbol);
         emitHeapArena();
         emitLimineRequests();
@@ -290,6 +302,61 @@ public final class Compiler {
     String requireStatic(ClassPool.ResolvedField f) {
         requireClass(f.ownerName());
         return staticSymbol(f.ownerName(), f.name());
+    }
+
+    String requireInterruptStubs() {
+        if (!interruptStubs) {
+            interruptStubs = true;
+            requireMethod(INTERRUPTS, "dispatch", "(J)V");
+        }
+        return INTERRUPT_STUBS;
+    }
+
+    /**
+     * One entry stub per vector, then a common path that saves every general-purpose register,
+     * calls the Java dispatcher with the frame address, restores and returns with iretq.
+     * Frame layout from the address passed: r15 ... rax (15 slots, r15 lowest), vector, error code,
+     * then the CPU's rip, cs, rflags, rsp, ss.
+     */
+    private void emitInterruptStubs() {
+        Section text = image.text;
+        X64 a = new X64(text);
+        text.align(16);
+        int common = text.size();
+        a.cld();
+        for (Reg r : SAVED_REGISTERS) {
+            a.push(r);
+        }
+        a.mov(Reg.RAX, Reg.RSP);
+        a.push(Reg.RAX);
+        a.push(Reg.RAX);
+        a.call(methodSymbol(INTERRUPTS, "dispatch", "(J)V"));
+        a.aluImm(X64.Alu.ADD, true, Reg.RSP, 16);
+        for (int i = SAVED_REGISTERS.length - 1; i >= 0; i--) {
+            a.pop(SAVED_REGISTERS[i]);
+        }
+        a.aluImm(X64.Alu.ADD, true, Reg.RSP, 16);
+        a.iretq();
+        image.define("interrupt.common", text, common, text.size() - common, Image.SymbolType.FUNC);
+
+        for (int vector = 0; vector < 256; vector++) {
+            text.align(16);
+            int start = text.size();
+            if (!ERROR_CODE_VECTORS.contains(vector)) {
+                a.pushImm(0);
+            }
+            a.pushImm(vector);
+            a.jmp("interrupt.common");
+            image.define("interrupt." + vector, text, start, text.size() - start, Image.SymbolType.FUNC);
+        }
+
+        Section rodata = image.rodata;
+        rodata.align(8);
+        int table = rodata.size();
+        for (int vector = 0; vector < 256; vector++) {
+            rodata.emitReloc(Reloc.Kind.ABS64, "interrupt." + vector, 0);
+        }
+        image.define(INTERRUPT_STUBS, rodata, table, rodata.size() - table, Image.SymbolType.OBJECT);
     }
 
     /** A TIB for a type named the way class entries name it: internal name, or descriptor for arrays. */

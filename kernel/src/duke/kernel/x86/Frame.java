@@ -1,0 +1,52 @@
+package duke.kernel.x86;
+
+import duke.rt.Magic;
+
+/**
+ * Accessors for the register frame the compiler's interrupt stubs build on the stack. A frame is
+ * passed as its address: it's raw stack memory, not an object.
+ */
+public final class Frame {
+
+    // Saved in push order rax..r15, so r15 is at the lowest address.
+    public static final String[] REGISTERS = {
+        "r15", "r14", "r13", "r12", "r11", "r10", "r9", "r8", "rdi", "rsi", "rbp", "rbx", "rdx", "rcx", "rax"};
+
+    private static final int VECTOR = 120;
+    private static final int ERROR_CODE = 128;
+    private static final int RIP = 136;
+    private static final int CS = 144;
+    private static final int RFLAGS = 152;
+    private static final int RSP = 160;
+
+    private Frame() {
+    }
+
+    public static long register(long frame, int index) {
+        return Magic.peekLong(frame + 8L * index);
+    }
+
+    public static int vector(long frame) {
+        return (int) Magic.peekLong(frame + VECTOR);
+    }
+
+    public static long errorCode(long frame) {
+        return Magic.peekLong(frame + ERROR_CODE);
+    }
+
+    public static long rip(long frame) {
+        return Magic.peekLong(frame + RIP);
+    }
+
+    public static long cs(long frame) {
+        return Magic.peekLong(frame + CS);
+    }
+
+    public static long rflags(long frame) {
+        return Magic.peekLong(frame + RFLAGS);
+    }
+
+    public static long rsp(long frame) {
+        return Magic.peekLong(frame + RSP);
+    }
+}

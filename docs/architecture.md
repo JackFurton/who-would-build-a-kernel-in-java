@@ -11,9 +11,21 @@
 
 Everything after step 2 is compiled Java except the dozen instructions of `_start`.
 
-At entry, interrupts are disabled and there is no IDT. Any fault triple-faults, and QEMU, run
-with `-no-reboot`, exits. SSE is disabled (Limine clears CR4 bits it doesn't need), so the
-compiler emits no SSE instructions.
+At entry, interrupts are disabled and there is no IDT, so a fault before `Idt.load()` triple-faults
+(QEMU, run with `-no-reboot`, then exits). SSE is disabled (Limine clears CR4 bits it doesn't
+need), so the compiler emits no SSE instructions.
+
+## Interrupts
+
+`Magic.interruptStubs()` makes the compiler emit 256 entry stubs and a table of their addresses.
+Each stub pushes a dummy error code where the CPU doesn't push one, then its vector, and jumps to a
+common path. That path clears DF, saves every general-purpose register, and calls
+`duke.kernel.x86.Interrupts.dispatch(frame)` with the address of the saved state. It restores
+after, and returns with `iretq`. `Idt` writes the gates in Java and loads them with `lidt`.
+
+`Interrupts.dispatch` runs a registered `Handler` if there is one. Otherwise it panics with the
+exception name, error code, CR2 for page faults, and a register dump. Handlers must not allocate
+for now: the bump allocator isn't reentrant.
 
 ## Compiler pipeline
 
