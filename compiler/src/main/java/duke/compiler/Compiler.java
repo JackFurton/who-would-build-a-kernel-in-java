@@ -56,6 +56,7 @@ public final class Compiler {
 
     static final String HEAP_ARENA = "heap.arena";
     static final String METHOD_TABLE = "method.table";
+    static final String IMAGE_LAYOUT = "image.layout";
     static final int HEAP_ARENA_SIZE = 16 * 1024 * 1024;
 
     private static final int BOOT_STACK_SIZE = 64 * 1024;
@@ -145,6 +146,7 @@ public final class Compiler {
         emitTibs();
         emitStrings();
         emitHeapArena();
+        emitImageLayout();
         return image;
     }
 
@@ -880,6 +882,27 @@ public final class Compiler {
         a.hlt();
         a.jmp(hang);
         image.define(ENTRY_SYMBOL, text, start, text.size() - start, Image.SymbolType.FUNC);
+    }
+
+    /**
+     * Section boundaries for Magic.imageLayout(), so the kernel can map its own image: six
+     * addresses, text start/end, rodata start/end, data start, bss end. Emitted last, so the end
+     * symbols see the final sizes.
+     */
+    private void emitImageLayout() {
+        Section rodata = image.rodata;
+        rodata.align(8);
+        int table = rodata.size();
+        for (String bound : List.of("text.start", "text.end", "rodata.start", "rodata.end", "data.start", "bss.end")) {
+            rodata.emitReloc(Reloc.Kind.ABS64, "image." + bound, 0);
+        }
+        image.define(IMAGE_LAYOUT, rodata, table, rodata.size() - table, Image.SymbolType.OBJECT);
+        image.define("image.text.start", image.text, 0, 0, Image.SymbolType.OBJECT);
+        image.define("image.text.end", image.text, image.text.size(), 0, Image.SymbolType.OBJECT);
+        image.define("image.rodata.start", image.rodata, 0, 0, Image.SymbolType.OBJECT);
+        image.define("image.rodata.end", image.rodata, image.rodata.size(), 0, Image.SymbolType.OBJECT);
+        image.define("image.data.start", image.data, 0, 0, Image.SymbolType.OBJECT);
+        image.define("image.bss.end", image.bss, image.bss.size(), 0, Image.SymbolType.OBJECT);
     }
 
     /** Costs nothing in the file: .bss is only memsz. Replaced by a real heap in #16. */

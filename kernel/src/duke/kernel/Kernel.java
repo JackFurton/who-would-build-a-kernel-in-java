@@ -1,6 +1,7 @@
 package duke.kernel;
 
 import duke.boot.Limine;
+import duke.kernel.mm.KernelAddressSpace;
 import duke.kernel.mm.PhysicalMemory;
 import duke.kernel.x86.Idt;
 import duke.kernel.x86.Interrupts;
@@ -21,6 +22,7 @@ public final class Kernel {
             Panic.panic("Limine doesn't support base revision 6");
         }
         PhysicalMemory.init();
+        KernelAddressSpace.activate();
     }
 
     /** The entry point: the compiler's _start stub calls this. */
@@ -40,6 +42,9 @@ public final class Kernel {
         printMemoryMap();
         Console.println("frames: " + PhysicalMemory.freeFrames() + " free ("
                 + (PhysicalMemory.freeFrames() * PhysicalMemory.PAGE_SIZE >> 20) + " MiB)");
+        Console.println("paging: running on our own page tables, PML4 at physical 0x"
+                + Long.toHexString(KernelAddressSpace.table().root()) + ", " + KernelAddressSpace.table().tableFrames()
+                + " table frames, NX " + (KernelAddressSpace.noExecuteSupported() ? "on" : "unavailable"));
         Console.println("DUKE-BOOT-OK");
     }
 
