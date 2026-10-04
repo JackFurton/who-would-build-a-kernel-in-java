@@ -13,6 +13,15 @@ public final class Panic {
         haltForever();
     }
 
+    public static void panic(String... parts) {
+        Console.print("\nPANIC: ");
+        for (String part : parts) {
+            Console.print(part);
+        }
+        Console.println("");
+        haltForever();
+    }
+
     public static void panic(String message, int a, int b) {
         Console.print("\nPANIC: ");
         Console.print(message);

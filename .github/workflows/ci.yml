@@ -37,6 +37,9 @@ jobs:
       - name: Conformance (HotSpot vs Duke)
         run: make conformance
 
+      - name: Panic tests (runtime checks fail loudly)
+        run: make panic-tests
+
       - name: Upload kernel and logs
         if: always()
         uses: actions/upload-artifact@v7
@@ -48,5 +51,6 @@ jobs:
             build/serial.log
             build/conformance/serial.log
             build/conformance/boot.txt
+            build/panics/*/serial.log
             compiler/build/reports/tests/
           if-no-files-found: ignore

@@ -68,7 +68,7 @@ Results come back in `rax`. All registers are caller-saved. Symbols are
 object:  [0] TIB pointer   [8...] fields (superclass first, then largest-first)
 array:   [0] TIB pointer   [8] int length   [12] padding   [16...] elements
 TIB:     [0] super TIB   [8] size   [12] flags   [16] element TIB   [24] name (a String)
-         [32] interfaces (reserved)   [40] itable (reserved)   [48...] vtable
+         [32] interface list   [40] itable (reserved)   [48...] vtable
 ```
 
 ### Dispatch
@@ -94,6 +94,10 @@ layout is part of the contract between `dukec` and `kernel/src/java/lang/String.
 Null dereferences, array bounds and division by zero are checked inline. Failures jump to
 per-method slow paths that call `duke.rt.Runtime`, which panics. There are no exceptions yet.
 
+`checkcast`, `instanceof` and reference array stores decide exact TIB matches inline (plus null,
+and stores into `Object[]`) and otherwise call `duke.rt.Types`, which walks the super chain, the
+TIB's interface list, or array element types.
+
 ### Intrinsics
 
 Native methods on `duke.rt.Magic` are compiled inline: port I/O (`outb`/`inb` and the wider
@@ -102,13 +106,13 @@ forms), raw memory access (`peek*`/`poke*`), `addressOf`, `halt`, `disableInterr
 
 ## What compiles today
 
-Static, instance and virtual methods, object and array allocation
+Static, instance and virtual methods, type checks and casts, object and array allocation
 (including multi-dimensional), constructors, int/long/boolean/byte/char/short arithmetic with Java semantics, all control flow
 including both switch forms, static and instance fields, array loads and stores, string literals
 and `String.length`/`charAt`.
 
-Not yet, and each a clear compile error: interfaces, exceptions,
-floating point, `invokedynamic` (lambdas, string concatenation), monitors, `checkcast`/`instanceof`.
+Not yet, and each a clear compile error: calls through interfaces, exceptions,
+floating point, `invokedynamic` (lambdas, string concatenation), monitors.
 
 ## Testing
 
@@ -119,3 +123,6 @@ floating point, `invokedynamic` (lambdas, string concatenation), monitors, `chec
   `tests/conformance` on HotSpot, generates a kernel that runs the same tests, boots it and
   compares the results. Add a test by adding a non-private, no-argument static method with a
   primitive result.
+- `make panic-tests` boots one kernel per file in `tests/panics` and checks it dies with the
+  panic line named in the file's `// expect:` comment. This covers the failure side of every
+  runtime check (null, bounds, division, casts, array stores, allocation).

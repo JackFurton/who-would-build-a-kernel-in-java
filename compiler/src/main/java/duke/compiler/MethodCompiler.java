@@ -44,6 +44,7 @@ import java.lang.classfile.instruction.StackInstruction;
 import java.lang.classfile.instruction.StoreInstruction;
 import java.lang.classfile.instruction.SwitchCase;
 import java.lang.classfile.instruction.TableSwitchInstruction;
+import java.lang.classfile.instruction.TypeCheckInstruction;
 import java.lang.constant.ClassDesc;
 import java.lang.constant.MethodTypeDesc;
 import java.lang.reflect.AccessFlag;
@@ -69,6 +70,7 @@ final class MethodCompiler {
     private static final String RUNTIME = "duke/rt/Runtime";
     private static final String MAGIC = "duke/rt/Magic";
     private static final String HEAP = "duke/rt/Heap";
+    private static final String TYPES = "duke/rt/Types";
 
     private final Compiler program;
     private final ClassPool pool;
@@ -194,6 +196,7 @@ final class MethodCompiler {
             case NewPrimitiveArrayInstruction n -> newArray("[" + n.typeKind().upperBound().descriptorString());
             case NewReferenceArrayInstruction n -> newArray("[" + descriptorOf(n.componentType().asInternalName()));
             case NewMultiArrayInstruction n -> newMultiArray(n.arrayType().asInternalName(), n.dimensions());
+            case TypeCheckInstruction t -> typeCheck(t.opcode(), program.requireTib(t.type().asInternalName()));
             case NopInstruction n -> { }
             default -> throw error("unsupported bytecode " + i.opcode().name().toLowerCase());
         }
@@ -575,6 +578,59 @@ final class MethodCompiler {
         call(allocate, allocate.method().methodTypeSymbol(), 3);
     }
 
+    /** An exact TIB match is decided inline; anything else asks duke.rt.Types. */
+    private void typeCheck(Opcode op, String tib) {
+        program.requireClass(TYPES);
+        if (op == Opcode.INSTANCEOF) {
+            a.lea(RCX, Mem.rip(tib));
+            pushLong(RCX);
+            ClassPool.ResolvedMethod m = pool.resolveMethod(TYPES, "instanceOf", "(Ljava/lang/Object;J)Z");
+            call(m, m.method().methodTypeSymbol(), 3);
+            return;
+        }
+        X64.Label done = new X64.Label();
+        a.load(8, false, RAX, Mem.at(RSP));
+        a.test(true, RAX, RAX);
+        a.jcc(Cond.E, done);
+        a.load(8, false, RAX, Mem.at(RAX));
+        a.lea(RCX, Mem.rip(tib));
+        a.alu(Alu.CMP, true, RAX, RCX);
+        a.jcc(Cond.E, done);
+        a.push(Mem.at(RSP));
+        pushLong(RCX);
+        ClassPool.ResolvedMethod m = pool.resolveMethod(TYPES, "checkCast", "(Ljava/lang/Object;J)V");
+        call(m, m.method().methodTypeSymbol(), 3);
+        a.bind(done);
+    }
+
+    /**
+     * Array store check with the stack as {@code array, index, value}. Null values, exact element
+     * matches and Object[] targets pass inline. A null array falls through to the NPE check after.
+     */
+    private void arrayStoreCheck() {
+        X64.Label ok = new X64.Label();
+        a.load(8, false, RDX, Mem.at(RSP));
+        a.test(true, RDX, RDX);
+        a.jcc(Cond.E, ok);
+        a.load(8, false, RAX, Mem.at(RSP, 16));
+        a.test(true, RAX, RAX);
+        a.jcc(Cond.E, ok);
+        a.load(8, false, RAX, Mem.at(RAX));
+        a.load(8, false, RAX, Mem.at(RAX, Layouts.TIB_ELEMENT));
+        a.load(8, false, RDX, Mem.at(RDX));
+        a.alu(Alu.CMP, true, RAX, RDX);
+        a.jcc(Cond.E, ok);
+        a.lea(RDX, Mem.rip(program.requireTib(ClassPool.OBJECT)));
+        a.alu(Alu.CMP, true, RAX, RDX);
+        a.jcc(Cond.E, ok);
+        a.push(Mem.at(RSP, 16));
+        a.push(Mem.at(RSP, 8));
+        program.requireClass(TYPES);
+        ClassPool.ResolvedMethod m = pool.resolveMethod(TYPES, "checkArrayStore", "(Ljava/lang/Object;Ljava/lang/Object;)V");
+        call(m, m.method().methodTypeSymbol(), 2);
+        a.bind(ok);
+    }
+
     /** Class entries name arrays by descriptor and classes by internal name. */
     private static String descriptorOf(String classEntryName) {
         return classEntryName.startsWith("[") ? classEntryName : "L" + classEntryName + ";";
@@ -724,11 +780,13 @@ final class MethodCompiler {
         pushValue(RAX, kind == TypeKind.LONG);
     }
 
-    /** TODO(#6): reference stores skip the ArrayStoreException type check. */
     private void arrayStore(TypeKind kind) {
         int width = arrayWidth(kind);
         if (width == 0) {
             throw error("unsupported array element type " + kind);
+        }
+        if (kind == TypeKind.REFERENCE) {
+            arrayStoreCheck();
         }
         popValue(RDX, kind == TypeKind.LONG);
         checkedArrayAccess();

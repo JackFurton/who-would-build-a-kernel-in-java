@@ -11,8 +11,10 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Collection;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Stream;
 
 /** Every class in the kernel image. The world is closed: anything not here does not exist. */
@@ -91,6 +93,30 @@ public final class ClassPool {
 
     public String superName(ClassModel model) {
         return model.superclass().map(c -> c.asInternalName()).orElse(null);
+    }
+
+    /**
+     * Every interface {@code type} implements: those declared on it and its superclasses, plus all
+     * their superinterfaces. For an interface, its superinterfaces.
+     */
+    public Set<String> allInterfaces(String type) {
+        Set<String> result = new LinkedHashSet<>();
+        for (String c = type; c != null; ) {
+            ClassModel model = get(c);
+            for (var entry : model.interfaces()) {
+                addWithSuperinterfaces(entry.asInternalName(), result);
+            }
+            c = superName(model);
+        }
+        return result;
+    }
+
+    private void addWithSuperinterfaces(String iface, Set<String> into) {
+        if (into.add(iface)) {
+            for (var entry : get(iface).interfaces()) {
+                addWithSuperinterfaces(entry.asInternalName(), into);
+            }
+        }
     }
 
     public boolean isSubclass(String sub, String sup) {
