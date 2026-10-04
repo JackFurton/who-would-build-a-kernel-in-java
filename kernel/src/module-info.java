@@ -8,6 +8,7 @@ module java.base {
     exports java.lang.invoke;
     exports java.util;
     exports duke.rt;
+    exports duke.boot;
     exports duke.kernel;
     exports duke.kernel.x86;
 }
