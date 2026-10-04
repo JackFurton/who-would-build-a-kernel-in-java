@@ -42,4 +42,12 @@ public final class Console {
             divisor /= 10;
         }
     }
+
+    public static void printHex(long value) {
+        print("0x");
+        for (int shift = 60; shift >= 0; shift -= 4) {
+            int digit = (int) ((value >>> shift) & 0xF);
+            Serial.write(digit < 10 ? '0' + digit : 'a' + digit - 10);
+        }
+    }
 }
