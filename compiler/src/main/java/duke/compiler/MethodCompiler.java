@@ -789,6 +789,12 @@ final class MethodCompiler {
             case "pokeInt" -> poke(4);
             case "pokeLong" -> poke(8);
             case "copyMemory" -> copyMemory();
+            case "fillMemory" -> {
+                popLong(RCX);
+                a.pop(RAX);
+                popLong(Reg.RDI);
+                a.repStosb();
+            }
             case "addressOf" -> {
                 a.pop(RAX);
                 pushLong(RAX);

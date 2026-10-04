@@ -30,6 +30,14 @@ after, and returns with `iretq`. `Idt` writes the gates in Java and loads them w
 exception name, error code, CR2 for page faults, and a register dump. Handlers must not allocate
 for now: the bump allocator isn't reentrant.
 
+## Memory
+
+`PhysicalMemory` hands out 4 KiB frames from the "usable" regions of Limine's memory map,
+tracked in a `FrameBitmap` (one bit per page, next-fit search). Frames are named by physical
+address and touched through Limine's higher-half direct map. Bootloader-reclaimable memory stays
+reserved until we run on our own page tables, since Limine's tables and responses live there.
+Java objects still come from the fixed bump arena in `.bss` (see Objects below).
+
 ## Compiler pipeline
 
 ```

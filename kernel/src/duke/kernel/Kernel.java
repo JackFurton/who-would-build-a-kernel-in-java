@@ -1,6 +1,7 @@
 package duke.kernel;
 
 import duke.boot.Limine;
+import duke.kernel.mm.PhysicalMemory;
 import duke.kernel.x86.Idt;
 import duke.kernel.x86.Interrupts;
 import duke.rt.Magic;
@@ -10,15 +11,21 @@ public final class Kernel {
     private Kernel() {
     }
 
-    /** Called by the compiler-generated entry stub once every class initializer has run. */
     private static int breakpoints;
 
-    public static void main() {
+    /** Brings up the core subsystems. Shared with the ktest runner, so tests see a real kernel. */
+    public static void init() {
         Serial.init();
         Idt.load();
         if (!Limine.baseRevisionSupported()) {
             Panic.panic("Limine doesn't support base revision 6");
         }
+        PhysicalMemory.init();
+    }
+
+    /** The entry point: the compiler's _start stub calls this. */
+    public static void main() {
+        init();
         Console.println("Duke: hello from Java on bare metal");
         Console.println("bytecode arithmetic check: 6 * 7 = " + 6L * multiplier());
         Interrupts.register(3, frame -> breakpoints++);
@@ -31,6 +38,8 @@ public final class Kernel {
             Console.println("exceptions: caught " + e);
         }
         printMemoryMap();
+        Console.println("frames: " + PhysicalMemory.freeFrames() + " free ("
+                + (PhysicalMemory.freeFrames() * PhysicalMemory.PAGE_SIZE >> 20) + " MiB)");
         Console.println("DUKE-BOOT-OK");
     }
 

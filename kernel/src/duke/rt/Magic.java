@@ -40,6 +40,9 @@ public final class Magic {
     /** memmove: correct for overlapping ranges in either direction. */
     public static native void copyMemory(long destination, long source, long bytes);
 
+    /** memset: {@code bytes} copies of the low byte of {@code value} at {@code destination}. */
+    public static native void fillMemory(long destination, int value, long bytes);
+
     public static native long addressOf(Object object);
 
     public static native Object toObject(long address);
