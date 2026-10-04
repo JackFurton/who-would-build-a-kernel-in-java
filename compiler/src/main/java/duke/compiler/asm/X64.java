@@ -234,6 +234,16 @@ public final class X64 {
         emitImm(imm, small);
     }
 
+    public void cmpByte(Mem m, int imm8) {
+        memOp(false, false, 7, m, 1, 0x80);
+        out.emit8(imm8);
+    }
+
+    public void movByte(Mem m, int imm8) {
+        memOp(false, false, 0, m, 1, 0xC6);
+        out.emit8(imm8);
+    }
+
     public void imul(boolean wide, Reg dst, Reg src) {
         regOp(wide, false, dst.code(), src.code(), 0x0F, 0xAF);
     }

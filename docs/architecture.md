@@ -6,9 +6,8 @@
 2. Limine loads `kernel.elf`. Its segments sit in the higher half at `0xffffffff80000000`.
    Limine finds the requests block (start marker, base revision 6 tag, end marker) in `.data`,
    switches to long mode with paging on, and jumps to `_start`.
-3. `_start` comes from `Compiler.emitBootStub`. It switches to a 64 KiB stack in `.bss`, calls
-   every reachable `<clinit>` in order, then calls `Kernel.main()`. If `main` returns, the CPU
-   halts.
+3. `_start` comes from `Compiler.emitBootStub`. It switches to a 64 KiB stack in `.bss`,
+   initializes `Kernel`, then calls `Kernel.main()`. If `main` returns, the CPU halts.
 
 Everything after step 2 is compiled Java except the dozen instructions of `_start`.
 
@@ -99,6 +98,14 @@ at `Class`'s own TIB. So `getClass()` is one load, `Foo.class` is the TIB's addr
 
 String literals are prebuilt objects in `.data`, Latin-1 only for now. `String`'s `value` field
 layout is part of the contract between `dukec` and `kernel/src/java/lang/String.java`.
+
+### Class initialization
+
+Classes initialize lazily, with JVM semantics (JVMS 5.5): on the first `new`, static field access
+or static call, superclass first. Each class whose initialization runs code gets a one-byte flag
+and a stub. Trigger sites compile to `cmp byte [flag], 0; jne skip; call stub`. No check is
+emitted for classes with nothing to run, or inside the class itself or a subclass. The flag is set
+before `<clinit>` runs, so cycles and self-references see default values exactly as on HotSpot.
 
 ### Runtime checks
 

@@ -478,10 +478,12 @@ final class MethodCompiler {
         boolean wide = descriptor.equals("J") || descriptor.equals("D");
         switch (f.opcode()) {
             case GETSTATIC -> {
+                ensureInitialized(field.ownerName());
                 a.load(width, signed, RAX, Mem.rip(program.requireStatic(field)));
                 pushValue(RAX, wide);
             }
             case PUTSTATIC -> {
+                ensureInitialized(field.ownerName());
                 popValue(RAX, wide);
                 a.store(width, Mem.rip(program.requireStatic(field)), RAX);
             }
@@ -534,7 +536,7 @@ final class MethodCompiler {
                 if (!m.is(AccessFlag.STATIC)) {
                     throw error(m.ownerName() + "." + name + " is not static");
                 }
-                program.requireClass(m.ownerName());
+                ensureInitialized(m.ownerName());
                 call(m, type, argSlots(type));
             }
             case INVOKESPECIAL -> {
@@ -584,23 +586,40 @@ final class MethodCompiler {
         }
     }
 
+    /**
+     * JVMS 5.5 initialization trigger. Skipped when nothing would run, and inside the class itself
+     * or a subclass, where the class is already initialized or being initialized.
+     */
+    private void ensureInitialized(String type) {
+        program.requireClass(type);
+        if (!program.needsInit(type) || pool.isSubclass(method.ownerName(), type)) {
+            return;
+        }
+        String initializer = program.requireInitializer(type);
+        X64.Label done = new X64.Label();
+        a.cmpByte(Mem.rip("initialized:" + type), 0);
+        a.jcc(Cond.NE, done);
+        a.call(initializer);
+        a.bind(done);
+    }
+
     /** Pushes the new object; the {@code dup; invokespecial <init>} that follows is ordinary bytecode. */
     private void newObject(String className) {
         if (pool.get(className).flags().has(AccessFlag.ABSTRACT)) {
             throw error("cannot instantiate abstract class or interface " + className);
         }
-        program.requireClass(className);
+        ensureInitialized(className);
         a.lea(RAX, Mem.rip(Compiler.tibSymbol(className)));
         pushLong(RAX);
         a.pushImm(program.layouts().of(className).size());
         ClassPool.ResolvedMethod allocate = pool.resolveMethod(HEAP, "allocateObject", "(JI)Ljava/lang/Object;");
-        program.requireClass(HEAP);
+        ensureInitialized(HEAP);
         call(allocate, allocate.method().methodTypeSymbol(), 3);
     }
 
     /** An exact TIB match is decided inline; anything else asks duke.rt.Types. */
     private void typeCheck(Opcode op, String tib) {
-        program.requireClass(TYPES);
+        ensureInitialized(TYPES);
         if (op == Opcode.INSTANCEOF) {
             a.lea(RCX, Mem.rip(tib));
             pushLong(RCX);
@@ -645,7 +664,7 @@ final class MethodCompiler {
         a.jcc(Cond.E, ok);
         a.push(Mem.at(RSP, 16));
         a.push(Mem.at(RSP, 8));
-        program.requireClass(TYPES);
+        ensureInitialized(TYPES);
         ClassPool.ResolvedMethod m = pool.resolveMethod(TYPES, "checkArrayStore", "(Ljava/lang/Object;Ljava/lang/Object;)V");
         call(m, m.method().methodTypeSymbol(), 2);
         a.bind(ok);
@@ -663,7 +682,7 @@ final class MethodCompiler {
         a.push(RCX);
         a.pushImm(Layouts.width(type.substring(1)));
         ClassPool.ResolvedMethod allocate = pool.resolveMethod(HEAP, "allocateArray", "(JII)Ljava/lang/Object;");
-        program.requireClass(HEAP);
+        ensureInitialized(HEAP);
         call(allocate, allocate.method().methodTypeSymbol(), 4);
     }
 
@@ -674,7 +693,7 @@ final class MethodCompiler {
         pushLong(RCX);
         pushLong(RAX);
         ClassPool.ResolvedMethod allocate = pool.resolveMethod(HEAP, "allocateMultiArray", "(JJ)Ljava/lang/Object;");
-        program.requireClass(HEAP);
+        ensureInitialized(HEAP);
         a.call(program.requireMethod(allocate));
         a.aluImm(Alu.ADD, true, RSP, 8 * (4 + dimensions));
         a.push(RAX);
