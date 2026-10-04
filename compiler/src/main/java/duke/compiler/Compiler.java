@@ -119,6 +119,10 @@ public final class Compiler {
         return "tib:" + type;
     }
 
+    private static String interfacesSymbol(String type) {
+        return "interfaces:" + type;
+    }
+
     /** Marks a class reachable, which also schedules its static initializer. */
     void requireClass(String name) {
         if (classes.contains(name)) {
@@ -181,6 +185,16 @@ public final class Compiler {
     String requireStatic(ClassPool.ResolvedField f) {
         requireClass(f.ownerName());
         return staticSymbol(f.ownerName(), f.name());
+    }
+
+    /** A TIB for a type named the way class entries name it: internal name, or descriptor for arrays. */
+    String requireTib(String type) {
+        if (type.startsWith("[")) {
+            return requireArrayTib(type);
+        }
+        pool.get(type);
+        tibs.add(type);
+        return tibSymbol(type);
     }
 
     /** {@code type} is an array descriptor such as {@code [I} or {@code [Ljava/lang/String;}. */
@@ -301,6 +315,7 @@ public final class Compiler {
                 if (superName != null) {
                     deps.add(superName);
                 }
+                deps.addAll(pool.allInterfaces(type));
             }
             for (String dep : deps) {
                 if (tibs.add(dep)) {
@@ -338,13 +353,25 @@ public final class Compiler {
      * [12] flags: array, interface, reference array (u32)
      * [16] element TIB for reference arrays, else 0
      * [24] name, a String
-     * [32] implemented interfaces, reserved
+     * [32] 0-terminated list of every interface the type implements, or 0 if none
      * [40] interface method table, reserved
      * [48] vtable: one code pointer per Vtables slot, 0 where nothing dispatches to it
      * </pre>
      */
     private void emitTibs() {
         Section rodata = image.rodata;
+        for (String type : tibs) {
+            if (type.startsWith("[") || pool.allInterfaces(type).isEmpty()) {
+                continue;
+            }
+            rodata.align(8);
+            int start = rodata.size();
+            for (String iface : pool.allInterfaces(type)) {
+                rodata.emitReloc(Reloc.Kind.ABS64, tibSymbol(iface), 0);
+            }
+            rodata.emit64(0);
+            image.define(interfacesSymbol(type), rodata, start, rodata.size() - start, Image.SymbolType.OBJECT);
+        }
         for (String type : tibs) {
             boolean array = type.startsWith("[");
             String element = array ? elementType(type) : null;
@@ -361,7 +388,7 @@ public final class Compiler {
             rodata.emit32(flags);
             emitPointer(rodata, element == null ? null : tibSymbol(element));
             emitPointer(rodata, strings.get(javaName(type)));
-            rodata.emit64(0);
+            emitPointer(rodata, image.isDefined(interfacesSymbol(type)) ? interfacesSymbol(type) : null);
             rodata.emit64(0);
             String dispatchType = array || isInterface ? ClassPool.OBJECT : type;
             for (Vtables.Key key : vtables.layout(dispatchType)) {

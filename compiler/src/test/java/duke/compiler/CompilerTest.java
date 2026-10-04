@@ -68,17 +68,19 @@ class CompilerTest {
         Path classes = compile("""
                 package duke.test;
                 public final class Entry {
-                    static boolean check(Object o) {
-                        return o instanceof String;
+                    static int half(int x) {
+                        float f = x;
+                        return (int) (f / 2);
                     }
                     public static void main() {
-                        check(null);
+                        half(0);
                     }
                 }
                 """);
         CompileException e = assertThrows(CompileException.class,
                 () -> new Compiler(ClassPool.load(classes)).compile("duke/test/Entry", "main"));
-        assertEquals("duke/test/Entry.check(Ljava/lang/Object;)Z (line 4): unsupported bytecode instanceof", e.getMessage());
+        assertEquals("duke/test/Entry.half(I)I (line 4): unsupported conversion i2f"
+                + " (floating point is not supported yet)", e.getMessage());
     }
 
     @Test

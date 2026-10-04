@@ -44,7 +44,7 @@ covers both. Put the firmware somewhere unusual? Set `OVMF=/path/to/OVMF_CODE.fd
 
 ```sh
 make run          # build and boot; serial output in your terminal, Ctrl-A X to quit
-make test         # compiler unit tests, boot test, conformance suite
+make test         # compiler unit tests, boot test, conformance and panic suites
 make disasm       # objdump the kernel (symbols included)
 ```
 

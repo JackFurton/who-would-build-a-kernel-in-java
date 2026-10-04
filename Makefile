@@ -16,7 +16,7 @@ export OVMF
 KERNEL_SRCS   := $(shell find kernel/src -name '*.java')
 COMPILER_SRCS := $(shell find compiler/src/main -name '*.java') compiler/build.gradle.kts
 
-.PHONY: all compiler run test unit-test boot-test conformance disasm clean
+.PHONY: all compiler run test unit-test boot-test conformance panic-tests disasm clean
 
 all: $(BUILD)/esp/boot/kernel.elf
 
@@ -46,7 +46,7 @@ $(BUILD)/esp/boot/kernel.elf: $(BUILD)/kernel.elf $(BUILD)/limine/BOOTX64.EFI bo
 run: all
 	tools/qemu.sh $(BUILD)/esp -serial mon:stdio
 
-test: unit-test boot-test conformance
+test: unit-test boot-test conformance panic-tests
 
 unit-test:
 	./gradlew -q :compiler:test
@@ -56,6 +56,9 @@ boot-test: all
 
 conformance: $(DUKEC) $(BUILD)/limine/BOOTX64.EFI
 	java tools/Conformance.java
+
+panic-tests: $(DUKEC) $(BUILD)/limine/BOOTX64.EFI
+	java tools/PanicTests.java
 
 disasm: $(BUILD)/kernel.elf
 	objdump -d -M intel $(BUILD)/kernel.elf | less

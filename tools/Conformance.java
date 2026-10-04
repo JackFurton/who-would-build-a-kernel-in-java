@@ -13,8 +13,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.stream.Stream;
-import javax.tools.ToolProvider;
 
 /**
  * Differential test of the compiler: runs every test method in tests/conformance on the host JVM,
@@ -25,18 +23,17 @@ import javax.tools.ToolProvider;
  */
 public class Conformance {
 
-    static final Path ROOT = Path.of("").toAbsolutePath();
-    static final Path TESTS = ROOT.resolve("tests/conformance");
-    static final Path OUT = ROOT.resolve("build/conformance");
+    static final Path TESTS = Harness.ROOT.resolve("tests/conformance");
+    static final Path OUT = Harness.ROOT.resolve("build/conformance");
     static final String PACKAGE = "duke.conformance";
     static final String DONE = "DUKE-CONFORMANCE-DONE";
 
     public static void main(String[] args) throws Exception {
-        deleteRecursively(OUT);
-        List<Path> testSources = javaFiles(TESTS);
+        Harness.deleteRecursively(OUT);
+        List<Path> testSources = Harness.javaFiles(TESTS);
 
         Path hostClasses = OUT.resolve("host");
-        javac(List.of("-d", hostClasses.toString()), testSources);
+        Harness.javac(List.of("-d", hostClasses.toString()), testSources);
         Map<String, Method> tests = new LinkedHashMap<>();
         Map<String, Long> expected = new LinkedHashMap<>();
         try (URLClassLoader loader = new URLClassLoader(new URL[] {hostClasses.toUri().toURL()})) {
@@ -63,21 +60,10 @@ public class Conformance {
         writeMain(gen, tests);
 
         Path kernelClasses = OUT.resolve("kclasses");
-        List<Path> kernelSources = new ArrayList<>(javaFiles(ROOT.resolve("kernel/src")));
-        kernelSources.addAll(testSources);
-        kernelSources.addAll(javaFiles(gen));
-        String sourcePath = "java.base=" + String.join(java.io.File.pathSeparator,
-                ROOT.resolve("kernel/src").toString(), TESTS.toString(), gen.toString());
-        javac(List.of("--system", "none", "--module-source-path", sourcePath, "-d", kernelClasses.toString()), kernelSources);
-
-        Path elf = OUT.resolve("kernel.elf");
-        run(OUT.resolve("dukec.txt"), ROOT.resolve("compiler/build/install/dukec/bin/dukec").toString(),
-                "--classes", kernelClasses.toString(), "--entry", PACKAGE.replace('.', '/') + "/Main.main",
-                "--output", elf.toString(), "--map", OUT.resolve("kernel.map").toString());
-        run(null, "tools/make-esp.sh", OUT.resolve("esp").toString(), "build/limine/BOOTX64.EFI",
-                "boot/limine.conf", elf.toString());
+        Harness.compileKernel(kernelClasses, List.of(TESTS, gen));
+        Path esp = Harness.buildImage(kernelClasses, PACKAGE.replace('.', '/') + "/Main.main", OUT);
         Path serial = OUT.resolve("serial.log");
-        int boot = runStatus(OUT.resolve("boot.txt"), "tools/boot-test.sh", OUT.resolve("esp").toString(),
+        int boot = Harness.runStatus(OUT.resolve("boot.txt"), "tools/boot-test.sh", esp.toString(),
                 serial.toString(), DONE, "300");
 
         Map<String, Long> actual = parse(serial);
@@ -131,13 +117,9 @@ public class Conformance {
 
     static Map<String, Long> parse(Path serial) throws IOException {
         Map<String, Long> results = new LinkedHashMap<>();
-        if (!Files.exists(serial)) {
-            return results;
-        }
         Pattern line = Pattern.compile("([A-Za-z0-9_]+\\.[A-Za-z0-9_]+)=(-?\\d+)");
-        for (String l : Files.readString(serial).split("\r?\n")) {
-            // Limine leaves terminal escape sequences in front of the first line.
-            Matcher m = line.matcher(l.replaceAll("\\x1b\\[[0-9;=?]*[A-Za-z]", "").strip());
+        for (String l : Harness.readSerial(serial).split("\n")) {
+            Matcher m = line.matcher(l.strip());
             if (m.matches()) {
                 results.put(m.group(1), Long.parseLong(m.group(2)));
             }
@@ -155,51 +137,5 @@ public class Conformance {
             md.append("- ").append(f).append('\n');
         }
         Files.writeString(Path.of(path), md, java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.APPEND);
-    }
-
-    static void javac(List<String> options, List<Path> sources) {
-        List<String> args = new ArrayList<>(options);
-        sources.forEach(p -> args.add(p.toString()));
-        int status = ToolProvider.getSystemJavaCompiler().run(null, null, null, args.toArray(String[]::new));
-        if (status != 0) {
-            throw new IllegalStateException("javac failed");
-        }
-    }
-
-    static void run(Path log, String... command) throws Exception {
-        if (runStatus(log, command) != 0) {
-            if (log != null) {
-                System.out.print(Files.readString(log));
-            }
-            throw new IllegalStateException("command failed: " + String.join(" ", command));
-        }
-    }
-
-    static int runStatus(Path log, String... command) throws Exception {
-        ProcessBuilder pb = new ProcessBuilder(command).directory(ROOT.toFile()).redirectErrorStream(true);
-        if (log != null) {
-            Files.createDirectories(log.getParent());
-            pb.redirectOutput(log.toFile());
-        } else {
-            pb.inheritIO();
-        }
-        return pb.start().waitFor();
-    }
-
-    static List<Path> javaFiles(Path dir) throws IOException {
-        try (Stream<Path> files = Files.walk(dir)) {
-            return files.filter(p -> p.toString().endsWith(".java")).sorted().toList();
-        }
-    }
-
-    static void deleteRecursively(Path dir) throws IOException {
-        if (!Files.exists(dir)) {
-            return;
-        }
-        try (Stream<Path> files = Files.walk(dir)) {
-            for (Path p : files.sorted(Comparator.reverseOrder()).toList()) {
-                Files.delete(p);
-            }
-        }
     }
 }
