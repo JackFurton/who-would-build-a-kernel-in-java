@@ -1,0 +1,70 @@
+package duke.kernel.x86;
+
+import duke.kernel.acpi.Madt;
+import duke.kernel.mm.KernelAddressSpace;
+import duke.rt.Magic;
+
+/** This CPU's local APIC, through its memory-mapped registers. */
+public final class LocalApic {
+
+    public static final int SPURIOUS_VECTOR = 0xFF;
+
+    private static final int ID = 0x20;
+    private static final int EOI = 0xB0;
+    private static final int SPURIOUS = 0xF0;
+    private static final int LVT_TIMER = 0x320;
+    private static final int TIMER_INITIAL = 0x380;
+    private static final int TIMER_CURRENT = 0x390;
+    private static final int TIMER_DIVIDE = 0x3E0;
+
+    private static final int SOFTWARE_ENABLE = 1 << 8;
+    private static final int TIMER_PERIODIC = 1 << 17;
+    private static final int MASKED = 1 << 16;
+    private static final int DIVIDE_BY_16 = 0x3;
+
+    private static long base;
+
+    private LocalApic() {
+    }
+
+    public static void init() {
+        base = KernelAddressSpace.mapDevice(Madt.localApicAddress(), 4096);
+        // Spurious interrupts need no EOI; the handler just has to exist.
+        Interrupts.register(SPURIOUS_VECTOR, frame -> { });
+        write(SPURIOUS, SOFTWARE_ENABLE | SPURIOUS_VECTOR);
+    }
+
+    public static int id() {
+        return read(ID) >>> 24;
+    }
+
+    public static void endOfInterrupt() {
+        write(EOI, 0);
+    }
+
+    /** Starts a masked one-shot countdown from 2^32 - 1, for calibration. */
+    static void startCountdown() {
+        write(TIMER_DIVIDE, DIVIDE_BY_16);
+        write(LVT_TIMER, MASKED);
+        write(TIMER_INITIAL, 0xFFFF_FFFF);
+    }
+
+    static long elapsedSinceCountdown() {
+        return 0xFFFF_FFFFL - (read(TIMER_CURRENT) & 0xFFFF_FFFFL);
+    }
+
+    /** Fires {@code vector} every {@code ticks} timer ticks (bus clock / 16). */
+    static void startPeriodic(int vector, long ticks) {
+        write(TIMER_DIVIDE, DIVIDE_BY_16);
+        write(LVT_TIMER, TIMER_PERIODIC | vector);
+        write(TIMER_INITIAL, (int) ticks);
+    }
+
+    private static int read(int register) {
+        return Magic.peekInt(base + register);
+    }
+
+    private static void write(int register, int value) {
+        Magic.pokeInt(base + register, value);
+    }
+}

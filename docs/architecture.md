@@ -96,6 +96,13 @@ Device registers live in reserved physical memory outside the direct map, so
 `KernelAddressSpace.mapDevice` maps them uncached into their own PML4 slot. QEMU runs with
 `-smp 2`, so the CPU count is a real check.
 
+Time comes from the local APIC timer. `Pic.disable()` remaps the legacy PICs to vectors
+0xE0-0xEF and masks them, so a spurious IRQ can't land on a CPU exception vector. The APIC timer
+is calibrated against the HPET's main counter over 10 ms, then runs periodic at 100 Hz into a
+Java handler that counts ticks and sends EOI. `Kernel.init()` ends by enabling interrupts. Every
+suite runs with the tick live. The GC-stress conformance run takes about 6,000 timer interrupts at
+arbitrary instructions, in the middle of about 53,000 collections.
+
 ## Compiler pipeline
 
 ```
