@@ -256,7 +256,8 @@ forms), raw memory access (`peek*`/`poke*`), `addressOf`, `halt`, `disableInterr
 
 ## What compiles today
 
-Static, instance, virtual and interface methods (including defaults), exceptions, type checks and casts, boxing, string concatenation, lambdas and method references, object and array allocation
+Static, instance, virtual and interface methods (including defaults), exceptions, the core of
+`java.util` (collections, `Arrays`, `Comparator`, `java.util.function`), type checks and casts, boxing, string concatenation, lambdas and method references, object and array allocation
 (including multi-dimensional), constructors, int/long/boolean/byte/char/short arithmetic with Java semantics, all control flow
 including both switch forms, static and instance fields, array loads and stores, string literals
 and `String.length`/`charAt`.

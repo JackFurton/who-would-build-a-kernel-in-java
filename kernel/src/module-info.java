@@ -7,6 +7,7 @@ module java.base {
     exports java.lang.annotation;
     exports java.lang.invoke;
     exports java.util;
+    exports java.util.function;
     exports duke.rt;
     exports duke.boot;
     exports duke.kernel;
