@@ -20,6 +20,20 @@ public final class Layouts {
     public static final int ARRAY_LENGTH_OFFSET = 8;
     public static final int ARRAY_DATA_OFFSET = 16;
 
+    /** Type information block fields; Compiler.emitTibs documents each. */
+    public static final int TIB_SUPER = 0;
+    public static final int TIB_SIZE = 8;
+    public static final int TIB_FLAGS = 12;
+    public static final int TIB_ELEMENT = 16;
+    public static final int TIB_NAME = 24;
+    public static final int TIB_INTERFACES = 32;
+    public static final int TIB_ITABLE = 40;
+    public static final int TIB_VTABLE = 48;
+
+    public static final int TIB_FLAG_ARRAY = 1;
+    public static final int TIB_FLAG_INTERFACE = 2;
+    public static final int TIB_FLAG_REFERENCE_ARRAY = 4;
+
     public record ClassLayout(int size, Map<String, Integer> fieldOffsets) {
 
         public int offsetOf(String field) {

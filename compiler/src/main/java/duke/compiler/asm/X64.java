@@ -89,6 +89,10 @@ public final class X64 {
         out.emitReloc(Reloc.Kind.PC32, symbol, -4);
     }
 
+    public void call(Mem target) {
+        memOp(false, false, 2, target, 0, 0xFF);
+    }
+
     public void jmp(String symbol) {
         out.emit8(0xE9);
         out.emitReloc(Reloc.Kind.PC32, symbol, -4);

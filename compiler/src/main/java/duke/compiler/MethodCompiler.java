@@ -542,14 +542,19 @@ final class MethodCompiler {
                 }
                 boolean exact = m.is(AccessFlag.PRIVATE) || m.is(AccessFlag.FINAL)
                         || m.owner().flags().has(AccessFlag.FINAL) || !pool.isOverridden(m);
-                if (!exact) {
-                    throw error("call to " + m.ownerName() + "." + name + " needs virtual dispatch, which is not supported yet");
-                }
                 int args = argSlots(type);
                 a.load(8, false, RAX, Mem.at(RSP, 8 * args));
                 nullCheck(RAX);
                 program.requireClass(m.ownerName());
-                call(m, type, args + 1);
+                if (exact) {
+                    call(m, type, args + 1);
+                } else {
+                    int slot = program.vtables().slot(owner, name, descriptor);
+                    program.requireVirtual(owner, name, descriptor);
+                    a.load(8, false, RAX, Mem.at(RAX));
+                    a.call(Mem.at(RAX, Layouts.TIB_VTABLE + 8 * slot));
+                    afterCall(type, args + 1);
+                }
             }
             default -> throw error("unsupported call " + inv.opcode().name().toLowerCase() + " to " + owner + "." + name
                     + " (interfaces, lambdas and string concatenation are not supported yet)");
@@ -604,6 +609,11 @@ final class MethodCompiler {
             throw error("call to native method " + m.ownerName() + "." + m.name() + "; only " + MAGIC + " intrinsics may be native");
         }
         a.call(program.requireMethod(m));
+        afterCall(type, slots);
+    }
+
+    /** Pops the arguments and pushes the result. */
+    private void afterCall(MethodTypeDesc type, int slots) {
         if (slots > 0) {
             a.aluImm(Alu.ADD, true, RSP, 8 * slots);
         }

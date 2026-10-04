@@ -4,6 +4,7 @@
  */
 module java.base {
     exports java.lang;
+    exports java.lang.annotation;
     exports duke.rt;
     exports duke.kernel;
 }

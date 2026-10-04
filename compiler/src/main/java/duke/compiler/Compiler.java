@@ -51,29 +51,40 @@ public final class Compiler {
     private final Set<String> classes = new LinkedHashSet<>();
     private final Map<String, String> strings = new LinkedHashMap<>();
     private final Set<String> tibs = new LinkedHashSet<>();
+    private final Set<VirtualCall> virtualCalls = new LinkedHashSet<>();
+    private final Vtables vtables;
     private int multiArraySites;
 
     public Compiler(ClassPool pool) {
         this.pool = pool;
         this.layouts = new Layouts(pool);
+        this.vtables = new Vtables(pool);
     }
+
+    private record VirtualCall(String owner, String name, String descriptor) {}
 
     public Image compile(String entryClass, String entryMethod) {
         ClassPool.ResolvedMethod main = pool.resolveMethod(entryClass, entryMethod, "()V");
         if (!main.is(AccessFlag.STATIC)) {
             throw new CompileException("entry point " + entryClass + "." + entryMethod + " must be static");
         }
+        // Every TIB carries its name as a String, so String and its byte[] are always in the image.
+        requireClass(STRING_CLASS);
+        tibs.add(BYTE_ARRAY);
         requireClass(entryClass);
         String mainSymbol = requireMethod(main);
 
-        while (!worklist.isEmpty()) {
-            ClassPool.ResolvedMethod m = worklist.removeFirst();
-            new MethodCompiler(this, m).compile();
-        }
+        do {
+            while (!worklist.isEmpty()) {
+                new MethodCompiler(this, worklist.removeFirst()).compile();
+            }
+            resolveDispatchTargets();
+        } while (!worklist.isEmpty());
 
+        closeTibs();
         emitStatics();
-        emitStrings();
         emitTibs();
+        emitStrings();
         emitBootStub(mainSymbol);
         emitHeapArena();
         emitLimineRequests();
@@ -90,6 +101,10 @@ public final class Compiler {
 
     Image image() {
         return image;
+    }
+
+    Vtables vtables() {
+        return vtables;
     }
 
     static String methodSymbol(String owner, String name, String descriptor) {
@@ -134,6 +149,29 @@ public final class Compiler {
             worklist.addLast(m);
         }
         return symbol;
+    }
+
+    /** Records a dispatched call; every reachable override becomes reachable in turn. */
+    void requireVirtual(String owner, String name, String descriptor) {
+        virtualCalls.add(new VirtualCall(owner, name, descriptor));
+    }
+
+    /**
+     * Rapid-type-analysis-style closure: for each dispatched call, compile the implementation each
+     * reachable subclass would select. New methods can reach new classes, so the caller iterates.
+     */
+    private void resolveDispatchTargets() {
+        for (VirtualCall call : List.copyOf(virtualCalls)) {
+            for (String c : List.copyOf(classes)) {
+                if (pool.get(c).flags().has(AccessFlag.INTERFACE) || !pool.isSubclass(c, call.owner())) {
+                    continue;
+                }
+                ClassPool.ResolvedMethod impl = pool.findMethod(c, call.name(), call.descriptor());
+                if (impl != null && !impl.is(AccessFlag.ABSTRACT) && !impl.is(AccessFlag.STATIC)) {
+                    requireMethod(impl);
+                }
+            }
+        }
     }
 
     String requireMethod(String owner, String name, String descriptor) {
@@ -246,37 +284,101 @@ public final class Compiler {
         }
     }
 
+    /** Adds every TIB the emitted ones point at: superclasses, Object for arrays, element types. */
+    private void closeTibs() {
+        Deque<String> pending = new ArrayDeque<>(tibs);
+        while (!pending.isEmpty()) {
+            String type = pending.removeFirst();
+            List<String> deps = new ArrayList<>();
+            if (type.startsWith("[")) {
+                deps.add(ClassPool.OBJECT);
+                String element = elementType(type);
+                if (element != null) {
+                    deps.add(element);
+                }
+            } else {
+                String superName = pool.superName(pool.get(type));
+                if (superName != null) {
+                    deps.add(superName);
+                }
+            }
+            for (String dep : deps) {
+                if (tibs.add(dep)) {
+                    pending.addLast(dep);
+                }
+            }
+        }
+        for (String type : tibs) {
+            requireString(javaName(type));
+        }
+    }
+
+    /** The element type of a reference array, or null for a primitive array. */
+    static String elementType(String arrayType) {
+        String element = arrayType.substring(1);
+        if (element.startsWith("[")) {
+            return element;
+        }
+        if (element.startsWith("L")) {
+            return element.substring(1, element.length() - 1);
+        }
+        return null;
+    }
+
+    /** The name Class.getName() would report: dots for classes, descriptors for arrays. */
+    static String javaName(String type) {
+        return type.replace('/', '.');
+    }
+
     /**
-     * TIB layout: [0] super TIB or 0, [8] instance size (element size for arrays), [12] flags
-     * (bit 0: array). Virtual dispatch tables will follow at [16].
+     * TIB layout (offsets in Layouts):
+     * <pre>
+     * [0]  super TIB, or 0 for Object; Object for arrays
+     * [8]  instance size, or element size for arrays (u32)
+     * [12] flags: array, interface, reference array (u32)
+     * [16] element TIB for reference arrays, else 0
+     * [24] name, a String
+     * [32] implemented interfaces, reserved
+     * [40] interface method table, reserved
+     * [48] vtable: one code pointer per Vtables slot, 0 where nothing dispatches to it
+     * </pre>
      */
     private void emitTibs() {
         Section rodata = image.rodata;
         for (String type : tibs) {
+            boolean array = type.startsWith("[");
+            String element = array ? elementType(type) : null;
+            boolean isInterface = !array && pool.get(type).flags().has(AccessFlag.INTERFACE);
+            String superName = array ? ClassPool.OBJECT : pool.superName(pool.get(type));
+            int flags = (array ? Layouts.TIB_FLAG_ARRAY : 0)
+                    | (isInterface ? Layouts.TIB_FLAG_INTERFACE : 0)
+                    | (element != null ? Layouts.TIB_FLAG_REFERENCE_ARRAY : 0);
+
             rodata.align(8);
             int start = rodata.size();
-            if (type.startsWith("[")) {
-                rodata.emitReloc(Reloc.Kind.ABS64, tibSymbol("java/lang/Object"), 0);
-                rodata.emit32(Layouts.width(type.substring(1)));
-                rodata.emit32(1);
-                requireClassData("java/lang/Object");
-            } else {
-                String superName = pool.superName(pool.get(type));
-                if (superName == null) {
-                    rodata.emit64(0);
-                } else {
-                    rodata.emitReloc(Reloc.Kind.ABS64, tibSymbol(superName), 0);
-                }
-                rodata.emit32(layouts.of(type).size());
-                rodata.emit32(0);
+            emitPointer(rodata, superName == null ? null : tibSymbol(superName));
+            rodata.emit32(array ? Layouts.width(type.substring(1)) : layouts.of(type).size());
+            rodata.emit32(flags);
+            emitPointer(rodata, element == null ? null : tibSymbol(element));
+            emitPointer(rodata, strings.get(javaName(type)));
+            rodata.emit64(0);
+            rodata.emit64(0);
+            String dispatchType = array || isInterface ? ClassPool.OBJECT : type;
+            for (Vtables.Key key : vtables.layout(dispatchType)) {
+                ClassPool.ResolvedMethod impl = pool.findMethod(dispatchType, key.name(), key.descriptor());
+                String symbol = impl == null ? null : methodSymbol(impl.ownerName(), impl.name(), impl.descriptor());
+                boolean compiled = symbol != null && queuedMethods.contains(symbol) && !impl.is(AccessFlag.ABSTRACT);
+                emitPointer(rodata, compiled ? symbol : null);
             }
-            image.define(tibSymbol(type), rodata, start, 16, Image.SymbolType.OBJECT);
+            image.define(tibSymbol(type), rodata, start, rodata.size() - start, Image.SymbolType.OBJECT);
         }
     }
 
-    private void requireClassData(String name) {
-        if (!tibs.contains(name)) {
-            throw new CompileException("array TIBs need " + name + " in the image");
+    private static void emitPointer(Section section, String symbol) {
+        if (symbol == null) {
+            section.emit64(0);
+        } else {
+            section.emitReloc(Reloc.Kind.ABS64, symbol, 0);
         }
     }
 

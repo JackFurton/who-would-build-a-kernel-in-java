@@ -82,21 +82,22 @@ class CompilerTest {
     }
 
     @Test
-    void overriddenMethodNeedsDispatch() throws IOException {
+    void dispatchCompilesOnlyOverridesThatCanBeCalled() throws IOException {
         Path classes = compile("""
                 package duke.test;
                 public final class Entry {
-                    static class A { int f() { return 1; } }
-                    static class B extends A { int f() { return 2; } }
+                    static class A { int f() { return 1; } int g() { return 1; } }
+                    static class B extends A { int f() { return 2; } int g() { return 2; } }
                     static int call(A a) { return a.f(); }
                     public static void main() {
-                        call(null);
+                        call(new B());
                     }
                 }
                 """);
-        CompileException e = assertThrows(CompileException.class,
-                () -> new Compiler(ClassPool.load(classes)).compile("duke/test/Entry", "main"));
-        assertTrue(e.getMessage().contains("needs virtual dispatch"), e.getMessage());
+        Image image = new Compiler(ClassPool.load(classes)).compile("duke/test/Entry", "main");
+        assertTrue(image.isDefined("duke/test/Entry$A.f()I"));
+        assertTrue(image.isDefined("duke/test/Entry$B.f()I"));
+        assertTrue(!image.isDefined("duke/test/Entry$B.g()I"), "nothing dispatches g, so no override of it is compiled");
     }
 
     @Test
