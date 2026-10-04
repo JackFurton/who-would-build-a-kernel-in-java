@@ -136,7 +136,8 @@ public class Conformance {
             src.append("        Console.print(").append(value).append(");\n");
             src.append("        Console.println(\"\");\n");
         }
-        src.append("        Console.println(\"gc: \" + duke.rt.Heap.collections() + \" collections\");\n");
+        src.append("        Console.println(\"gc: \" + duke.rt.Heap.collections() + \" collections, timer: \"\n"
+                + "                + duke.kernel.time.Timer.ticks() + \" interrupts taken\");\n");
         src.append("        Console.println(\"").append(DONE).append("\");\n    }\n}\n");
         Path file = gen.resolve(PACKAGE.replace('.', '/')).resolve("Main.java");
         Files.createDirectories(file.getParent());

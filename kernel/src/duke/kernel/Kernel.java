@@ -7,7 +7,10 @@ import duke.kernel.acpi.Madt;
 import duke.kernel.mm.KernelAddressSpace;
 import duke.kernel.mm.KernelHeap;
 import duke.kernel.mm.PhysicalMemory;
+import duke.kernel.time.Timer;
 import duke.kernel.x86.Gdt;
+import duke.kernel.x86.LocalApic;
+import duke.kernel.x86.Pic;
 import duke.kernel.x86.Idt;
 import duke.kernel.x86.Interrupts;
 import duke.rt.Heap;
@@ -37,6 +40,10 @@ public final class Kernel {
         Acpi.init();
         Madt.init();
         Hpet.init();
+        Pic.disable();
+        LocalApic.init();
+        Timer.init();
+        Magic.enableInterrupts();
     }
 
     private static long reclaimed;
@@ -70,6 +77,10 @@ public final class Kernel {
         Console.println("gc: allocated 512 MiB on a 256 MiB machine; " + Heap.collections() + " collections, heap "
                 + (Heap.committed() >> 20) + " MiB committed");
         printPlatform();
+        long before = Timer.uptimeMillis();
+        Timer.sleep(100);
+        Console.println("timer: local APIC timer at " + Timer.apicFrequency() / 1000 + " kHz (calibrated against the HPET), "
+                + Timer.HZ + " Hz tick; slept 100 ms, uptime advanced " + (Timer.uptimeMillis() - before) + " ms");
         Console.println("DUKE-BOOT-OK");
     }
 

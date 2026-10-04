@@ -13,5 +13,6 @@ module java.base {
     exports duke.kernel;
     exports duke.kernel.acpi;
     exports duke.kernel.mm;
+    exports duke.kernel.time;
     exports duke.kernel.x86;
 }
