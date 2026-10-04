@@ -46,6 +46,7 @@ public final class Compiler {
             Reg.R8, Reg.R9, Reg.R10, Reg.R11, Reg.R12, Reg.R13, Reg.R14, Reg.R15};
 
     static final String HEAP_ARENA = "heap.arena";
+    static final String METHOD_TABLE = "method.table";
     static final int HEAP_ARENA_SIZE = 16 * 1024 * 1024;
 
     private static final int BOOT_STACK_SIZE = 64 * 1024;
@@ -71,6 +72,9 @@ public final class Compiler {
     private final LambdaCompiler lambdas;
     private int multiArraySites;
     private boolean interruptStubs;
+    private final Map<String, LineInfo> lineInfo = new LinkedHashMap<>();
+
+    private record LineInfo(String sourceFile, List<int[]> lines) {}
 
     public Compiler(ClassPool pool) {
         this.pool = pool;
@@ -104,14 +108,16 @@ public final class Compiler {
         } while (!worklist.isEmpty());
 
         closeTibs();
-        emitStatics();
-        emitTibs();
-        emitStrings();
+        // All code first: the method table describes every function in .text.
         emitInitializers();
         if (interruptStubs) {
             emitInterruptStubs();
         }
         emitBootStub(entryClass, mainSymbol);
+        emitMethodTable();
+        emitStatics();
+        emitTibs();
+        emitStrings();
         emitHeapArena();
         emitLimineRequests();
         return image;
@@ -302,6 +308,55 @@ public final class Compiler {
     String requireStatic(ClassPool.ResolvedField f) {
         requireClass(f.ownerName());
         return staticSymbol(f.ownerName(), f.name());
+    }
+
+    void recordLines(String methodSymbol, String sourceFile, List<int[]> lines) {
+        lineInfo.put(methodSymbol, new LineInfo(sourceFile, lines));
+    }
+
+    /**
+     * For symbolized backtraces (duke.rt.Backtrace). Header: entry count (u64). Each 40-byte entry,
+     * sorted by address: start, size (u32), line count (u32), name String, source file String or 0,
+     * line table or 0. A line table is (code offset u32, line u32) pairs in code order.
+     */
+    private void emitMethodTable() {
+        List<Image.Symbol> functions = new ArrayList<>();
+        for (Image.Symbol sym : image.symbols()) {
+            if (sym.section() == image.text && sym.type() == Image.SymbolType.FUNC) {
+                functions.add(sym);
+            }
+        }
+        functions.sort((x, y) -> Integer.compare(x.offset(), y.offset()));
+
+        Section rodata = image.rodata;
+        rodata.align(8);
+        for (Image.Symbol f : functions) {
+            LineInfo info = lineInfo.get(f.name());
+            if (info != null && !info.lines().isEmpty()) {
+                int start = rodata.size();
+                for (int[] pair : info.lines()) {
+                    rodata.emit32(pair[0]);
+                    rodata.emit32(pair[1]);
+                }
+                image.define("lines:" + f.name(), rodata, start, rodata.size() - start, Image.SymbolType.OBJECT);
+            }
+        }
+        rodata.align(8);
+        int table = rodata.size();
+        rodata.emit64(functions.size());
+        for (Image.Symbol f : functions) {
+            LineInfo info = lineInfo.get(f.name());
+            boolean hasLines = info != null && !info.lines().isEmpty();
+            rodata.emitReloc(Reloc.Kind.ABS64, f.name(), 0);
+            rodata.emit32(f.size());
+            rodata.emit32(hasLines ? info.lines().size() : 0);
+            // Like Java stack traces: no descriptor, the line number disambiguates overloads.
+            int paren = f.name().indexOf('(');
+            emitPointer(rodata, requireString(javaName(paren < 0 ? f.name() : f.name().substring(0, paren))));
+            emitPointer(rodata, info == null || info.sourceFile() == null ? null : requireString(info.sourceFile()));
+            emitPointer(rodata, hasLines ? "lines:" + f.name() : null);
+        }
+        image.define(METHOD_TABLE, rodata, table, rodata.size() - table, Image.SymbolType.OBJECT);
     }
 
     String requireInterruptStubs() {

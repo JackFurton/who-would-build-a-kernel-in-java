@@ -1,5 +1,6 @@
 package duke.kernel;
 
+import duke.rt.Backtrace;
 import duke.rt.Magic;
 
 public final class Panic {
@@ -8,14 +9,18 @@ public final class Panic {
     }
 
     public static void panic(String message) {
-        Console.print("\nPANIC: ");
-        Console.println(message);
-        haltForever();
+        begin(message);
+        haltWithTrace(Magic.framePointer());
     }
 
     public static void panic(String... parts) {
         begin(parts);
-        haltForever();
+        haltWithTrace(Magic.framePointer());
+    }
+
+    public static void panic(String message, int a, int b) {
+        begin(message, " (", Integer.toString(a), ", ", Integer.toString(b), ")");
+        haltWithTrace(Magic.framePointer());
     }
 
     /** Prints the panic line but keeps running, so the caller can add detail before haltForever(). */
@@ -27,14 +32,9 @@ public final class Panic {
         Console.println("");
     }
 
-    public static void panic(String message, int a, int b) {
-        Console.print("\nPANIC: ");
-        Console.print(message);
-        Console.print(" (");
-        Console.print(a);
-        Console.print(", ");
-        Console.print(b);
-        Console.println(")");
+    /** {@code rbp} is the panicking method's own frame; the trace starts at whoever called it. */
+    private static void haltWithTrace(long rbp) {
+        Backtrace.print(Magic.peekLong(rbp + 8) - 1, Magic.peekLong(rbp));
         haltForever();
     }
 

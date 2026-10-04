@@ -1,4 +1,5 @@
 // expect: PANIC: ArrayIndexOutOfBoundsException (3, 3)
+// expect:   at duke.panics.IndexOutOfBounds.main(IndexOutOfBounds.java:11)
 package duke.panics;
 
 import duke.kernel.Serial;

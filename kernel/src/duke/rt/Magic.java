@@ -87,6 +87,12 @@ public final class Magic {
     /** Writes eax, ebx, ecx, edx as four ints at {@code out}. */
     public static native void cpuid(int leaf, int subleaf, long out);
 
+    /** The caller's rbp. Every compiled method keeps a frame pointer, so this starts a stack walk. */
+    public static native long framePointer();
+
+    /** The compiler's method table; layout documented on Compiler.emitMethodTable. */
+    public static native long methodTable();
+
     /** int3. */
     public static native void breakpoint();
 

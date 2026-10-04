@@ -15,6 +15,7 @@ import duke.compiler.asm.X64.Alu;
 import duke.compiler.asm.X64.Shift;
 import duke.compiler.image.Image;
 import duke.compiler.image.Section;
+import java.lang.classfile.Attributes;
 import java.lang.classfile.CodeElement;
 import java.lang.classfile.Instruction;
 import java.lang.classfile.Label;
@@ -49,6 +50,7 @@ import java.lang.classfile.instruction.TypeCheckInstruction;
 import java.lang.constant.ClassDesc;
 import java.lang.constant.MethodTypeDesc;
 import java.lang.reflect.AccessFlag;
+import java.util.ArrayList;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
@@ -80,9 +82,14 @@ final class MethodCompiler {
     private final Map<Label, X64.Label> labels = new IdentityHashMap<>();
     private int argSlots;
     private int line = -1;
-    private X64.Label nullPointer;
-    private X64.Label outOfBounds;
-    private X64.Label divideByZero;
+    /** (code offset, source line) pairs, in code order. */
+    private final List<int[]> lines = new ArrayList<>();
+    private final List<SlowPath> slowPaths = new ArrayList<>();
+
+    private enum Fault { NULL_POINTER, OUT_OF_BOUNDS, DIVIDE_BY_ZERO }
+
+    /** An out-of-line failure path for one check site, remembering the site's source line. */
+    private record SlowPath(Fault fault, X64.Label label, int line) {}
 
     MethodCompiler(Compiler program, ClassPool.ResolvedMethod method) {
         this.program = program;
@@ -120,15 +127,21 @@ final class MethodCompiler {
         for (CodeElement e : code) {
             switch (e) {
                 case LabelTarget t -> a.bind(label(t.label()));
-                case LineNumber n -> line = n.line();
+                case LineNumber n -> {
+                    line = n.line();
+                    lines.add(new int[] {a.position() - start, line});
+                }
                 case Instruction i -> instruction(i);
                 default -> { }
             }
         }
-        emitSlowPaths();
+        emitSlowPaths(start);
 
         String symbol = Compiler.methodSymbol(method.ownerName(), method.name(), method.descriptor());
         program.image().define(symbol, text, start, a.position() - start, Image.SymbolType.FUNC);
+        String sourceFile = method.owner().findAttribute(Attributes.sourceFile())
+                .map(f -> f.sourceFile().stringValue()).orElse(null);
+        program.recordLines(symbol, sourceFile, lines);
     }
 
     private CompileException error(String message) {
@@ -843,6 +856,14 @@ final class MethodCompiler {
                 a.store(4, Mem.at(RSI, 12), RDX);
             }
             case "breakpoint" -> a.int3();
+            case "framePointer" -> {
+                a.push(RBP);
+                a.push(RBP);
+            }
+            case "methodTable" -> {
+                a.lea(RAX, Mem.rip(Compiler.METHOD_TABLE));
+                pushLong(RAX);
+            }
             case "halt" -> a.hlt();
             case "disableInterrupts" -> a.cli();
             case "enableInterrupts" -> a.sti();
@@ -959,43 +980,44 @@ final class MethodCompiler {
     }
 
     private X64.Label nullPointer() {
-        if (nullPointer == null) {
-            nullPointer = new X64.Label();
-        }
-        return nullPointer;
+        return slowPath(Fault.NULL_POINTER);
     }
 
     private X64.Label outOfBounds() {
-        if (outOfBounds == null) {
-            outOfBounds = new X64.Label();
-        }
-        return outOfBounds;
+        return slowPath(Fault.OUT_OF_BOUNDS);
     }
 
     private X64.Label divideByZero() {
-        if (divideByZero == null) {
-            divideByZero = new X64.Label();
-        }
-        return divideByZero;
+        return slowPath(Fault.DIVIDE_BY_ZERO);
     }
 
-    /** Out-of-line failure paths shared by the whole method. The runtime handlers never return. */
-    private void emitSlowPaths() {
-        if (nullPointer != null) {
-            a.bind(nullPointer);
-            a.call(program.requireMethod(RUNTIME, "nullPointer", "()V"));
-            a.ud2();
-        }
-        if (outOfBounds != null) {
-            a.bind(outOfBounds);
-            a.push(RCX);
-            a.push(Mem.at(RAX, Layouts.ARRAY_LENGTH_OFFSET));
-            a.call(program.requireMethod(RUNTIME, "arrayIndexOutOfBounds", "(II)V"));
-            a.ud2();
-        }
-        if (divideByZero != null) {
-            a.bind(divideByZero);
-            a.call(program.requireMethod(RUNTIME, "divideByZero", "()V"));
+    /**
+     * One stub per check site rather than one per method. Its return address then identifies the
+     * site, which backtraces need for the right line (and exception tables will need for the right
+     * handler).
+     */
+    private X64.Label slowPath(Fault fault) {
+        SlowPath path = new SlowPath(fault, new X64.Label(), line);
+        slowPaths.add(path);
+        return path.label();
+    }
+
+    /** The runtime handlers never return. Each stub gets a line-table row for its site's line. */
+    private void emitSlowPaths(int start) {
+        for (SlowPath path : slowPaths) {
+            a.bind(path.label());
+            if (path.line() >= 0) {
+                lines.add(new int[] {a.position() - start, path.line()});
+            }
+            switch (path.fault()) {
+                case NULL_POINTER -> a.call(program.requireMethod(RUNTIME, "nullPointer", "()V"));
+                case OUT_OF_BOUNDS -> {
+                    a.push(RCX);
+                    a.push(Mem.at(RAX, Layouts.ARRAY_LENGTH_OFFSET));
+                    a.call(program.requireMethod(RUNTIME, "arrayIndexOutOfBounds", "(II)V"));
+                }
+                case DIVIDE_BY_ZERO -> a.call(program.requireMethod(RUNTIME, "divideByZero", "()V"));
+            }
             a.ud2();
         }
         for (X64.Label l : labels.values()) {

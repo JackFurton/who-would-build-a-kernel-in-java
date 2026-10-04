@@ -12,6 +12,8 @@ public final class Frame {
     public static final String[] REGISTERS = {
         "r15", "r14", "r13", "r12", "r11", "r10", "r9", "r8", "rdi", "rsi", "rbp", "rbx", "rdx", "rcx", "rax"};
 
+    public static final int RBP = 10;
+
     private static final int VECTOR = 120;
     private static final int ERROR_CODE = 128;
     private static final int RIP = 136;
