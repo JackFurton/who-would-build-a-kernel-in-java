@@ -43,11 +43,17 @@ public final class PhysicalMemory {
 
     /** A free frame's physical address. Contents are whatever was there before. */
     public static long allocate() {
-        long page = frames.allocate();
-        if (page < 0) {
+        long frame = tryAllocate();
+        if (frame < 0) {
             throw new OutOfMemoryError("out of physical memory");
         }
-        return page * PAGE_SIZE;
+        return frame;
+    }
+
+    /** Like allocate(), but -1 instead of throwing: for paths that can't allocate an exception. */
+    public static long tryAllocate() {
+        long page = frames.allocate();
+        return page < 0 ? -1 : page * PAGE_SIZE;
     }
 
     public static long allocateZeroed() {

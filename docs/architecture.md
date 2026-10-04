@@ -42,6 +42,12 @@ text read-only and executable, rodata read-only, data and bss writable, and both
 has it. The direct map covers every region type Limine maps, with 2 MiB pages where alignment
 allows, and uncached for the framebuffer. The virtual layout is unchanged, so execution simply
 continues. Bootloader-reclaimable memory is still reserved (#55).
+
+`KernelHeap.init()` then moves Java allocation off the 4 MiB early arena in `.bss` into a 512 GiB
+virtual region of its own. `Heap` stays a bump allocator, but when it runs off the committed end
+it asks its `Backing` to map 2 MiB more of zeroed frames. The backing reports failure rather than
+throwing: building an `OutOfMemoryError` would itself need the allocator. Nothing is freed until
+there's a collector (#17).
 Java objects still come from the fixed bump arena in `.bss` (see Objects below).
 
 ## Compiler pipeline
@@ -119,7 +125,7 @@ so default methods, `I.super.m()` and `invokevirtual` calls that land on an inhe
 take the same path.
 
 `new C` compiles to a call to `duke.rt.Heap.allocateObject(tib, size)`, plain Java bumping a
-pointer through a 16 MiB arena in `.bss`. Nothing is freed yet.
+pointer (see Memory above for where the memory comes from). Nothing is freed yet.
 
 A TIB is also its type's `java.lang.Class` object: word 0 is an ordinary object header pointing
 at `Class`'s own TIB. So `getClass()` is one load, `Foo.class` is the TIB's address, and

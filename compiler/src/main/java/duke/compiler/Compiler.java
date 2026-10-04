@@ -57,7 +57,8 @@ public final class Compiler {
     static final String HEAP_ARENA = "heap.arena";
     static final String METHOD_TABLE = "method.table";
     static final String IMAGE_LAYOUT = "image.layout";
-    static final int HEAP_ARENA_SIZE = 16 * 1024 * 1024;
+    /** Early-boot allocation only; KernelHeap takes over once paging is up. */
+    static final int HEAP_ARENA_SIZE = 4 * 1024 * 1024;
 
     private static final int BOOT_STACK_SIZE = 64 * 1024;
 
@@ -905,7 +906,7 @@ public final class Compiler {
         image.define("image.bss.end", image.bss, image.bss.size(), 0, Image.SymbolType.OBJECT);
     }
 
-    /** Costs nothing in the file: .bss is only memsz. Replaced by a real heap in #16. */
+    /** Costs nothing in the file: .bss is only memsz. */
     private void emitHeapArena() {
         image.bss.align(4096);
         int offset = image.bss.size();

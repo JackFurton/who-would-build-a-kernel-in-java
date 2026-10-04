@@ -1,4 +1,4 @@
-// expect: PANIC: OutOfMemoryError: kernel heap arena exhausted
+// expect: PANIC: OutOfMemoryError: Java heap space
 package duke.panics;
 
 import duke.kernel.Serial;

@@ -26,11 +26,11 @@ final class PagingTest {
     static void testImageTranslatesToWhereLimineLoadedIt() {
         long code = Magic.peekLong(Magic.interruptStubs());
         long table = Magic.methodTable();
-        long object = Magic.addressOf(new long[4]);
+        long literal = Magic.addressOf("a string literal lives in .data");
         PageTable t = KernelAddressSpace.table();
         assertEquals(imageToPhysical(code), t.translate(code), "text");
         assertEquals(imageToPhysical(table), t.translate(table), "rodata");
-        assertEquals(imageToPhysical(object), t.translate(object), "heap arena in bss");
+        assertEquals(imageToPhysical(literal), t.translate(literal), "data");
     }
 
     static void testSectionPermissions() {
@@ -38,7 +38,7 @@ final class PagingTest {
         long nx = KernelAddressSpace.noExecuteSupported() ? PageTable.NO_EXECUTE : 0;
         long code = t.flags(Magic.peekLong(Magic.interruptStubs()));
         long rodata = t.flags(Magic.methodTable());
-        long data = t.flags(Magic.addressOf(new int[1]));
+        long data = t.flags(Magic.addressOf("a string literal lives in .data"));
         assertEquals(0, code & (PageTable.WRITABLE | PageTable.NO_EXECUTE), "text is read-only and executable");
         assertEquals(nx, rodata & (PageTable.WRITABLE | PageTable.NO_EXECUTE), "rodata is read-only, not executable");
         assertEquals(PageTable.WRITABLE | nx, data & (PageTable.WRITABLE | PageTable.NO_EXECUTE), "data is writable, not executable");
