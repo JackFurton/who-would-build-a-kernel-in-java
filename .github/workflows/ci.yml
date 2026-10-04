@@ -9,13 +9,15 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+# Read-only by default: pull requests, including ones from forks, run untrusted code. Only the
+# metrics job, which exists only for pushes to main, can write.
+permissions:
+  contents: read
+
 jobs:
   build:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
-    permissions:
-      # Pushing to the metrics branch on main; PR runs never get there.
-      contents: write
     steps:
       - uses: actions/checkout@v7
 
@@ -52,10 +54,6 @@ jobs:
       - name: Shell over serial and PS/2
         run: make shell-test
 
-      - name: Record metrics
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        run: tools/record-metrics.sh
-
       - name: Upload kernel and logs
         if: always()
         uses: actions/upload-artifact@v7
@@ -70,4 +68,29 @@ jobs:
             build/panics/*/serial.log
             build/ktest/serial.log
             compiler/build/reports/tests/
+            compiler/build/test-results/test/*.xml
           if-no-files-found: ignore
+
+  metrics:
+    needs: build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      # Pushes the new row and chart to the metrics branch.
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '25'
+
+      - name: Fetch the build's kernel and test results
+        uses: actions/download-artifact@v8
+        with:
+          name: kernel-${{ github.sha }}
+
+      - name: Record metrics
+        run: tools/record-metrics.sh

@@ -51,5 +51,6 @@ must not allocate.
 ## Pull requests
 
 - One issue per PR; put `Closes #N` in the description.
-- Run `make test` before pushing. CI runs the same targets.
+- Run `make test` before pushing. CI runs the same targets on your PR automatically (GitHub may
+  hold the very first run from a brand-new account for approval, as a spam guard).
 - Match the surrounding code: comments explain *why*, not *what*.
