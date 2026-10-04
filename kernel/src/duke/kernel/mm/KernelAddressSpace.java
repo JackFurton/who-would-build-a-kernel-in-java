@@ -16,6 +16,26 @@ public final class KernelAddressSpace {
     private KernelAddressSpace() {
     }
 
+    /** Device registers (APICs, HPET) get uncached mappings here, in their own PML4 slot. */
+    private static final long DEVICE_BASE = 0xffff_d000_0000_0000L;
+    private static long nextDevice = DEVICE_BASE;
+
+    /**
+     * Maps a device's physical register range uncached and returns its virtual address. Device
+     * memory sits in reserved regions the direct map doesn't cover.
+     */
+    public static long mapDevice(long physical, long length) {
+        long base = physical & -PhysicalMemory.PAGE_SIZE;
+        long end = (physical + length + PhysicalMemory.PAGE_SIZE - 1) & -PhysicalMemory.PAGE_SIZE;
+        long virtual = nextDevice;
+        long nx = noExecute ? PageTable.NO_EXECUTE : 0;
+        for (long p = base; p < end; p += PhysicalMemory.PAGE_SIZE) {
+            table.map(virtual + (p - base), p, PageTable.WRITABLE | PageTable.CACHE_DISABLE | PageTable.WRITE_THROUGH | nx);
+        }
+        nextDevice += end - base;
+        return virtual + (physical - base);
+    }
+
     public static PageTable table() {
         return table;
     }

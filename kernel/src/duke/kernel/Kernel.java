@@ -1,6 +1,9 @@
 package duke.kernel;
 
 import duke.boot.Limine;
+import duke.kernel.acpi.Acpi;
+import duke.kernel.acpi.Hpet;
+import duke.kernel.acpi.Madt;
 import duke.kernel.mm.KernelAddressSpace;
 import duke.kernel.mm.KernelHeap;
 import duke.kernel.mm.PhysicalMemory;
@@ -29,8 +32,11 @@ public final class Kernel {
         PhysicalMemory.init();
         KernelAddressSpace.activate();
         KernelHeap.init();
-        // Last: until here the CPU could still be reading Limine's page tables or GDT.
+        // After paging and the GDT: until here the CPU could still be reading Limine's.
         reclaimed = PhysicalMemory.reclaimBootloaderMemory();
+        Acpi.init();
+        Madt.init();
+        Hpet.init();
     }
 
     private static long reclaimed;
@@ -63,7 +69,28 @@ public final class Kernel {
         }
         Console.println("gc: allocated 512 MiB on a 256 MiB machine; " + Heap.collections() + " collections, heap "
                 + (Heap.committed() >> 20) + " MiB committed");
+        printPlatform();
         Console.println("DUKE-BOOT-OK");
+    }
+
+    private static void printPlatform() {
+        Console.println("acpi: revision " + Acpi.revision() + ", tables " + Acpi.signatures());
+        StringBuilder cpus = new StringBuilder();
+        for (Madt.LocalApic cpu : Madt.cpus()) {
+            cpus.append(cpus.length() == 0 ? "" : ", ").append("apic ").append(cpu.apicId)
+                    .append(cpu.enabled ? "" : " (disabled)");
+        }
+        Console.println("cpus: " + Madt.cpus().size() + " (" + cpus + "), local APIC at 0x"
+                + Long.toHexString(Madt.localApicAddress()) + (Madt.legacyPics() ? ", legacy PICs present" : ""));
+        for (Madt.IoApic io : Madt.ioApics()) {
+            Console.println("ioapic " + io.id + " at 0x" + Long.toHexString(io.address) + ", GSIs from " + io.gsiBase);
+        }
+        StringBuilder overrides = new StringBuilder();
+        for (Madt.Override o : Madt.overrides()) {
+            overrides.append(overrides.length() == 0 ? "" : ", ").append("irq ").append(o.irq).append(" -> gsi ")
+                    .append(o.gsi).append(o.levelTriggered() ? " level" : "").append(o.activeLow() ? " low" : "");
+        }
+        Console.println("irq overrides: " + overrides + "; hpet at 0x" + Long.toHexString(Hpet.address()));
     }
 
     private static void printMemoryMap() {
