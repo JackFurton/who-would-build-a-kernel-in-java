@@ -650,7 +650,7 @@ final class MethodCompiler {
         pushValue(RAX, kind == TypeKind.LONG);
     }
 
-    /** TODO(#aastore-check): reference stores skip the ArrayStoreException type check. */
+    /** TODO(#6): reference stores skip the ArrayStoreException type check. */
     private void arrayStore(TypeKind kind) {
         int width = arrayWidth(kind);
         if (width == 0) {
