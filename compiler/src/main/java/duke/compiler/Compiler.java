@@ -45,6 +45,13 @@ public final class Compiler {
             Reg.RAX, Reg.RCX, Reg.RDX, Reg.RBX, Reg.RBP, Reg.RSI, Reg.RDI,
             Reg.R8, Reg.R9, Reg.R10, Reg.R11, Reg.R12, Reg.R13, Reg.R14, Reg.R15};
 
+    static final String STACK_LIMIT = "stack.limit";
+    static final String STACK_OVERFLOW = "stack.overflow";
+    /** Below the normal limit: room for constructing and throwing StackOverflowError. */
+    static final int STACK_RESERVE = 16 * 1024;
+    /** Below the emergency limit there's only room to panic. */
+    static final int STACK_EMERGENCY = 4 * 1024;
+
     static final String HEAP_ARENA = "heap.arena";
     static final String METHOD_TABLE = "method.table";
     static final int HEAP_ARENA_SIZE = 16 * 1024 * 1024;
@@ -72,6 +79,7 @@ public final class Compiler {
     private final LambdaCompiler lambdas;
     private int multiArraySites;
     private boolean interruptStubs;
+    private boolean stackOverflowStub;
     private final Map<String, LineInfo> lineInfo = new LinkedHashMap<>();
 
     private record LineInfo(String sourceFile, List<int[]> lines) {}
@@ -119,6 +127,9 @@ public final class Compiler {
         emitInitializers();
         if (interruptStubs) {
             emitInterruptStubs();
+        }
+        if (stackOverflowStub) {
+            emitStackOverflowStub();
         }
         emitBootStub(entryClass, mainSymbol);
         emitMethodTable();
@@ -401,6 +412,9 @@ public final class Compiler {
         if (symbol.equals("interrupt.common")) {
             return METHOD_INTERRUPT_ENTRY;
         }
+        if (symbol.equals(STACK_OVERFLOW)) {
+            return METHOD_HIDDEN;
+        }
         int dot = symbol.indexOf('.');
         int paren = symbol.indexOf('(');
         if (dot < 0 || paren < 0 || pool.find(symbol.substring(0, dot)) == null) {
@@ -410,9 +424,46 @@ public final class Compiler {
         String name = symbol.substring(dot + 1, paren);
         boolean throwableSetup = pool.isSubclass(owner, "java/lang/Throwable")
                 && (name.equals("<init>") || name.equals("fillInStackTrace"));
-        boolean plumbing = owner.equals("duke/rt/Runtime") || owner.equals("duke/rt/Types")
+        boolean plumbing = symbol.equals(STACK_OVERFLOW) || owner.equals("duke/rt/Runtime") || owner.equals("duke/rt/Types")
                 || owner.equals("duke/rt/Backtrace") || owner.equals("duke/rt/Exceptions");
         return throwableSetup || plumbing ? METHOD_HIDDEN : 0;
+    }
+
+    void requireStackOverflowStub() {
+        if (!stackOverflowStub) {
+            stackOverflowStub = true;
+            requireMethod("duke/rt/Runtime", "stackOverflow", "()V");
+            requireMethod("duke/rt/Runtime", "stackExhausted", "()V");
+        }
+    }
+
+    /**
+     * Called from a prologue that found rsp below the limit. The first time, it lowers the limit to
+     * the emergency mark and tail-jumps to Runtime.stackOverflow, which throws from inside the
+     * reserve. Overflowing again before the unwinder resets the limit means even the reserve is
+     * gone: checks are disabled and Runtime.stackExhausted panics.
+     */
+    private void emitStackOverflowStub() {
+        image.data.align(8);
+        int limit = image.data.size();
+        image.data.emit64(0);
+        image.define(STACK_LIMIT, image.data, limit, 8, Image.SymbolType.OBJECT);
+
+        Section text = image.text;
+        text.align(16);
+        int start = text.size();
+        X64 a = new X64(text);
+        X64.Label exhausted = new X64.Label();
+        a.lea(Reg.RAX, Mem.rip("boot.stack", STACK_EMERGENCY));
+        a.alu(X64.Alu.CMP, true, Mem.rip(STACK_LIMIT), Reg.RAX);
+        a.jcc(Cond.E, exhausted);
+        a.store(8, Mem.rip(STACK_LIMIT), Reg.RAX);
+        a.jmp(methodSymbol("duke/rt/Runtime", "stackOverflow", "()V"));
+        a.bind(exhausted);
+        a.alu(X64.Alu.XOR, false, Reg.RAX, Reg.RAX);
+        a.store(8, Mem.rip(STACK_LIMIT), Reg.RAX);
+        a.jmp(methodSymbol("duke/rt/Runtime", "stackExhausted", "()V"));
+        image.define(STACK_OVERFLOW, text, start, text.size() - start, Image.SymbolType.FUNC);
     }
 
     String requireInterruptStubs() {
@@ -725,6 +776,10 @@ public final class Compiler {
         X64 a = new X64(text);
         a.lea(Reg.RSP, Mem.rip("boot.stack", BOOT_STACK_SIZE));
         a.alu(X64.Alu.XOR, false, Reg.RBP, Reg.RBP);
+        if (stackOverflowStub) {
+            a.lea(Reg.RAX, Mem.rip("boot.stack", STACK_RESERVE));
+            a.store(8, Mem.rip(STACK_LIMIT), Reg.RAX);
+        }
         if (initializers.contains(entryClass)) {
             a.call(initializerSymbol(entryClass));
         }

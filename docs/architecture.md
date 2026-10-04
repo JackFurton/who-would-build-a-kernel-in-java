@@ -147,6 +147,12 @@ the frame's base (rbp minus its locals), sets rbp, pushes the exception (the JVM
 state) and jumps. `finally`, multi-catch and try-with-resources are just javac's bytecode on top.
 Unwinding stops at an interrupt entry, since exceptions can't propagate out of an interrupt.
 
+Stack overflow is a real, catchable `StackOverflowError`. Every prologue compares rsp against
+`stack.limit`, which sits 16 KiB above the bottom of the stack. Crossing it calls a stub that lowers
+the limit to 4 KiB above the bottom and throws from inside that reserve. The unwinder restores the
+normal limit when it resumes in a handler. Overflowing the reserve too panics instead of
+corrupting memory. The check is 18 bytes per method, about 12% of `.text` today.
+
 An uncaught exception panics with `uncaught <toString>`, its stack trace and its causes.
 `Throwable` captures return addresses at construction. The compiler flags Throwable constructors
 and runtime plumbing as hidden so traces start where the JDK's would. `OutOfMemoryError` is still a

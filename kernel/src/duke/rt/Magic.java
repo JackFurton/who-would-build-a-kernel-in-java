@@ -99,6 +99,9 @@ public final class Magic {
      */
     public static native void resumeAt(long handler, long rsp, long rbp, Throwable exception);
 
+    /** Back to the normal stack limit, after unwinding out of a StackOverflowError's reserve. */
+    public static native void resetStackLimit();
+
     /** int3. */
     public static native void breakpoint();
 

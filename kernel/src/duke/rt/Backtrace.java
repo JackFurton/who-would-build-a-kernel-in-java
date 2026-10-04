@@ -117,11 +117,14 @@ public final class Backtrace {
         return 0;
     }
 
-    /** The source line of the last line-table row at or before {@code offset}. */
+    /**
+     * The source line of the last line-table row at or before {@code offset}. Code before the first
+     * row is the prologue (the stack check lives there), which belongs to the method's first line.
+     */
     private static int line(long entry, int offset) {
         int count = Magic.peekInt(entry + 12);
         long table = Magic.peekLong(entry + 32);
-        int line = 0;
+        int line = count > 0 ? Magic.peekInt(table + 4) : 0;
         for (int i = 0; i < count && Magic.peekInt(table + 8L * i) <= offset; i++) {
             line = Magic.peekInt(table + 8L * i + 4);
         }
