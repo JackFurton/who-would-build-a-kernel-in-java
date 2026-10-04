@@ -1,5 +1,8 @@
 package duke.kernel;
 
+import duke.kernel.x86.Interrupts;
+import duke.kernel.x86.IoApic;
+import duke.kernel.x86.LocalApic;
 import duke.rt.Magic;
 
 /** 16550 UART on COM1, polled. */
@@ -20,6 +23,25 @@ public final class Serial {
         Magic.outb(COM1 + 3, 0x03); // 8N1, DLAB off
         Magic.outb(COM1 + 2, 0xC7); // FIFO on, cleared, 14-byte threshold
         Magic.outb(COM1 + 4, 0x03); // DTR + RTS
+    }
+
+    public static final int VECTOR = 0x24;
+    private static final int DATA_READY = 0x01;
+    private static final int RECEIVE_INTERRUPT = 0x01;
+
+    /** Turns on receive interrupts (IRQ 4) feeding Input; carriage returns arrive as newlines. */
+    public static void enableInput() {
+        Interrupts.register(VECTOR, frame -> {
+            while ((Magic.inb(LINE_STATUS) & DATA_READY) != 0) {
+                int c = Magic.inb(COM1);
+                Input.put(c == '\r' ? '\n' : c);
+            }
+            LocalApic.endOfInterrupt();
+        });
+        IoApic.routeIrq(4, VECTOR);
+        // OUT2 gates the UART's interrupt line on PC-compatible hardware.
+        Magic.outb(COM1 + 4, 0x0B);
+        Magic.outb(COM1 + 1, RECEIVE_INTERRUPT);
     }
 
     public static void write(int b) {

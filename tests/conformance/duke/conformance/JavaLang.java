@@ -204,4 +204,9 @@ final class JavaLang {
         System.arraycopy(longs, 0, copy, 0, 3);
         return ((String) objects[2]).length() + (copy[0] == 1L << 40 ? 100 : 0);
     }
+
+    static String stripVersusTrim() {
+        String s = " \t\u0001hi there\u001f\n ";
+        return "[" + s.strip() + "][" + s.trim() + "]" + s.strip().length() + "," + s.trim().length();
+    }
 }

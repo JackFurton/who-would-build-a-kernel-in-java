@@ -9,6 +9,7 @@ import duke.kernel.mm.KernelHeap;
 import duke.kernel.mm.PhysicalMemory;
 import duke.kernel.time.Timer;
 import duke.kernel.x86.Gdt;
+import duke.kernel.x86.IoApic;
 import duke.kernel.x86.LocalApic;
 import duke.kernel.x86.Pic;
 import duke.kernel.x86.Idt;
@@ -43,6 +44,9 @@ public final class Kernel {
         Pic.disable();
         LocalApic.init();
         Timer.init();
+        IoApic.init();
+        Ps2Keyboard.init();
+        Serial.enableInput();
         Magic.enableInterrupts();
     }
 
@@ -82,6 +86,7 @@ public final class Kernel {
         Console.println("timer: local APIC timer at " + Timer.apicFrequency() / 1000 + " kHz (calibrated against the HPET), "
                 + Timer.HZ + " Hz tick; slept 100 ms, uptime advanced " + (Timer.uptimeMillis() - before) + " ms");
         Console.println("DUKE-BOOT-OK");
+        Shell.run();
     }
 
     private static void printPlatform() {

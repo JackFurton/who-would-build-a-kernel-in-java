@@ -117,6 +117,32 @@ public final class String implements Comparable<String> {
         return true;
     }
 
+    /** Without leading and trailing whitespace as Character.isWhitespace defines it. */
+    public String strip() {
+        int start = 0;
+        int end = value.length;
+        while (start < end && Character.isWhitespace((char) (value[start] & 0xFF))) {
+            start++;
+        }
+        while (end > start && Character.isWhitespace((char) (value[end - 1] & 0xFF))) {
+            end--;
+        }
+        return substring(start, end);
+    }
+
+    /** Without leading and trailing characters up to and including space, which strip() keeps. */
+    public String trim() {
+        int start = 0;
+        int end = value.length;
+        while (start < end && (value[start] & 0xFF) <= ' ') {
+            start++;
+        }
+        while (end > start && (value[end - 1] & 0xFF) <= ' ') {
+            end--;
+        }
+        return substring(start, end);
+    }
+
     public String substring(int beginIndex) {
         return substring(beginIndex, value.length);
     }

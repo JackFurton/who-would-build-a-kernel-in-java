@@ -49,6 +49,9 @@ jobs:
       - name: Kernel tests (inside the booted kernel)
         run: make ktest
 
+      - name: Shell over serial and PS/2
+        run: make shell-test
+
       - name: Record metrics
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: tools/record-metrics.sh
