@@ -117,6 +117,7 @@ final class MethodCompiler {
         if (extraLocals > 0) {
             a.aluImm(Alu.SUB, true, RSP, 8 * extraLocals);
         }
+        stackCheck();
 
         for (CodeElement e : code) {
             switch (e) {
@@ -863,6 +864,10 @@ final class MethodCompiler {
                 a.store(4, Mem.at(RSI, 12), RDX);
             }
             case "breakpoint" -> a.int3();
+            case "resetStackLimit" -> {
+                a.lea(RAX, Mem.rip("boot.stack", Compiler.STACK_RESERVE));
+                a.store(8, Mem.rip(Compiler.STACK_LIMIT), RAX);
+            }
             case "resumeAt" -> {
                 // resumeAt(handler, rsp, rbp, exception): the JVM's handler entry state is an
                 // operand stack holding just the exception, on top of the frame's locals.
@@ -996,6 +1001,19 @@ final class MethodCompiler {
         popValue(RDX, kind == TypeKind.LONG);
         checkedArrayAccess();
         a.store(width, Mem.at(RAX, RCX, width, Layouts.ARRAY_DATA_OFFSET), RDX);
+    }
+
+    /**
+     * Every frame checks the stack limit once it has its locals. Crossing it calls the compiler's
+     * overflow stub, which lowers the limit into the reserve and throws StackOverflowError.
+     */
+    private void stackCheck() {
+        program.requireStackOverflowStub();
+        X64.Label ok = new X64.Label();
+        a.alu(Alu.CMP, true, Mem.rip(Compiler.STACK_LIMIT), RSP);
+        a.jcc(Cond.BE, ok);
+        a.call(Compiler.STACK_OVERFLOW);
+        a.bind(ok);
     }
 
     /**

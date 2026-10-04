@@ -32,6 +32,7 @@ final class Exceptions {
                         long catchTib = Magic.peekLong(row + 16);
                         if (catchTib == 0 || Tib.isAssignable(tib, catchTib)) {
                             long frameBytes = Magic.peekInt(table + 4);
+                            Magic.resetStackLimit();
                             Magic.resumeAt(start + Magic.peekInt(row + 8), rbp - frameBytes, rbp, exception);
                         }
                     }
