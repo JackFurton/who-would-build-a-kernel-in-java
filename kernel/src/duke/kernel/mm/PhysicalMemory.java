@@ -31,7 +31,8 @@ public final class PhysicalMemory {
         for (int i = 0; i < Limine.memoryMapSize(); i++) {
             if (Limine.memoryMapType(i) == Limine.MEMMAP_USABLE) {
                 // Usable regions are page-aligned per the protocol; round inward anyway.
-                long first = (Limine.memoryMapBase(i) + PAGE_SIZE - 1) / PAGE_SIZE;
+                // Never hand out frame 0: 0 reads as "no frame" everywhere, and it's the real-mode IVT.
+                long first = Math.max(1, (Limine.memoryMapBase(i) + PAGE_SIZE - 1) / PAGE_SIZE);
                 long end = (Limine.memoryMapBase(i) + Limine.memoryMapLength(i)) / PAGE_SIZE;
                 if (end > first) {
                     frames.release(first, end - first);

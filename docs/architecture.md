@@ -33,9 +33,15 @@ for now: the bump allocator isn't reentrant.
 ## Memory
 
 `PhysicalMemory` hands out 4 KiB frames from the "usable" regions of Limine's memory map,
-tracked in a `FrameBitmap` (one bit per page, next-fit search). Frames are named by physical
-address and touched through Limine's higher-half direct map. Bootloader-reclaimable memory stays
-reserved until we run on our own page tables, since Limine's tables and responses live there.
+tracked in a `FrameBitmap` (one bit per page, next-fit search). Frame 0 is never handed out.
+Frames are named by physical address and touched through the higher-half direct map.
+
+`KernelAddressSpace.activate()` then builds our own 4-level tables (`PageTable`) and switches
+CR3. The kernel image is mapped from the compiler's section boundaries (`Magic.imageLayout()`):
+text read-only and executable, rodata read-only, data and bss writable, and both NX when the CPU
+has it. The direct map covers every region type Limine maps, with 2 MiB pages where alignment
+allows, and uncached for the framebuffer. The virtual layout is unchanged, so execution simply
+continues. Bootloader-reclaimable memory is still reserved (#55).
 Java objects still come from the fixed bump arena in `.bss` (see Objects below).
 
 ## Compiler pipeline

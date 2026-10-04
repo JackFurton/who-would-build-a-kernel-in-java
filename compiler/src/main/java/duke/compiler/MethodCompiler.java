@@ -890,6 +890,10 @@ final class MethodCompiler {
                 a.push(RBP);
                 a.push(RBP);
             }
+            case "imageLayout" -> {
+                a.lea(RAX, Mem.rip(Compiler.IMAGE_LAYOUT));
+                pushLong(RAX);
+            }
             case "methodTable" -> {
                 a.lea(RAX, Mem.rip(Compiler.METHOD_TABLE));
                 pushLong(RAX);

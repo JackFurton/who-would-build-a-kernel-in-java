@@ -93,6 +93,12 @@ public final class Magic {
     /** The caller's rbp. Every compiled method keeps a frame pointer, so this starts a stack walk. */
     public static native long framePointer();
 
+    /**
+     * Six virtual addresses bounding the kernel image: text start/end, rodata start/end, data
+     * start, bss end (Compiler.emitImageLayout).
+     */
+    public static native long imageLayout();
+
     /** The compiler's method table; layout documented on Compiler.emitMethodTable. */
     public static native long methodTable();
 

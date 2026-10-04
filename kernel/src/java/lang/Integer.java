@@ -90,6 +90,10 @@ public final class Integer extends Number implements Comparable<Integer> {
         return x < y ? -1 : (x == y ? 0 : 1);
     }
 
+    public static int compareUnsigned(int x, int y) {
+        return compare(x + MIN_VALUE, y + MIN_VALUE);
+    }
+
     public static int signum(int i) {
         return (i >> 31) | (-i >>> 31);
     }
