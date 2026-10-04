@@ -60,6 +60,16 @@ public final class Magic {
 
     public static native void loadIdt(long descriptor);
 
+    /** Loads ds, es, ss, fs and gs with {@code data} and reloads cs with {@code code}. */
+    public static native void loadSegments(int code, int data);
+
+    public static native void loadTaskRegister(int selector);
+
+    /** The rsp below which method prologues throw StackOverflowError; 0 disables the checks. */
+    public static native long stackLimit();
+
+    public static native void setStackLimit(long limit);
+
     public static native void loadGdt(long descriptor);
 
     public static native long readCr0();
@@ -94,8 +104,8 @@ public final class Magic {
     public static native long framePointer();
 
     /**
-     * Six virtual addresses bounding the kernel image: text start/end, rodata start/end, data
-     * start, bss end (Compiler.emitImageLayout).
+     * Virtual addresses bounding the kernel image: text start/end, rodata start/end, data start,
+     * bss end, then the boot stack's guard page (Compiler.emitImageLayout).
      */
     public static native long imageLayout();
 

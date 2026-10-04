@@ -40,7 +40,8 @@ public final class Interrupts {
             return;
         }
         String name = vector < EXCEPTIONS.length ? EXCEPTIONS[vector] : vector < 32 ? "reserved exception" : "interrupt";
-        String detail = vector == 14 ? " at address 0x" + Long.toHexString(Magic.readCr2()) : "";
+        String detail = vector == 14 ? " at address 0x" + Long.toHexString(Magic.readCr2())
+                : vector == 8 ? ", likely the stack running into its guard page" : "";
         Panic.begin(name, " (vector ", Integer.toString(vector), ", error 0x", Long.toHexString(Frame.errorCode(frame)), ")", detail);
         dump(frame);
         Backtrace.print(Frame.rip(frame), Frame.register(frame, Frame.RBP));

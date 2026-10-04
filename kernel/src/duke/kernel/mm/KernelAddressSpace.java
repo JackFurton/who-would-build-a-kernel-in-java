@@ -4,8 +4,8 @@ import duke.boot.Limine;
 import duke.rt.Magic;
 
 /**
- * Replaces Limine's page tables with ours: the kernel image with per-section permissions, and the
- * higher-half direct map over every region Limine mapped. Same virtual layout, so execution
+ * Replaces Limine's page tables with ours: the kernel image with per-section permissions (minus
+ * the boot stack's guard page), and the higher-half direct map over every region Limine mapped. Same virtual layout, so execution
  * carries on across the CR3 switch.
  */
 public final class KernelAddressSpace {
@@ -34,6 +34,7 @@ public final class KernelAddressSpace {
         mapImage(t, Magic.peekLong(layout), Magic.peekLong(layout + 8), physicalOffset, 0);
         mapImage(t, Magic.peekLong(layout + 16), Magic.peekLong(layout + 24), physicalOffset, nx);
         mapImage(t, Magic.peekLong(layout + 32), Magic.peekLong(layout + 40), physicalOffset, PageTable.WRITABLE | nx);
+        t.unmap(Magic.peekLong(layout + 48));
 
         long hhdm = Limine.hhdmOffset();
         for (int i = 0; i < Limine.memoryMapSize(); i++) {

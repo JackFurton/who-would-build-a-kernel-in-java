@@ -26,6 +26,13 @@ common path. That path clears DF, saves every general-purpose register, and call
 `duke.kernel.x86.Interrupts.dispatch(frame)` with the address of the saved state. It restores
 after, and returns with `iretq`. `Idt` writes the gates in Java and loads them with `lidt`.
 
+We load our own GDT (`Gdt`: kernel code 0x08, data 0x10, and a TSS) before the IDT. Limine's lives in
+bootloader-reclaimable memory, and the CPU reads the GDT on every interrupt. The TSS provides IST 1,
+a separate stack for double faults. A page below the boot stack is left unmapped, so running off the
+stack faults. That fault can't push its frame, so it escalates to a double fault, which lands on
+the IST stack and gets reported. The double-fault entry stub also switches the prologue stack
+checks off (`stack.limit = 0`), since the IST stack sits below the boot stack's limit.
+
 `Interrupts.dispatch` runs a registered `Handler` if there is one. Otherwise it panics with the
 exception name, error code, CR2 for page faults, and a register dump. Handlers must not allocate
 for now: the bump allocator isn't reentrant.
