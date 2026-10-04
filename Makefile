@@ -14,6 +14,9 @@ OVMF ?= $(firstword $(wildcard \
 export OVMF
 
 KERNEL_SRCS   := $(shell find kernel/src -name '*.java')
+# Keep in sync with tools/Harness.java and CompilerTest. javac's default string concatenation is
+# invokedynamic; inline makes it plain StringBuilder calls the compiler can handle.
+KERNEL_JAVAC  := javac --system none -XDstringConcat=inline
 COMPILER_SRCS := $(shell find compiler/src/main -name '*.java') compiler/build.gradle.kts
 
 .PHONY: all compiler run test unit-test boot-test conformance panic-tests disasm clean
@@ -28,7 +31,7 @@ $(DUKEC): $(COMPILER_SRCS)
 
 $(BUILD)/kclasses.stamp: $(KERNEL_SRCS)
 	rm -rf $(BUILD)/kclasses
-	javac --system none --module-source-path java.base=kernel/src -d $(BUILD)/kclasses $(KERNEL_SRCS)
+	$(KERNEL_JAVAC) --module-source-path java.base=kernel/src -d $(BUILD)/kclasses $(KERNEL_SRCS)
 	touch $@
 
 $(BUILD)/kernel.elf: $(DUKEC) $(BUILD)/kclasses.stamp

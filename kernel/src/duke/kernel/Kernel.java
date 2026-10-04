@@ -9,9 +9,7 @@ public final class Kernel {
     public static void main() {
         Serial.init();
         Console.println("Duke: hello from Java on bare metal");
-        Console.print("bytecode arithmetic check: 6 * 7 = ");
-        Console.print(6L * multiplier());
-        Console.println("");
+        Console.println("bytecode arithmetic check: 6 * 7 = " + 6L * multiplier());
         Console.println("DUKE-BOOT-OK");
     }
 

@@ -26,7 +26,9 @@ final class Harness {
             sources.addAll(javaFiles(root));
         }
         String sourcePath = "java.base=" + String.join(File.pathSeparator, roots.stream().map(Path::toString).toList());
-        javac(List.of("--system", "none", "--module-source-path", sourcePath, "-d", out.toString()), sources);
+        // Same flags as KERNEL_JAVAC in the Makefile.
+        javac(List.of("--system", "none", "-XDstringConcat=inline", "--module-source-path", sourcePath,
+                "-d", out.toString()), sources);
     }
 
     static void javac(List<String> options, List<Path> sources) {

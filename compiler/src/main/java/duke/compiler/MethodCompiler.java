@@ -28,6 +28,7 @@ import java.lang.classfile.instruction.ConstantInstruction;
 import java.lang.classfile.instruction.ConvertInstruction;
 import java.lang.classfile.instruction.FieldInstruction;
 import java.lang.classfile.instruction.IncrementInstruction;
+import java.lang.classfile.instruction.InvokeDynamicInstruction;
 import java.lang.classfile.instruction.InvokeInstruction;
 import java.lang.classfile.instruction.LabelTarget;
 import java.lang.classfile.instruction.LineNumber;
@@ -181,6 +182,9 @@ final class MethodCompiler {
             case StackInstruction s -> stack(s.opcode());
             case FieldInstruction f -> field(f);
             case InvokeInstruction inv -> invoke(inv);
+            case InvokeDynamicInstruction indy -> throw error(indy.bootstrapMethod().owner().displayName().equals("StringConcatFactory")
+                    ? "string concatenation compiled to invokedynamic; compile the kernel with javac -XDstringConcat=inline"
+                    : "invokedynamic (" + indy.name().stringValue() + ") is not supported yet; lambdas and method references need #41");
             case ReturnInstruction r -> {
                 switch (r.typeKind().slotSize()) {
                     case 1 -> a.pop(RAX);
@@ -582,7 +586,7 @@ final class MethodCompiler {
                 }
             }
             default -> throw error("unsupported call " + inv.opcode().name().toLowerCase() + " to " + owner + "." + name
-                    + " (lambdas and string concatenation are not supported yet)");
+                    + " (lambdas are not supported yet)");
         }
     }
 
