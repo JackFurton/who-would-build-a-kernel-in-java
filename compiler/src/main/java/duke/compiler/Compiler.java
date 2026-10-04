@@ -35,6 +35,8 @@ public final class Compiler {
 
     static final String STRING_CLASS = "java/lang/String";
     static final String CLASS_CLASS = "java/lang/Class";
+    /** Holds the Limine requests, built at build time; see BuildTimeInit. */
+    static final String LIMINE = "duke/boot/Limine";
     static final String BYTE_ARRAY = "[B";
 
     static final String INTERRUPTS = "duke/kernel/x86/Interrupts";
@@ -57,7 +59,6 @@ public final class Compiler {
     static final int HEAP_ARENA_SIZE = 16 * 1024 * 1024;
 
     private static final int BOOT_STACK_SIZE = 64 * 1024;
-    private static final int LIMINE_BASE_REVISION = 6;
 
     private final ClassPool pool;
     private final Layouts layouts;
@@ -110,6 +111,11 @@ public final class Compiler {
         // Every TIB is a Class object carrying its name as a String, so these are always in the image.
         requireClass(CLASS_CLASS);
         requireClass(STRING_CLASS);
+        requireClass(LIMINE);
+        if (buildTimeStatics(LIMINE) == null) {
+            throw new CompileException(LIMINE + "'s static initializer must be constant-only: Limine reads the"
+                    + " requests from the image before any code runs");
+        }
         tibs.add(BYTE_ARRAY);
         requireClass(entryClass);
         if (needsInit(entryClass)) {
@@ -139,7 +145,6 @@ public final class Compiler {
         emitTibs();
         emitStrings();
         emitHeapArena();
-        emitLimineRequests();
         return image;
     }
 
@@ -883,22 +888,5 @@ public final class Compiler {
         int offset = image.bss.size();
         image.bss.reserve(HEAP_ARENA_SIZE);
         image.define(HEAP_ARENA, image.bss, offset, HEAP_ARENA_SIZE, Image.SymbolType.OBJECT);
-    }
-
-    /** See PROTOCOL.md in Limine-Bootloader/limine-protocol, "Requests Delimiters" and "Base Revisions". */
-    private void emitLimineRequests() {
-        Section data = image.data;
-        data.align(8);
-        data.emit64(0xf6b8f4b39de7d1aeL);
-        data.emit64(0xfab91a6940fcb9cfL);
-        data.emit64(0x785c6ed015d3e316L);
-        data.emit64(0x181e920a7852b9d9L);
-        int revision = data.size();
-        data.emit64(0xf9562b2d5c95a6c8L);
-        data.emit64(0x6a7b384944536bdcL);
-        data.emit64(LIMINE_BASE_REVISION);
-        image.define("limine.base_revision", data, revision, 24, Image.SymbolType.OBJECT);
-        data.emit64(0xadc0e0531bb10d03L);
-        data.emit64(0x9572709f31764c62L);
     }
 }

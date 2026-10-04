@@ -53,14 +53,16 @@ class CompilerTest {
     void imageCarriesLimineBaseRevisionTag() throws IOException {
         Image image = new Compiler(ClassPool.load(compile())).compile("duke/kernel/Kernel", "main");
         Image.Linked linked = image.link(Compiler.KERNEL_BASE);
-        long tag = linked.address("limine.base_revision");
         Image.Placed data = linked.sections().stream().filter(p -> p.section() == image.data).findFirst().orElseThrow();
         ByteBuffer b = ByteBuffer.wrap(data.bytes()).order(ByteOrder.LITTLE_ENDIAN);
-        int at = (int) (tag - data.address());
-        assertEquals(0, at % 8, "Limine only scans 8-byte aligned slots");
-        assertEquals(0xf9562b2d5c95a6c8L, b.getLong(at));
-        assertEquals(0x6a7b384944536bdcL, b.getLong(at + 8));
-        assertEquals(6, b.getLong(at + 16));
+        // The static field holds a pointer to a build-time array; its elements start 16 bytes in.
+        long field = linked.address("duke/boot/Limine::BASE_REVISION");
+        long array = b.getLong((int) (field - data.address()));
+        int elements = (int) (array - data.address()) + 16;
+        assertEquals(0, elements % 8, "Limine only scans 8-byte aligned slots");
+        assertEquals(0xf9562b2d5c95a6c8L, b.getLong(elements));
+        assertEquals(0x6a7b384944536bdcL, b.getLong(elements + 8));
+        assertEquals(6, b.getLong(elements + 16));
     }
 
     @Test

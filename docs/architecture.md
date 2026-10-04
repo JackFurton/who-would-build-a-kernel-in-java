@@ -4,8 +4,11 @@
 
 1. UEFI firmware runs Limine from `EFI/BOOT/BOOTX64.EFI`. Limine reads `boot/limine/limine.conf`.
 2. Limine loads `kernel.elf`. Its segments sit in the higher half at `0xffffffff80000000`.
-   Limine finds the requests block (start marker, base revision 6 tag, end marker) in `.data`,
-   switches to long mode with paging on, and jumps to `_start`.
+   Limine scans the image for its requests: base revision 6, HHDM, memory map, executable
+   address, framebuffer and RSDP. These are declared in Java as `static final long[]` in
+   `duke.boot.Limine`. Build-time initialization turns them into data, and the compiler puts the
+   class in every image and fails if that ever stops being possible. Limine writes response
+   pointers into the arrays, switches to long mode with paging on, and jumps to `_start`.
 3. `_start` comes from `Compiler.emitBootStub`. It switches to a 64 KiB stack in `.bss`,
    initializes `Kernel`, then calls `Kernel.main()`. If `main` returns, the CPU halts.
 
