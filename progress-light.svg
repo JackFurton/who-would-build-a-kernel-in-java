@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="760" height="594" viewBox="0 0 760 594" role="img" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif">
 <title>Duke progress</title>
-<desc>Latest (1762ada): Conformance 218; Unit 122; Panic 15; .text 41.2 KB; Compiler 3201; Kernel 2161; </desc>
+<desc>Latest (48e6997): Conformance 225; Unit 123; Panic 15; .text 38.5 KB; Compiler 3479; Kernel 2290; </desc>
 <rect x="0" y="0" width="760" height="190" rx="8" fill="#fcfcfb"/>
 <text x="16.0" y="24.0" fill="#0b0b0b" font-size="14" font-weight="600" text-anchor="start" style="font-variant-numeric: tabular-nums">Tests in the suites</text>
 <rect x="16" y="34" width="10" height="10" rx="2" fill="#2a78d6"/>
@@ -18,16 +18,16 @@
 <line x1="52.0" x2="610.0" y1="54.0" y2="54.0" stroke="#e1e0d9" stroke-width="1"/>
 <text x="44.0" y="58.0" fill="#898781" font-size="11" font-weight="400" text-anchor="end" style="font-variant-numeric: tabular-nums">300</text>
 <text x="52.0" y="178.0" fill="#898781" font-size="11" font-weight="400" text-anchor="middle" style="font-variant-numeric: tabular-nums">Oct 3 21:53</text>
-<text x="331.0" y="178.0" fill="#898781" font-size="11" font-weight="400" text-anchor="middle" style="font-variant-numeric: tabular-nums">Oct 3 22:24</text>
-<text x="610.0" y="178.0" fill="#898781" font-size="11" font-weight="400" text-anchor="middle" style="font-variant-numeric: tabular-nums">Oct 3 22:56</text>
-<polyline points="52.0,134.2 76.3,134.2 115.8,130.7 129.8,126.4 203.8,123.6 225.3,121.1 265.3,116.9 295.0,107.7 323.5,105.2 353.4,98.2 383.5,92.2 439.2,92.2 495.3,92.2 533.5,84.4 555.2,83.0 610.0,83.0" fill="none" stroke="#2a78d6" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
-<circle cx="610.0" cy="83.0" r="4" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/>
-<polyline points="52.0,127.8 76.3,127.8 115.8,127.8 129.8,127.8 203.8,126.8 225.3,126.8 265.3,126.8 295.0,125.4 323.5,125.0 353.4,125.0 383.5,125.0 439.2,118.3 495.3,118.3 533.5,116.9 555.2,116.9 610.0,116.9" fill="none" stroke="#eb6834" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
-<circle cx="610.0" cy="116.9" r="4" fill="#eb6834" stroke="#fcfcfb" stroke-width="2"/>
-<polyline points="52.0,160.0 76.3,160.0 115.8,160.0 129.8,160.0 203.8,160.0 225.3,157.2 265.3,157.2 295.0,157.2 323.5,157.2 353.4,157.2 383.5,157.2 439.2,155.8 495.3,155.4 533.5,155.1 555.2,154.7 610.0,154.7" fill="none" stroke="#1baf7a" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+<text x="331.0" y="178.0" fill="#898781" font-size="11" font-weight="400" text-anchor="middle" style="font-variant-numeric: tabular-nums">Oct 3 22:42</text>
+<text x="610.0" y="178.0" fill="#898781" font-size="11" font-weight="400" text-anchor="middle" style="font-variant-numeric: tabular-nums">Oct 3 23:31</text>
+<polyline points="52.0,134.2 67.6,134.2 92.8,130.7 101.8,126.4 149.1,123.6 162.9,121.1 188.5,116.9 207.5,107.7 225.7,105.2 244.9,98.2 264.1,92.2 299.7,92.2 335.7,92.2 360.1,84.4 374.0,83.0 409.0,83.0 610.0,80.5" fill="none" stroke="#2a78d6" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+<circle cx="610.0" cy="80.5" r="4" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/>
+<polyline points="52.0,127.8 67.6,127.8 92.8,127.8 101.8,127.8 149.1,126.8 162.9,126.8 188.5,126.8 207.5,125.4 225.7,125.0 244.9,125.0 264.1,125.0 299.7,118.3 335.7,118.3 360.1,116.9 374.0,116.9 409.0,116.9 610.0,116.5" fill="none" stroke="#eb6834" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+<circle cx="610.0" cy="116.5" r="4" fill="#eb6834" stroke="#fcfcfb" stroke-width="2"/>
+<polyline points="52.0,160.0 67.6,160.0 92.8,160.0 101.8,160.0 149.1,160.0 162.9,157.2 188.5,157.2 207.5,157.2 225.7,157.2 244.9,157.2 264.1,157.2 299.7,155.8 335.7,155.4 360.1,155.1 374.0,154.7 409.0,154.7 610.0,154.7" fill="none" stroke="#1baf7a" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
 <circle cx="610.0" cy="154.7" r="4" fill="#1baf7a" stroke="#fcfcfb" stroke-width="2"/>
-<text x="622.0" y="87.0" fill="#52514e" font-size="12" font-weight="400" text-anchor="start" style="font-variant-numeric: tabular-nums">Conformance 218</text>
-<text x="622.0" y="120.9" fill="#52514e" font-size="12" font-weight="400" text-anchor="start" style="font-variant-numeric: tabular-nums">Unit 122</text>
+<text x="622.0" y="84.5" fill="#52514e" font-size="12" font-weight="400" text-anchor="start" style="font-variant-numeric: tabular-nums">Conformance 225</text>
+<text x="622.0" y="120.5" fill="#52514e" font-size="12" font-weight="400" text-anchor="start" style="font-variant-numeric: tabular-nums">Unit 123</text>
 <text x="622.0" y="158.7" fill="#52514e" font-size="12" font-weight="400" text-anchor="start" style="font-variant-numeric: tabular-nums">Panic 15</text>
 <rect x="0" y="202" width="760" height="190" rx="8" fill="#fcfcfb"/>
 <text x="16.0" y="226.0" fill="#0b0b0b" font-size="14" font-weight="600" text-anchor="start" style="font-variant-numeric: tabular-nums">Boot kernel code size (.text)</text>
@@ -40,11 +40,11 @@
 <line x1="52.0" x2="610.0" y1="256.0" y2="256.0" stroke="#e1e0d9" stroke-width="1"/>
 <text x="44.0" y="260.0" fill="#898781" font-size="11" font-weight="400" text-anchor="end" style="font-variant-numeric: tabular-nums">60</text>
 <text x="52.0" y="380.0" fill="#898781" font-size="11" font-weight="400" text-anchor="middle" style="font-variant-numeric: tabular-nums">Oct 3 21:53</text>
-<text x="331.0" y="380.0" fill="#898781" font-size="11" font-weight="400" text-anchor="middle" style="font-variant-numeric: tabular-nums">Oct 3 22:24</text>
-<text x="610.0" y="380.0" fill="#898781" font-size="11" font-weight="400" text-anchor="middle" style="font-variant-numeric: tabular-nums">Oct 3 22:56</text>
-<polyline points="52.0,359.5 76.3,359.5 115.8,359.5 129.8,359.5 203.8,359.5 225.3,359.5 265.3,359.5 295.0,359.5 323.5,359.5 353.4,347.4 383.5,347.4 439.2,322.8 495.3,315.2 533.5,294.1 555.2,289.3 610.0,289.3" fill="none" stroke="#2a78d6" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
-<circle cx="610.0" cy="289.3" r="4" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/>
-<text x="622.0" y="293.3" fill="#52514e" font-size="12" font-weight="400" text-anchor="start" style="font-variant-numeric: tabular-nums">41.2 KB</text>
+<text x="331.0" y="380.0" fill="#898781" font-size="11" font-weight="400" text-anchor="middle" style="font-variant-numeric: tabular-nums">Oct 3 22:42</text>
+<text x="610.0" y="380.0" fill="#898781" font-size="11" font-weight="400" text-anchor="middle" style="font-variant-numeric: tabular-nums">Oct 3 23:31</text>
+<polyline points="52.0,359.5 67.6,359.5 92.8,359.5 101.8,359.5 149.1,359.5 162.9,359.5 188.5,359.5 207.5,359.5 225.7,359.5 244.9,347.4 264.1,347.4 299.7,322.8 335.7,315.2 360.1,294.1 374.0,289.3 409.0,289.3 610.0,294.1" fill="none" stroke="#2a78d6" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+<circle cx="610.0" cy="294.1" r="4" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/>
+<text x="622.0" y="298.1" fill="#52514e" font-size="12" font-weight="400" text-anchor="start" style="font-variant-numeric: tabular-nums">38.5 KB</text>
 <rect x="0" y="404" width="760" height="190" rx="8" fill="#fcfcfb"/>
 <text x="16.0" y="428.0" fill="#0b0b0b" font-size="14" font-weight="600" text-anchor="start" style="font-variant-numeric: tabular-nums">Lines of Java</text>
 <rect x="16" y="438" width="10" height="10" rx="2" fill="#2a78d6"/>
@@ -58,12 +58,12 @@
 <line x1="52.0" x2="610.0" y1="458.0" y2="458.0" stroke="#e1e0d9" stroke-width="1"/>
 <text x="44.0" y="462.0" fill="#898781" font-size="11" font-weight="400" text-anchor="end" style="font-variant-numeric: tabular-nums">4000</text>
 <text x="52.0" y="582.0" fill="#898781" font-size="11" font-weight="400" text-anchor="middle" style="font-variant-numeric: tabular-nums">Oct 3 21:53</text>
-<text x="331.0" y="582.0" fill="#898781" font-size="11" font-weight="400" text-anchor="middle" style="font-variant-numeric: tabular-nums">Oct 3 22:24</text>
-<text x="610.0" y="582.0" fill="#898781" font-size="11" font-weight="400" text-anchor="middle" style="font-variant-numeric: tabular-nums">Oct 3 22:56</text>
-<polyline points="52.0,511.7 76.3,511.7 115.8,510.7 129.8,509.3 203.8,504.5 225.3,501.7 265.3,499.0 295.0,497.8 323.5,495.5 353.4,495.4 383.5,489.5 439.2,484.9 495.3,483.0 533.5,481.0 555.2,479.2 610.0,479.2" fill="none" stroke="#2a78d6" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
-<circle cx="610.0" cy="479.2" r="4" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/>
-<polyline points="52.0,559.3 76.3,559.3 115.8,558.2 129.8,557.1 203.8,556.8 225.3,554.7 265.3,554.3 295.0,539.9 323.5,539.9 353.4,528.1 383.5,526.1 439.2,521.7 495.3,519.2 533.5,507.1 555.2,506.7 610.0,506.7" fill="none" stroke="#eb6834" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
-<circle cx="610.0" cy="506.7" r="4" fill="#eb6834" stroke="#fcfcfb" stroke-width="2"/>
-<text x="622.0" y="483.2" fill="#52514e" font-size="12" font-weight="400" text-anchor="start" style="font-variant-numeric: tabular-nums">Compiler 3201</text>
-<text x="622.0" y="510.7" fill="#52514e" font-size="12" font-weight="400" text-anchor="start" style="font-variant-numeric: tabular-nums">Kernel 2161</text>
+<text x="331.0" y="582.0" fill="#898781" font-size="11" font-weight="400" text-anchor="middle" style="font-variant-numeric: tabular-nums">Oct 3 22:42</text>
+<text x="610.0" y="582.0" fill="#898781" font-size="11" font-weight="400" text-anchor="middle" style="font-variant-numeric: tabular-nums">Oct 3 23:31</text>
+<polyline points="52.0,511.7 67.6,511.7 92.8,510.7 101.8,509.3 149.1,504.5 162.9,501.7 188.5,499.0 207.5,497.8 225.7,495.5 244.9,495.4 264.1,489.5 299.7,484.9 335.7,483.0 360.1,481.0 374.0,479.2 409.0,479.2 610.0,471.8" fill="none" stroke="#2a78d6" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+<circle cx="610.0" cy="471.8" r="4" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/>
+<polyline points="52.0,559.3 67.6,559.3 92.8,558.2 101.8,557.1 149.1,556.8 162.9,554.7 188.5,554.3 207.5,539.9 225.7,539.9 244.9,528.1 264.1,526.1 299.7,521.7 335.7,519.2 360.1,507.1 374.0,506.7 409.0,506.7 610.0,503.3" fill="none" stroke="#eb6834" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+<circle cx="610.0" cy="503.3" r="4" fill="#eb6834" stroke="#fcfcfb" stroke-width="2"/>
+<text x="622.0" y="475.8" fill="#52514e" font-size="12" font-weight="400" text-anchor="start" style="font-variant-numeric: tabular-nums">Compiler 3479</text>
+<text x="622.0" y="507.3" fill="#52514e" font-size="12" font-weight="400" text-anchor="start" style="font-variant-numeric: tabular-nums">Kernel 2290</text>
 </svg>
