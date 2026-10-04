@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="760" height="594" viewBox="0 0 760 594" role="img" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif">
 <title>Duke progress</title>
-<desc>Latest (701d6da): Conformance 245; Unit 133; Panic 16; .text 63.2 KB; Compiler 4032; Kernel 4807; </desc>
+<desc>Latest (3b7e20a): Conformance 245; Unit 133; Panic 16; .text 76.5 KB; Compiler 4032; Kernel 5061; </desc>
 <rect x="0" y="0" width="760" height="190" rx="8" fill="#1a1a19"/>
 <text x="16.0" y="24.0" fill="#ffffff" font-size="14" font-weight="600" text-anchor="start" style="font-variant-numeric: tabular-nums">Tests in the suites</text>
 <rect x="16" y="34" width="10" height="10" rx="2" fill="#3987e5"/>
@@ -18,13 +18,13 @@
 <line x1="52.0" x2="610.0" y1="54.0" y2="54.0" stroke="#2c2c2a" stroke-width="1"/>
 <text x="44.0" y="58.0" fill="#898781" font-size="11" font-weight="400" text-anchor="end" style="font-variant-numeric: tabular-nums">300</text>
 <text x="52.0" y="178.0" fill="#898781" font-size="11" font-weight="400" text-anchor="middle" style="font-variant-numeric: tabular-nums">Oct 3 21:53</text>
-<text x="331.0" y="178.0" fill="#898781" font-size="11" font-weight="400" text-anchor="middle" style="font-variant-numeric: tabular-nums">Oct 3 23:06</text>
-<text x="610.0" y="178.0" fill="#898781" font-size="11" font-weight="400" text-anchor="middle" style="font-variant-numeric: tabular-nums">Oct 4 00:20</text>
-<polyline points="52.0,134.2 62.4,134.2 79.4,130.7 85.4,126.4 117.1,123.6 126.3,121.1 143.5,116.9 156.2,107.7 168.4,105.2 181.3,98.2 194.2,92.2 218.1,92.2 242.2,92.2 258.5,84.4 267.8,83.0 291.3,83.0 426.0,80.5 437.0,80.5 446.6,80.5 515.9,80.5 530.2,80.5 555.4,80.5 578.8,80.5 591.2,73.4 610.0,73.4" fill="none" stroke="#3987e5" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+<text x="331.0" y="178.0" fill="#898781" font-size="11" font-weight="400" text-anchor="middle" style="font-variant-numeric: tabular-nums">Oct 3 23:35</text>
+<text x="610.0" y="178.0" fill="#898781" font-size="11" font-weight="400" text-anchor="middle" style="font-variant-numeric: tabular-nums">Oct 4 01:18</text>
+<polyline points="52.0,134.2 59.5,134.2 71.6,130.7 75.9,126.4 98.7,123.6 105.3,121.1 117.6,116.9 126.8,107.7 135.5,105.2 144.7,98.2 154.0,92.2 171.1,92.2 188.4,92.2 200.2,84.4 206.8,83.0 223.7,83.0 320.3,80.5 328.2,80.5 335.1,80.5 384.8,80.5 395.0,80.5 413.1,80.5 429.9,80.5 438.8,73.4 452.3,73.4 610.0,73.4" fill="none" stroke="#3987e5" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
 <circle cx="610.0" cy="73.4" r="4" fill="#3987e5" stroke="#1a1a19" stroke-width="2"/>
-<polyline points="52.0,127.8 62.4,127.8 79.4,127.8 85.4,127.8 117.1,126.8 126.3,126.8 143.5,126.8 156.2,125.4 168.4,125.0 181.3,125.0 194.2,125.0 218.1,118.3 242.2,118.3 258.5,116.9 267.8,116.9 291.3,116.9 426.0,116.5 437.0,116.2 446.6,116.2 515.9,116.2 530.2,115.8 555.4,113.0 578.8,113.0 591.2,113.0 610.0,113.0" fill="none" stroke="#d95926" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+<polyline points="52.0,127.8 59.5,127.8 71.6,127.8 75.9,127.8 98.7,126.8 105.3,126.8 117.6,126.8 126.8,125.4 135.5,125.0 144.7,125.0 154.0,125.0 171.1,118.3 188.4,118.3 200.2,116.9 206.8,116.9 223.7,116.9 320.3,116.5 328.2,116.2 335.1,116.2 384.8,116.2 395.0,115.8 413.1,113.0 429.9,113.0 438.8,113.0 452.3,113.0 610.0,113.0" fill="none" stroke="#d95926" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
 <circle cx="610.0" cy="113.0" r="4" fill="#d95926" stroke="#1a1a19" stroke-width="2"/>
-<polyline points="52.0,160.0 62.4,160.0 79.4,160.0 85.4,160.0 117.1,160.0 126.3,157.2 143.5,157.2 156.2,157.2 168.4,157.2 181.3,157.2 194.2,157.2 218.1,155.8 242.2,155.4 258.5,155.1 267.8,154.7 291.3,154.7 426.0,154.7 437.0,154.7 446.6,154.7 515.9,154.7 530.2,154.7 555.4,154.3 578.8,154.3 591.2,154.3 610.0,154.3" fill="none" stroke="#199e70" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+<polyline points="52.0,160.0 59.5,160.0 71.6,160.0 75.9,160.0 98.7,160.0 105.3,157.2 117.6,157.2 126.8,157.2 135.5,157.2 144.7,157.2 154.0,157.2 171.1,155.8 188.4,155.4 200.2,155.1 206.8,154.7 223.7,154.7 320.3,154.7 328.2,154.7 335.1,154.7 384.8,154.7 395.0,154.7 413.1,154.3 429.9,154.3 438.8,154.3 452.3,154.3 610.0,154.3" fill="none" stroke="#199e70" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
 <circle cx="610.0" cy="154.3" r="4" fill="#199e70" stroke="#1a1a19" stroke-width="2"/>
 <text x="622.0" y="77.4" fill="#c3c2b7" font-size="12" font-weight="400" text-anchor="start" style="font-variant-numeric: tabular-nums">Conformance 245</text>
 <text x="622.0" y="117.0" fill="#c3c2b7" font-size="12" font-weight="400" text-anchor="start" style="font-variant-numeric: tabular-nums">Unit 133</text>
@@ -33,18 +33,16 @@
 <text x="16.0" y="226.0" fill="#ffffff" font-size="14" font-weight="600" text-anchor="start" style="font-variant-numeric: tabular-nums">Boot kernel code size (.text)</text>
 <line x1="52.0" x2="610.0" y1="362.0" y2="362.0" stroke="#383835" stroke-width="1"/>
 <text x="44.0" y="366.0" fill="#898781" font-size="11" font-weight="400" text-anchor="end" style="font-variant-numeric: tabular-nums">0</text>
-<line x1="52.0" x2="610.0" y1="326.7" y2="326.7" stroke="#2c2c2a" stroke-width="1"/>
-<text x="44.0" y="330.7" fill="#898781" font-size="11" font-weight="400" text-anchor="end" style="font-variant-numeric: tabular-nums">25</text>
-<line x1="52.0" x2="610.0" y1="291.3" y2="291.3" stroke="#2c2c2a" stroke-width="1"/>
-<text x="44.0" y="295.3" fill="#898781" font-size="11" font-weight="400" text-anchor="end" style="font-variant-numeric: tabular-nums">50</text>
+<line x1="52.0" x2="610.0" y1="309.0" y2="309.0" stroke="#2c2c2a" stroke-width="1"/>
+<text x="44.0" y="313.0" fill="#898781" font-size="11" font-weight="400" text-anchor="end" style="font-variant-numeric: tabular-nums">50</text>
 <line x1="52.0" x2="610.0" y1="256.0" y2="256.0" stroke="#2c2c2a" stroke-width="1"/>
-<text x="44.0" y="260.0" fill="#898781" font-size="11" font-weight="400" text-anchor="end" style="font-variant-numeric: tabular-nums">75</text>
+<text x="44.0" y="260.0" fill="#898781" font-size="11" font-weight="400" text-anchor="end" style="font-variant-numeric: tabular-nums">100</text>
 <text x="52.0" y="380.0" fill="#898781" font-size="11" font-weight="400" text-anchor="middle" style="font-variant-numeric: tabular-nums">Oct 3 21:53</text>
-<text x="331.0" y="380.0" fill="#898781" font-size="11" font-weight="400" text-anchor="middle" style="font-variant-numeric: tabular-nums">Oct 3 23:06</text>
-<text x="610.0" y="380.0" fill="#898781" font-size="11" font-weight="400" text-anchor="middle" style="font-variant-numeric: tabular-nums">Oct 4 00:20</text>
-<polyline points="52.0,360.0 62.4,360.0 79.4,360.0 85.4,360.0 117.1,360.0 126.3,360.0 143.5,360.0 156.2,360.0 168.4,360.0 181.3,350.4 194.2,350.4 218.1,330.7 242.2,324.6 258.5,307.7 267.8,303.8 291.3,303.8 426.0,307.6 437.0,303.6 446.6,294.1 515.9,290.9 530.2,276.6 555.4,275.0 578.8,272.6 591.2,272.6 610.0,272.6" fill="none" stroke="#3987e5" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
-<circle cx="610.0" cy="272.6" r="4" fill="#3987e5" stroke="#1a1a19" stroke-width="2"/>
-<text x="622.0" y="276.6" fill="#c3c2b7" font-size="12" font-weight="400" text-anchor="start" style="font-variant-numeric: tabular-nums">63.2 KB</text>
+<text x="331.0" y="380.0" fill="#898781" font-size="11" font-weight="400" text-anchor="middle" style="font-variant-numeric: tabular-nums">Oct 3 23:35</text>
+<text x="610.0" y="380.0" fill="#898781" font-size="11" font-weight="400" text-anchor="middle" style="font-variant-numeric: tabular-nums">Oct 4 01:18</text>
+<polyline points="52.0,360.5 59.5,360.5 71.6,360.5 75.9,360.5 98.7,360.5 105.3,360.5 117.6,360.5 126.8,360.5 135.5,360.5 144.7,353.3 154.0,353.3 171.1,338.5 188.4,333.9 200.2,321.3 206.8,318.4 223.7,318.4 320.3,321.2 328.2,318.2 335.1,311.1 384.8,308.7 395.0,297.9 413.1,296.7 429.9,295.0 438.8,295.0 452.3,295.0 610.0,280.9" fill="none" stroke="#3987e5" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+<circle cx="610.0" cy="280.9" r="4" fill="#3987e5" stroke="#1a1a19" stroke-width="2"/>
+<text x="622.0" y="284.9" fill="#c3c2b7" font-size="12" font-weight="400" text-anchor="start" style="font-variant-numeric: tabular-nums">76.5 KB</text>
 <rect x="0" y="404" width="760" height="190" rx="8" fill="#1a1a19"/>
 <text x="16.0" y="428.0" fill="#ffffff" font-size="14" font-weight="600" text-anchor="start" style="font-variant-numeric: tabular-nums">Lines of Java</text>
 <rect x="16" y="438" width="10" height="10" rx="2" fill="#3987e5"/>
@@ -60,12 +58,12 @@
 <line x1="52.0" x2="610.0" y1="458.0" y2="458.0" stroke="#2c2c2a" stroke-width="1"/>
 <text x="44.0" y="462.0" fill="#898781" font-size="11" font-weight="400" text-anchor="end" style="font-variant-numeric: tabular-nums">6000</text>
 <text x="52.0" y="582.0" fill="#898781" font-size="11" font-weight="400" text-anchor="middle" style="font-variant-numeric: tabular-nums">Oct 3 21:53</text>
-<text x="331.0" y="582.0" fill="#898781" font-size="11" font-weight="400" text-anchor="middle" style="font-variant-numeric: tabular-nums">Oct 3 23:06</text>
-<text x="610.0" y="582.0" fill="#898781" font-size="11" font-weight="400" text-anchor="middle" style="font-variant-numeric: tabular-nums">Oct 4 00:20</text>
-<polyline points="52.0,529.1 62.4,529.1 79.4,528.5 85.4,527.5 117.1,524.3 126.3,522.5 143.5,520.6 156.2,519.9 168.4,518.3 181.3,518.3 194.2,514.3 218.1,511.3 242.2,510.0 258.5,508.7 267.8,507.4 291.3,507.4 426.0,502.5 437.0,502.3 446.6,501.9 515.9,501.9 530.2,493.8 555.4,492.8 578.8,492.8 591.2,492.8 610.0,492.8" fill="none" stroke="#3987e5" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+<text x="331.0" y="582.0" fill="#898781" font-size="11" font-weight="400" text-anchor="middle" style="font-variant-numeric: tabular-nums">Oct 3 23:35</text>
+<text x="610.0" y="582.0" fill="#898781" font-size="11" font-weight="400" text-anchor="middle" style="font-variant-numeric: tabular-nums">Oct 4 01:18</text>
+<polyline points="52.0,529.1 59.5,529.1 71.6,528.5 75.9,527.5 98.7,524.3 105.3,522.5 117.6,520.6 126.8,519.9 135.5,518.3 144.7,518.3 154.0,514.3 171.1,511.3 188.4,510.0 200.2,508.7 206.8,507.4 223.7,507.4 320.3,502.5 328.2,502.3 335.1,501.9 384.8,501.9 395.0,493.8 413.1,492.8 429.9,492.8 438.8,492.8 452.3,492.8 610.0,492.8" fill="none" stroke="#3987e5" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
 <circle cx="610.0" cy="492.8" r="4" fill="#3987e5" stroke="#1a1a19" stroke-width="2"/>
-<polyline points="52.0,560.8 62.4,560.8 79.4,560.2 85.4,559.4 117.1,559.2 126.3,557.8 143.5,557.5 156.2,547.9 168.4,547.9 181.3,540.1 194.2,538.7 218.1,535.8 242.2,534.2 258.5,526.1 267.8,525.8 291.3,525.8 426.0,523.5 437.0,521.2 446.6,517.4 515.9,515.9 530.2,508.8 555.4,507.8 578.8,506.5 591.2,479.1 610.0,479.1" fill="none" stroke="#d95926" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
-<circle cx="610.0" cy="479.1" r="4" fill="#d95926" stroke="#1a1a19" stroke-width="2"/>
-<text x="622.0" y="483.1" fill="#c3c2b7" font-size="12" font-weight="400" text-anchor="start" style="font-variant-numeric: tabular-nums">Kernel 4807</text>
-<text x="622.0" y="498.1" fill="#c3c2b7" font-size="12" font-weight="400" text-anchor="start" style="font-variant-numeric: tabular-nums">Compiler 4032</text>
+<polyline points="52.0,560.8 59.5,560.8 71.6,560.2 75.9,559.4 98.7,559.2 105.3,557.8 117.6,557.5 126.8,547.9 135.5,547.9 144.7,540.1 154.0,538.7 171.1,535.8 188.4,534.2 200.2,526.1 206.8,525.8 223.7,525.8 320.3,523.5 328.2,521.2 335.1,517.4 384.8,515.9 395.0,508.8 413.1,507.8 429.9,506.5 438.8,479.1 452.3,479.1 610.0,474.6" fill="none" stroke="#d95926" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+<circle cx="610.0" cy="474.6" r="4" fill="#d95926" stroke="#1a1a19" stroke-width="2"/>
+<text x="622.0" y="478.6" fill="#c3c2b7" font-size="12" font-weight="400" text-anchor="start" style="font-variant-numeric: tabular-nums">Kernel 5061</text>
+<text x="622.0" y="496.8" fill="#c3c2b7" font-size="12" font-weight="400" text-anchor="start" style="font-variant-numeric: tabular-nums">Compiler 4032</text>
 </svg>
