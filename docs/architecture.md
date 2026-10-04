@@ -131,6 +131,15 @@ and a stub. Trigger sites compile to `cmp byte [flag], 0; jne skip; call stub`. 
 emitted for classes with nothing to run, or inside the class itself or a subclass. The flag is set
 before `<clinit>` runs, so cycles and self-references see default values exactly as on HotSpot.
 
+Some initializers never run at boot. `BuildTimeInit` interprets a `<clinit>` at compile time when
+it's straight-line code that only builds constants: pushes, array creation, array loads and
+stores, and the class's own statics. The resulting arrays are emitted into `.data` with the normal
+heap layout, the fields point at them, and the class needs no init stub or checks at all. Anything
+else (a call, a branch, `new`) keeps lazy runtime init. This is safe because such an initializer
+has no effect outside its own fields, so when it runs is unobservable. A fuller image heap
+(running arbitrary initializers on the host, GraalVM-style) would need a heap snapshotter and a
+policy for which classes are safe. That waits until something needs it.
+
 ### Runtime checks
 
 Null dereferences, array bounds and division by zero are checked inline, and on failure call
