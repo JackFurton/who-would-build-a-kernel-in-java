@@ -120,6 +120,24 @@ class CompilerTest {
     }
 
     @Test
+    void constantOnlyInitializersRunAtBuildTime() throws IOException {
+        Path classes = compile("""
+                package duke.test;
+                public final class Entry {
+                    static final class Table { static final long[] VALUES = {1, 2, 3}; }
+                    static final class Effect { static long seen = Table.VALUES[0]; }
+                    public static void main() {
+                        long x = Table.VALUES[1] + Effect.seen;
+                    }
+                }
+                """);
+        Image image = new Compiler(ClassPool.load(classes)).compile("duke/test/Entry", "main");
+        assertTrue(!image.isDefined("initialize:duke/test/Entry$Table"), "constant-only initializer needs no stub");
+        assertTrue(!image.isDefined("duke/test/Entry$Table.<clinit>()V"), "nor compiled code");
+        assertTrue(image.isDefined("initialize:duke/test/Entry$Effect"), "reading another class's static runs at boot");
+    }
+
+    @Test
     void nonLatin1StringLiteralIsRejected() throws IOException {
         Path classes = compile("""
                 package duke.test;

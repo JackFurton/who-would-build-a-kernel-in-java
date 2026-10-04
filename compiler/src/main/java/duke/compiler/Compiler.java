@@ -69,6 +69,8 @@ public final class Compiler {
     private final Set<String> classes = new LinkedHashSet<>();
     /** Classes with an initializer stub, in the order something first required one. */
     private final Set<String> initializers = new LinkedHashSet<>();
+    /** BuildTimeInit results by class; a null value means the initializer has to run at boot. */
+    private final Map<String, Map<String, BuildTimeInit.Value>> buildTimeStatics = new LinkedHashMap<>();
     private final Map<String, String> strings = new LinkedHashMap<>();
     private final Set<String> tibs = new LinkedHashSet<>();
     private final Set<VirtualCall> virtualCalls = new LinkedHashSet<>();
@@ -205,7 +207,7 @@ public final class Compiler {
     boolean needsInit(String type) {
         for (String c = type; c != null; ) {
             ClassModel model = pool.get(c);
-            if (pool.declaredMethod(model, "<clinit>", "()V") != null) {
+            if (hasRuntimeClinit(c)) {
                 return true;
             }
             if (model.flags().has(AccessFlag.INTERFACE)) {
@@ -214,6 +216,39 @@ public final class Compiler {
             c = pool.superName(model);
         }
         return false;
+    }
+
+    /** A static initializer that has to run at boot because it couldn't run at build time. */
+    private boolean hasRuntimeClinit(String type) {
+        return pool.declaredMethod(pool.get(type), "<clinit>", "()V") != null && buildTimeStatics(type) == null;
+    }
+
+    /**
+     * The static field values {@code type}'s initializer produces when BuildTimeInit can run it,
+     * else null. Interns the strings and TIBs those values need, so it must run before emission.
+     */
+    private Map<String, BuildTimeInit.Value> buildTimeStatics(String type) {
+        if (!buildTimeStatics.containsKey(type)) {
+            Map<String, BuildTimeInit.Value> statics = BuildTimeInit.evaluate(pool.get(type));
+            buildTimeStatics.put(type, statics);
+            if (statics != null) {
+                statics.values().forEach(this::requireImageData);
+            }
+        }
+        return buildTimeStatics.get(type);
+    }
+
+    private void requireImageData(BuildTimeInit.Value value) {
+        switch (value) {
+            case BuildTimeInit.Str s -> requireString(s.value());
+            case BuildTimeInit.Arr a -> {
+                requireArrayTib(a.type);
+                for (BuildTimeInit.Value e : a.elements) {
+                    requireImageData(e);
+                }
+            }
+            default -> { }
+        }
     }
 
     /**
@@ -229,9 +264,8 @@ public final class Compiler {
             if (superName != null && !model.flags().has(AccessFlag.INTERFACE) && needsInit(superName)) {
                 requireInitializer(superName);
             }
-            MethodModel clinit = pool.declaredMethod(model, "<clinit>", "()V");
-            if (clinit != null) {
-                requireMethod(new ClassPool.ResolvedMethod(model, clinit));
+            if (hasRuntimeClinit(type)) {
+                requireMethod(new ClassPool.ResolvedMethod(model, pool.declaredMethod(model, "<clinit>", "()V")));
             }
         }
         return initializerSymbol(type);
@@ -262,7 +296,7 @@ public final class Compiler {
             if (superName != null && initializers.contains(superName) && !model.flags().has(AccessFlag.INTERFACE)) {
                 a.call(initializerSymbol(superName));
             }
-            if (pool.declaredMethod(model, "<clinit>", "()V") != null) {
+            if (hasRuntimeClinit(type)) {
                 a.call(methodSymbol(type, "<clinit>", "()V"));
             }
             a.bind(done);
@@ -572,13 +606,31 @@ public final class Compiler {
 
     private void emitStatics() {
         Section data = image.data;
+        List<Map<String, BuildTimeInit.Value>> evaluated = new ArrayList<>();
         for (String name : classes) {
+            Map<String, BuildTimeInit.Value> statics = buildTimeStatics.get(name);
+            if (statics != null) {
+                evaluated.add(statics);
+            }
+        }
+        Map<BuildTimeInit.Arr, String> arrays = BuildTimeInit.symbolsFor(evaluated);
+        for (Map.Entry<BuildTimeInit.Arr, String> e : arrays.entrySet()) {
+            emitImageArray(e.getKey(), e.getValue(), arrays);
+        }
+        for (String name : classes) {
+            Map<String, BuildTimeInit.Value> statics = buildTimeStatics.get(name);
             for (FieldModel f : pool.get(name).fields()) {
                 if (!f.flags().has(AccessFlag.STATIC)) {
                     continue;
                 }
                 data.align(8);
                 int offset = data.size();
+                BuildTimeInit.Value computed = statics == null ? null : statics.get(f.fieldName().stringValue());
+                if (computed != null) {
+                    emitImageValue(data, computed, 8, arrays);
+                    image.define(staticSymbol(name, f.fieldName().stringValue()), data, offset, 8, Image.SymbolType.OBJECT);
+                    continue;
+                }
                 ConstantDesc initial = constantValue(f);
                 switch (initial) {
                     case null -> data.emit64(0);
@@ -589,6 +641,39 @@ public final class Compiler {
                 }
                 image.define(staticSymbol(name, f.fieldName().stringValue()), data, offset, 8, Image.SymbolType.OBJECT);
             }
+        }
+    }
+
+    /** Same layout as a heap array: TIB, length, padding, elements. In .data, so it stays mutable. */
+    private void emitImageArray(BuildTimeInit.Arr array, String symbol, Map<BuildTimeInit.Arr, String> arrays) {
+        Section data = image.data;
+        data.align(8);
+        int start = data.size();
+        data.emitReloc(Reloc.Kind.ABS64, tibSymbol(array.type), 0);
+        data.emit32(array.elements.length);
+        data.emit32(0);
+        int width = Layouts.width(array.type.substring(1));
+        for (BuildTimeInit.Value e : array.elements) {
+            emitImageValue(data, e, width, arrays);
+        }
+        data.align(8);
+        image.define(symbol, data, start, data.size() - start, Image.SymbolType.OBJECT);
+    }
+
+    private void emitImageValue(Section data, BuildTimeInit.Value value, int width,
+            Map<BuildTimeInit.Arr, String> arrays) {
+        switch (value) {
+            case BuildTimeInit.Prim p -> {
+                switch (width) {
+                    case 1 -> data.emit8((int) p.bits());
+                    case 2 -> data.emit16((int) p.bits());
+                    case 4 -> data.emit32((int) p.bits());
+                    default -> data.emit64(p.bits());
+                }
+            }
+            case BuildTimeInit.Str s -> data.emitReloc(Reloc.Kind.ABS64, requireString(s.value()), 0);
+            case BuildTimeInit.Arr a -> data.emitReloc(Reloc.Kind.ABS64, arrays.get(a), 0);
+            case BuildTimeInit.Null n -> data.emit64(0);
         }
     }
 
