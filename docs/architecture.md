@@ -217,6 +217,10 @@ kernel sources has to pass it: the Makefile, `tools/Harness.java` and `CompilerT
   `tests/conformance` on HotSpot, generates a kernel that runs the same tests, boots it and
   compares the results. Add a test by adding a non-private, no-argument static method with a
   primitive result.
+- `make ktest` runs every `static void test*()` in `tests/kernel` inside one booted kernel, for
+  code HotSpot can't run (physical memory, page tables, interrupts). Failures are thrown
+  `AssertionError`s, caught per test. The kernel exits QEMU through `isa-debug-exit` with the
+  overall result, so the harness reads an exit status instead of watching serial.
 - `make panic-tests` boots one kernel per file in `tests/panics` and checks the output contains
   the lines in the file's leading `// expect:` comments, in order: the panic line, then
   optionally backtrace frames. This covers the failure side of every

@@ -58,7 +58,7 @@ covers both. Put the firmware somewhere unusual? Set `OVMF=/path/to/OVMF_CODE.fd
 
 ```sh
 make run          # build and boot; serial output in your terminal, Ctrl-A X to quit
-make test         # compiler unit tests, boot test, conformance and panic suites
+make test         # compiler unit tests, boot test, conformance, panic and kernel suites
 make disasm       # objdump the kernel (symbols included)
 ```
 
@@ -72,6 +72,7 @@ The first build downloads a pinned Limine release into `build/limine`.
 | `kernel/src/` | The kernel's `java.base`: `java.lang`, `duke.rt` (runtime and intrinsics), `duke.kernel` |
 | `tests/conformance/` | Differential tests, run on HotSpot and in the kernel |
 | `tests/panics/` | Kernels that must die with a specific panic and backtrace |
+| `tests/kernel/` | Tests that run inside the booted kernel (`make ktest`) |
 | `tools/` | ESP layout, QEMU launch, test harnesses, metrics and the progress chart |
 | `boot/` | Limine config |
 

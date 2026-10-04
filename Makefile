@@ -19,7 +19,7 @@ KERNEL_SRCS   := $(shell find kernel/src -name '*.java')
 KERNEL_JAVAC  := javac --system none -XDstringConcat=inline
 COMPILER_SRCS := $(shell find compiler/src/main -name '*.java') compiler/build.gradle.kts
 
-.PHONY: all compiler run test unit-test boot-test conformance panic-tests disasm clean
+.PHONY: all compiler run test unit-test boot-test conformance panic-tests ktest disasm clean
 
 all: $(BUILD)/esp/boot/kernel.elf
 
@@ -49,7 +49,7 @@ $(BUILD)/esp/boot/kernel.elf: $(BUILD)/kernel.elf $(BUILD)/limine/BOOTX64.EFI bo
 run: all
 	tools/qemu.sh $(BUILD)/esp -serial mon:stdio
 
-test: unit-test boot-test conformance panic-tests
+test: unit-test boot-test conformance panic-tests ktest
 
 unit-test:
 	./gradlew -q :compiler:test
@@ -62,6 +62,9 @@ conformance: $(DUKEC) $(BUILD)/limine/BOOTX64.EFI
 
 panic-tests: $(DUKEC) $(BUILD)/limine/BOOTX64.EFI
 	java tools/PanicTests.java
+
+ktest: $(DUKEC) $(BUILD)/limine/BOOTX64.EFI
+	java tools/KernelTests.java
 
 disasm: $(BUILD)/kernel.elf
 	objdump -d -M intel $(BUILD)/kernel.elf | less
