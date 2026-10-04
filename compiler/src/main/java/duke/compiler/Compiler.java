@@ -60,12 +60,14 @@ public final class Compiler {
     /** Interface method selectors in itable order. */
     private final Map<Vtables.Key, Integer> selectors = new LinkedHashMap<>();
     private final Vtables vtables;
+    private final LambdaCompiler lambdas;
     private int multiArraySites;
 
     public Compiler(ClassPool pool) {
         this.pool = pool;
         this.layouts = new Layouts(pool);
         this.vtables = new Vtables(pool);
+        this.lambdas = new LambdaCompiler(pool);
     }
 
     private record VirtualCall(String owner, String name, String descriptor) {}
@@ -117,6 +119,10 @@ public final class Compiler {
 
     Vtables vtables() {
         return vtables;
+    }
+
+    LambdaCompiler lambdas() {
+        return lambdas;
     }
 
     static String methodSymbol(String owner, String name, String descriptor) {

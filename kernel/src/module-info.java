@@ -5,6 +5,8 @@
 module java.base {
     exports java.lang;
     exports java.lang.annotation;
+    exports java.lang.invoke;
+    exports java.util;
     exports duke.rt;
     exports duke.kernel;
 }
