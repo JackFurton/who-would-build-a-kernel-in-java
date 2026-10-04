@@ -2,9 +2,11 @@ package duke.kernel;
 
 import duke.boot.Limine;
 import duke.kernel.mm.KernelAddressSpace;
+import duke.kernel.mm.KernelHeap;
 import duke.kernel.mm.PhysicalMemory;
 import duke.kernel.x86.Idt;
 import duke.kernel.x86.Interrupts;
+import duke.rt.Heap;
 import duke.rt.Magic;
 
 public final class Kernel {
@@ -23,6 +25,7 @@ public final class Kernel {
         }
         PhysicalMemory.init();
         KernelAddressSpace.activate();
+        KernelHeap.init();
     }
 
     /** The entry point: the compiler's _start stub calls this. */
@@ -45,6 +48,8 @@ public final class Kernel {
         Console.println("paging: running on our own page tables, PML4 at physical 0x"
                 + Long.toHexString(KernelAddressSpace.table().root()) + ", " + KernelAddressSpace.table().tableFrames()
                 + " table frames, NX " + (KernelAddressSpace.noExecuteSupported() ? "on" : "unavailable"));
+        Console.println("heap: growing on demand at 0x" + Long.toHexString(KernelHeap.BASE) + ", "
+                + (Heap.used() >> 10) + " KiB used, " + (Heap.committed() >> 10) + " KiB committed");
         Console.println("DUKE-BOOT-OK");
     }
 

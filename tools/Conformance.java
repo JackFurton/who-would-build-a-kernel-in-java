@@ -108,8 +108,9 @@ public class Conformance {
     static void writeMain(Path gen, Map<String, Method> tests) throws IOException {
         StringBuilder src = new StringBuilder();
         src.append("package ").append(PACKAGE).append(";\n\n");
-        src.append("import duke.kernel.Console;\nimport duke.kernel.Serial;\n\n");
-        src.append("final class Main {\n    static void main() {\n        Serial.init();\n");
+        src.append("import duke.kernel.Console;\nimport duke.kernel.Kernel;\n\n");
+        // Full bring-up, so the suite runs on the real memory system (paging, growable heap).
+        src.append("final class Main {\n    static void main() {\n        Kernel.init();\n");
         for (Map.Entry<String, Method> e : tests.entrySet()) {
             String call = e.getKey() + "()";
             Class<?> type = e.getValue().getReturnType();
