@@ -68,17 +68,17 @@ class CompilerTest {
         Path classes = compile("""
                 package duke.test;
                 public final class Entry {
-                    static Object make() {
-                        return new Object();
+                    static boolean check(Object o) {
+                        return o instanceof String;
                     }
                     public static void main() {
-                        make();
+                        check(null);
                     }
                 }
                 """);
         CompileException e = assertThrows(CompileException.class,
                 () -> new Compiler(ClassPool.load(classes)).compile("duke/test/Entry", "main"));
-        assertEquals("duke/test/Entry.make()Ljava/lang/Object; (line 4): unsupported bytecode new", e.getMessage());
+        assertEquals("duke/test/Entry.check(Ljava/lang/Object;)Z (line 4): unsupported bytecode instanceof", e.getMessage());
     }
 
     @Test

@@ -33,6 +33,7 @@ import java.lang.classfile.instruction.LabelTarget;
 import java.lang.classfile.instruction.LineNumber;
 import java.lang.classfile.instruction.LoadInstruction;
 import java.lang.classfile.instruction.LookupSwitchInstruction;
+import java.lang.classfile.instruction.NewObjectInstruction;
 import java.lang.classfile.instruction.NopInstruction;
 import java.lang.classfile.instruction.OperatorInstruction;
 import java.lang.classfile.instruction.ReturnInstruction;
@@ -64,6 +65,7 @@ final class MethodCompiler {
 
     private static final String RUNTIME = "duke/rt/Runtime";
     private static final String MAGIC = "duke/rt/Magic";
+    private static final String HEAP = "duke/rt/Heap";
 
     private final Compiler program;
     private final ClassPool pool;
@@ -185,6 +187,7 @@ final class MethodCompiler {
             }
             case ArrayLoadInstruction l -> arrayLoad(l.typeKind());
             case ArrayStoreInstruction s -> arrayStore(s.typeKind());
+            case NewObjectInstruction n -> newObject(n.className().asInternalName());
             case NopInstruction n -> { }
             default -> throw error("unsupported bytecode " + i.opcode().name().toLowerCase());
         }
@@ -547,6 +550,20 @@ final class MethodCompiler {
         }
     }
 
+    /** Pushes the new object; the {@code dup; invokespecial <init>} that follows is ordinary bytecode. */
+    private void newObject(String className) {
+        if (pool.get(className).flags().has(AccessFlag.ABSTRACT)) {
+            throw error("cannot instantiate abstract class or interface " + className);
+        }
+        program.requireClass(className);
+        a.lea(RAX, Mem.rip(Compiler.tibSymbol(className)));
+        pushLong(RAX);
+        a.pushImm(program.layouts().of(className).size());
+        ClassPool.ResolvedMethod allocate = pool.resolveMethod(HEAP, "allocateObject", "(JI)Ljava/lang/Object;");
+        program.requireClass(HEAP);
+        call(allocate, allocate.method().methodTypeSymbol(), 3);
+    }
+
     private void call(ClassPool.ResolvedMethod m, MethodTypeDesc type, int slots) {
         if (m.is(AccessFlag.NATIVE)) {
             throw error("call to native method " + m.ownerName() + "." + m.name() + "; only " + MAGIC + " intrinsics may be native");
@@ -580,6 +597,18 @@ final class MethodCompiler {
             case "pokeLong" -> poke(8);
             case "addressOf" -> {
                 a.pop(RAX);
+                pushLong(RAX);
+            }
+            case "toObject" -> {
+                popLong(RAX);
+                a.push(RAX);
+            }
+            case "heapArenaStart" -> {
+                a.lea(RAX, Mem.rip(Compiler.HEAP_ARENA));
+                pushLong(RAX);
+            }
+            case "heapArenaEnd" -> {
+                a.lea(RAX, Mem.rip(Compiler.HEAP_ARENA, Compiler.HEAP_ARENA_SIZE));
                 pushLong(RAX);
             }
             case "halt" -> a.hlt();

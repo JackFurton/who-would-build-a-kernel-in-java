@@ -70,6 +70,9 @@ array:   [0] TIB pointer   [8] int length   [12] padding   [16...] elements
 TIB:     [0] super TIB     [8] instance size (element size for arrays)   [12] flags (bit 0: array)
 ```
 
+`new C` compiles to a call to `duke.rt.Heap.allocateObject(tib, size)`, plain Java bumping a
+pointer through a 16 MiB arena in `.bss`. Nothing is freed yet.
+
 String literals are prebuilt objects in `.data`, Latin-1 only for now. `String`'s `value` field
 layout is part of the contract between `dukec` and `kernel/src/java/lang/String.java`.
 
@@ -86,11 +89,12 @@ forms), raw memory access (`peek*`/`poke*`), `addressOf`, `halt`, `disableInterr
 
 ## What compiles today
 
-Static and instance methods (non-virtual or devirtualizable), int/long/boolean/byte/char/short
-arithmetic with Java semantics, all control flow including both switch forms, static and
-instance fields, array loads and stores, string literals and `String.length`/`charAt`.
+Static and instance methods (non-virtual or devirtualizable), object allocation and
+constructors, int/long/boolean/byte/char/short arithmetic with Java semantics, all control flow
+including both switch forms, static and instance fields, array loads and stores, string literals
+and `String.length`/`charAt`.
 
-Not yet, and each a clear compile error: `new`, virtual dispatch, interfaces, exceptions,
+Not yet, and each a clear compile error: array creation, virtual dispatch, interfaces, exceptions,
 floating point, `invokedynamic` (lambdas, string concatenation), monitors, `checkcast`/`instanceof`.
 
 ## Testing
