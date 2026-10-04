@@ -10,5 +10,6 @@ module java.base {
     exports duke.rt;
     exports duke.boot;
     exports duke.kernel;
+    exports duke.kernel.mm;
     exports duke.kernel.x86;
 }

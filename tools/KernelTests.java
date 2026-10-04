@@ -81,8 +81,7 @@ public class KernelTests {
                 package duke.ktest;
 
                 import duke.kernel.Console;
-                import duke.kernel.Serial;
-                import duke.kernel.x86.Idt;
+                import duke.kernel.Kernel;
                 import duke.rt.Magic;
 
                 final class Main {
@@ -108,8 +107,7 @@ public class KernelTests {
                     }
 
                     static void main() {
-                        Serial.init();
-                        Idt.load();
+                        Kernel.init();
                 """);
         for (String test : tests) {
             src.append("        run(\"").append(test).append("\", ").append(test.replace('.', ':').replaceFirst(":", "::"))

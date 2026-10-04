@@ -133,6 +133,7 @@ class X64Test {
                 c("std", "fd", X64::std),
                 c("cld", "fc", X64::cld),
                 c("rep movsb", "f3 a4", X64::repMovsb),
+                c("rep stosb", "f3 aa", X64::repStosb),
                 c("lea rsi, [rsi + rcx - 1]", "48 8d 74 0e ff", a -> a.lea(RSI, Mem.at(RSI, RCX, 1, -1))),
                 c("leave", "c9", X64::leave),
                 c("ret", "c3", X64::ret));

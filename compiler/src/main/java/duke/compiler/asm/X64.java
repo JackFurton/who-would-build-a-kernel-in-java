@@ -383,6 +383,12 @@ public final class X64 {
         out.emit8(0xA4);
     }
 
+    /** Stores al into rcx bytes at [rdi]. */
+    public void repStosb() {
+        out.emit8(0xF3);
+        out.emit8(0xAA);
+    }
+
     public void ud2() {
         out.emit8(0x0F);
         out.emit8(0x0B);
