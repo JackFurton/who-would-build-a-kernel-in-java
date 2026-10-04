@@ -51,6 +51,7 @@ public final class Compiler {
     private final Set<String> classes = new LinkedHashSet<>();
     private final Map<String, String> strings = new LinkedHashMap<>();
     private final Set<String> tibs = new LinkedHashSet<>();
+    private int multiArraySites;
 
     public Compiler(ClassPool pool) {
         this.pool = pool;
@@ -142,6 +143,29 @@ public final class Compiler {
     String requireStatic(ClassPool.ResolvedField f) {
         requireClass(f.ownerName());
         return staticSymbol(f.ownerName(), f.name());
+    }
+
+    /** {@code type} is an array descriptor such as {@code [I} or {@code [Ljava/lang/String;}. */
+    String requireArrayTib(String type) {
+        tibs.add(type);
+        return tibSymbol(type);
+    }
+
+    /** Emits the per-site table {@code Heap.allocateMultiArray} walks; layout documented there. */
+    String requireMultiArrayDescriptor(String type, int dimensions) {
+        Section rodata = image.rodata;
+        rodata.align(8);
+        int start = rodata.size();
+        rodata.emit32(dimensions);
+        rodata.emit32(0);
+        for (int level = 0; level < dimensions; level++) {
+            String levelType = type.substring(level);
+            rodata.emitReloc(Reloc.Kind.ABS64, requireArrayTib(levelType), 0);
+            rodata.emit64(Layouts.width(levelType.substring(1)));
+        }
+        String symbol = "multianewarray:" + multiArraySites++;
+        image.define(symbol, rodata, start, rodata.size() - start, Image.SymbolType.OBJECT);
+        return symbol;
     }
 
     String requireString(String value) {

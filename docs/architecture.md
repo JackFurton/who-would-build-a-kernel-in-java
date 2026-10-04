@@ -89,12 +89,12 @@ forms), raw memory access (`peek*`/`poke*`), `addressOf`, `halt`, `disableInterr
 
 ## What compiles today
 
-Static and instance methods (non-virtual or devirtualizable), object allocation and
-constructors, int/long/boolean/byte/char/short arithmetic with Java semantics, all control flow
+Static and instance methods (non-virtual or devirtualizable), object and array allocation
+(including multi-dimensional), constructors, int/long/boolean/byte/char/short arithmetic with Java semantics, all control flow
 including both switch forms, static and instance fields, array loads and stores, string literals
 and `String.length`/`charAt`.
 
-Not yet, and each a clear compile error: array creation, virtual dispatch, interfaces, exceptions,
+Not yet, and each a clear compile error: virtual dispatch, interfaces, exceptions,
 floating point, `invokedynamic` (lambdas, string concatenation), monitors, `checkcast`/`instanceof`.
 
 ## Testing
