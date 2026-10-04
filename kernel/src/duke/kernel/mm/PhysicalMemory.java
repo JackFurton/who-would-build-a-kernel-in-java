@@ -21,16 +21,33 @@ public final class PhysicalMemory {
 
     public static void init() {
         hhdm = Limine.hhdmOffset();
+        // Size the bitmap for reclaimable memory too: some of it sits above the last usable region.
         long top = 0;
         for (int i = 0; i < Limine.memoryMapSize(); i++) {
-            if (Limine.memoryMapType(i) == Limine.MEMMAP_USABLE) {
+            int type = Limine.memoryMapType(i);
+            if (type == Limine.MEMMAP_USABLE || type == Limine.MEMMAP_BOOTLOADER_RECLAIMABLE) {
                 top = Math.max(top, Limine.memoryMapBase(i) + Limine.memoryMapLength(i));
             }
         }
         frames = new FrameBitmap(top / PAGE_SIZE);
+        releaseRegions(Limine.MEMMAP_USABLE);
+    }
+
+    /**
+     * Hands Limine's leftovers to the allocator: its page tables, GDT, stack and responses. Only
+     * safe once we run on our own page tables and GDT, and Limine.snapshot() has copied the
+     * responses we still need. Returns the bytes reclaimed.
+     */
+    public static long reclaimBootloaderMemory() {
+        long before = frames.freePages();
+        releaseRegions(Limine.MEMMAP_BOOTLOADER_RECLAIMABLE);
+        return (frames.freePages() - before) * PAGE_SIZE;
+    }
+
+    private static void releaseRegions(int type) {
         for (int i = 0; i < Limine.memoryMapSize(); i++) {
-            if (Limine.memoryMapType(i) == Limine.MEMMAP_USABLE) {
-                // Usable regions are page-aligned per the protocol; round inward anyway.
+            if (Limine.memoryMapType(i) == type) {
+                // Regions are page-aligned per the protocol; round inward anyway.
                 // Never hand out frame 0: 0 reads as "no frame" everywhere, and it's the real-mode IVT.
                 long first = Math.max(1, (Limine.memoryMapBase(i) + PAGE_SIZE - 1) / PAGE_SIZE);
                 long end = (Limine.memoryMapBase(i) + Limine.memoryMapLength(i)) / PAGE_SIZE;

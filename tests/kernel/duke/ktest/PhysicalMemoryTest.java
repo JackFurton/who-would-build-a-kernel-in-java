@@ -10,10 +10,12 @@ import duke.rt.Magic;
 
 final class PhysicalMemoryTest {
 
+    /** Usable, or bootloader-reclaimable, which Kernel.init() has handed to the allocator. */
     private static boolean insideUsableRegion(long frame) {
         for (int i = 0; i < Limine.memoryMapSize(); i++) {
             long base = Limine.memoryMapBase(i);
-            if (Limine.memoryMapType(i) == Limine.MEMMAP_USABLE && frame >= base
+            int type = Limine.memoryMapType(i);
+            if ((type == Limine.MEMMAP_USABLE || type == Limine.MEMMAP_BOOTLOADER_RECLAIMABLE) && frame >= base
                     && frame + PhysicalMemory.PAGE_SIZE <= base + Limine.memoryMapLength(i)) {
                 return true;
             }
@@ -64,5 +66,20 @@ final class PhysicalMemoryTest {
 
     static void testMisalignedFreeIsRejected() {
         assertThrows(IllegalArgumentException.class, () -> PhysicalMemory.free(4097), "misaligned");
+    }
+
+    static void testReclaimedFramesAreHandedOut() {
+        long reclaimable = 0;
+        long usable = 0;
+        for (int i = 0; i < Limine.memoryMapSize(); i++) {
+            if (Limine.memoryMapType(i) == Limine.MEMMAP_BOOTLOADER_RECLAIMABLE) {
+                reclaimable += Limine.memoryMapLength(i);
+            } else if (Limine.memoryMapType(i) == Limine.MEMMAP_USABLE) {
+                usable += Limine.memoryMapLength(i);
+            }
+        }
+        assertTrue(reclaimable > 0, "QEMU's map has reclaimable regions");
+        long total = PhysicalMemory.freeFrames() * PhysicalMemory.PAGE_SIZE + duke.rt.Heap.committed();
+        assertTrue(total > usable, "free plus committed memory exceeds what was usable at boot");
     }
 }
