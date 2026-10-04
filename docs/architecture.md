@@ -68,7 +68,7 @@ Results come back in `rax`. All registers are caller-saved. Symbols are
 object:  [0] TIB pointer   [8...] fields (superclass first, then largest-first)
 array:   [0] TIB pointer   [8] int length   [12] padding   [16...] elements
 TIB:     [0] super TIB   [8] size   [12] flags   [16] element TIB   [24] name (a String)
-         [32] interface list   [40] itable (reserved)   [48...] vtable
+         [32] interface list   [40] itable   [48...] vtable
 ```
 
 ### Dispatch
@@ -82,6 +82,13 @@ Vtables don't defeat tree-shaking. The compiler records every dispatched `(owner
 descriptor)` and, after each round of compilation, compiles the implementation every reachable
 subclass would select, repeating until nothing new turns up. Slots nothing dispatches through stay
 0.
+
+Interface calls use a global selector per method name and descriptor called through any interface.
+Every class that implements interfaces gets an itable indexed by selector, so `invokeinterface`
+is load TIB, load itable, call `[itable + 8*selector]`. Constant time, at the cost of mostly-empty
+tables, which is cheap while the kernel has a few hundred classes. Selection follows JVMS 5.4.6,
+so default methods, `I.super.m()` and `invokevirtual` calls that land on an inherited default all
+take the same path.
 
 `new C` compiles to a call to `duke.rt.Heap.allocateObject(tib, size)`, plain Java bumping a
 pointer through a 16 MiB arena in `.bss`. Nothing is freed yet.
@@ -106,12 +113,12 @@ forms), raw memory access (`peek*`/`poke*`), `addressOf`, `halt`, `disableInterr
 
 ## What compiles today
 
-Static, instance and virtual methods, type checks and casts, object and array allocation
+Static, instance, virtual and interface methods (including defaults), type checks and casts, object and array allocation
 (including multi-dimensional), constructors, int/long/boolean/byte/char/short arithmetic with Java semantics, all control flow
 including both switch forms, static and instance fields, array loads and stores, string literals
 and `String.length`/`charAt`.
 
-Not yet, and each a clear compile error: calls through interfaces, exceptions,
+Not yet, and each a clear compile error: exceptions,
 floating point, `invokedynamic` (lambdas, string concatenation), monitors.
 
 ## Testing

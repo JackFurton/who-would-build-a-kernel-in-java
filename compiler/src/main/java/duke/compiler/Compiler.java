@@ -52,6 +52,9 @@ public final class Compiler {
     private final Map<String, String> strings = new LinkedHashMap<>();
     private final Set<String> tibs = new LinkedHashSet<>();
     private final Set<VirtualCall> virtualCalls = new LinkedHashSet<>();
+    private final Set<VirtualCall> interfaceCalls = new LinkedHashSet<>();
+    /** Interface method selectors in itable order. */
+    private final Map<Vtables.Key, Integer> selectors = new LinkedHashMap<>();
     private final Vtables vtables;
     private int multiArraySites;
 
@@ -123,6 +126,10 @@ public final class Compiler {
         return "interfaces:" + type;
     }
 
+    private static String itableSymbol(String type) {
+        return "itable:" + type;
+    }
+
     /** Marks a class reachable, which also schedules its static initializer. */
     void requireClass(String name) {
         if (classes.contains(name)) {
@@ -160,6 +167,12 @@ public final class Compiler {
         virtualCalls.add(new VirtualCall(owner, name, descriptor));
     }
 
+    /** Records a call through an interface and returns its itable index. */
+    int requireInterfaceCall(String iface, String name, String descriptor) {
+        interfaceCalls.add(new VirtualCall(iface, name, descriptor));
+        return selectors.computeIfAbsent(new Vtables.Key(name, descriptor), k -> selectors.size());
+    }
+
     /**
      * Rapid-type-analysis-style closure: for each dispatched call, compile the implementation each
      * reachable subclass would select. New methods can reach new classes, so the caller iterates.
@@ -172,6 +185,17 @@ public final class Compiler {
                 }
                 ClassPool.ResolvedMethod impl = pool.findMethod(c, call.name(), call.descriptor());
                 if (impl != null && !impl.is(AccessFlag.ABSTRACT) && !impl.is(AccessFlag.STATIC)) {
+                    requireMethod(impl);
+                }
+            }
+        }
+        for (VirtualCall call : List.copyOf(interfaceCalls)) {
+            for (String c : List.copyOf(classes)) {
+                if (pool.get(c).flags().has(AccessFlag.INTERFACE) || !pool.allInterfaces(c).contains(call.owner())) {
+                    continue;
+                }
+                ClassPool.ResolvedMethod impl = pool.selectMethod(c, call.name(), call.descriptor());
+                if (impl != null && !impl.is(AccessFlag.ABSTRACT)) {
                     requireMethod(impl);
                 }
             }
@@ -354,7 +378,7 @@ public final class Compiler {
      * [16] element TIB for reference arrays, else 0
      * [24] name, a String
      * [32] 0-terminated list of every interface the type implements, or 0 if none
-     * [40] interface method table, reserved
+     * [40] itable: one code pointer per interface selector, or 0 for classes without interfaces
      * [48] vtable: one code pointer per Vtables slot, 0 where nothing dispatches to it
      * </pre>
      */
@@ -371,6 +395,9 @@ public final class Compiler {
             }
             rodata.emit64(0);
             image.define(interfacesSymbol(type), rodata, start, rodata.size() - start, Image.SymbolType.OBJECT);
+            if (!selectors.isEmpty() && !pool.get(type).flags().has(AccessFlag.INTERFACE)) {
+                emitItable(type);
+            }
         }
         for (String type : tibs) {
             boolean array = type.startsWith("[");
@@ -389,7 +416,7 @@ public final class Compiler {
             emitPointer(rodata, element == null ? null : tibSymbol(element));
             emitPointer(rodata, strings.get(javaName(type)));
             emitPointer(rodata, image.isDefined(interfacesSymbol(type)) ? interfacesSymbol(type) : null);
-            rodata.emit64(0);
+            emitPointer(rodata, image.isDefined(itableSymbol(type)) ? itableSymbol(type) : null);
             String dispatchType = array || isInterface ? ClassPool.OBJECT : type;
             for (Vtables.Key key : vtables.layout(dispatchType)) {
                 ClassPool.ResolvedMethod impl = pool.findMethod(dispatchType, key.name(), key.descriptor());
@@ -399,6 +426,20 @@ public final class Compiler {
             }
             image.define(tibSymbol(type), rodata, start, rodata.size() - start, Image.SymbolType.OBJECT);
         }
+    }
+
+    /** Entries stay 0 where the class doesn't implement the selector or nothing calls it. */
+    private void emitItable(String type) {
+        Section rodata = image.rodata;
+        rodata.align(8);
+        int start = rodata.size();
+        for (Vtables.Key key : selectors.keySet()) {
+            ClassPool.ResolvedMethod impl = pool.selectMethod(type, key.name(), key.descriptor());
+            String symbol = impl == null ? null : methodSymbol(impl.ownerName(), impl.name(), impl.descriptor());
+            boolean compiled = symbol != null && queuedMethods.contains(symbol) && !impl.is(AccessFlag.ABSTRACT);
+            emitPointer(rodata, compiled ? symbol : null);
+        }
+        image.define(itableSymbol(type), rodata, start, rodata.size() - start, Image.SymbolType.OBJECT);
     }
 
     private static void emitPointer(Section section, String symbol) {
