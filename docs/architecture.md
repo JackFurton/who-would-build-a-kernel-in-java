@@ -99,6 +99,18 @@ at `Class`'s own TIB. So `getClass()` is one load, `Foo.class` is the TIB's addr
 String literals are prebuilt objects in `.data`, Latin-1 only for now. `String`'s `value` field
 layout is part of the contract between `dukec` and `kernel/src/java/lang/String.java`.
 
+### Lambdas
+
+`LambdaCompiler` does `LambdaMetafactory`'s job at build time. For each lambda or method reference
+call site, it uses the JDK's `java.lang.classfile` builder to generate a real class:
+`Caller$$Lambda$N`, which implements the functional interface, has a field per captured value, and
+has a static `create` factory. Non-capturing lambdas get a singleton. The generated class goes
+into the class pool like any other, and the `invokedynamic` compiles to `invokestatic create`.
+Boxing, unboxing, casts and widening between the interface's erased signature and the
+implementation are emitted as ordinary bytecode in the generated method.
+
+`java.lang.invoke` in the kernel is stubs: javac needs the names to exist, nothing calls them.
+
 ### Class initialization
 
 Classes initialize lazily, with JVM semantics (JVMS 5.5): on the first `new`, static field access
@@ -124,13 +136,12 @@ forms), raw memory access (`peek*`/`poke*`), `addressOf`, `halt`, `disableInterr
 
 ## What compiles today
 
-Static, instance, virtual and interface methods (including defaults), type checks and casts, boxing, string concatenation, object and array allocation
+Static, instance, virtual and interface methods (including defaults), type checks and casts, boxing, string concatenation, lambdas and method references, object and array allocation
 (including multi-dimensional), constructors, int/long/boolean/byte/char/short arithmetic with Java semantics, all control flow
 including both switch forms, static and instance fields, array loads and stores, string literals
 and `String.length`/`charAt`.
 
-Not yet, and each a clear compile error: exceptions, floating point, lambdas and method
-references (`invokedynamic`), monitors.
+Not yet, and each a clear compile error: exceptions, floating point, monitors.
 
 String concatenation works because the kernel compiles with `javac -XDstringConcat=inline`, which
 turns `+` into `StringBuilder` calls instead of an `invokedynamic`. Every place that compiles

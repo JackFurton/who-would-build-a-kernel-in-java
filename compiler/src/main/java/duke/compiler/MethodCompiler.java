@@ -182,9 +182,7 @@ final class MethodCompiler {
             case StackInstruction s -> stack(s.opcode());
             case FieldInstruction f -> field(f);
             case InvokeInstruction inv -> invoke(inv);
-            case InvokeDynamicInstruction indy -> throw error(indy.bootstrapMethod().owner().displayName().equals("StringConcatFactory")
-                    ? "string concatenation compiled to invokedynamic; compile the kernel with javac -XDstringConcat=inline"
-                    : "invokedynamic (" + indy.name().stringValue() + ") is not supported yet; lambdas and method references need #41");
+            case InvokeDynamicInstruction indy -> invokeDynamic(indy);
             case ReturnInstruction r -> {
                 switch (r.typeKind().slotSize()) {
                     case 1 -> a.pop(RAX);
@@ -701,6 +699,24 @@ final class MethodCompiler {
         a.call(program.requireMethod(allocate));
         a.aluImm(Alu.ADD, true, RSP, 8 * (4 + dimensions));
         a.push(RAX);
+    }
+
+    /** Lambdas become a static call to a factory on a class LambdaCompiler generates now. */
+    private void invokeDynamic(InvokeDynamicInstruction indy) {
+        if (indy.bootstrapMethod().owner().displayName().equals("StringConcatFactory")) {
+            throw error("string concatenation compiled to invokedynamic; compile the kernel with javac -XDstringConcat=inline");
+        }
+        if (!LambdaCompiler.isLambda(indy)) {
+            throw error("unsupported invokedynamic bootstrap " + indy.bootstrapMethod().owner().displayName());
+        }
+        ClassPool.ResolvedMethod factory;
+        try {
+            factory = program.lambdas().proxyFor(indy, method.ownerName());
+        } catch (CompileException e) {
+            throw error(e.getMessage());
+        }
+        ensureInitialized(factory.ownerName());
+        call(factory, indy.typeSymbol(), argSlots(indy.typeSymbol()));
     }
 
     /** Receiver's TIB, then its itable, then the selector's slot. */
