@@ -1,5 +1,6 @@
 package duke.compiler;
 
+import duke.compiler.asm.Cond;
 import duke.compiler.asm.Mem;
 import duke.compiler.asm.Reg;
 import duke.compiler.asm.X64;
@@ -48,8 +49,10 @@ public final class Compiler {
 
     private final Deque<ClassPool.ResolvedMethod> worklist = new ArrayDeque<>();
     private final Set<String> queuedMethods = new LinkedHashSet<>();
-    /** Reachable classes in initialization order: every class after its superclass. */
+    /** Reachable classes, every class after its superclass. */
     private final Set<String> classes = new LinkedHashSet<>();
+    /** Classes with an initializer stub, in the order something first required one. */
+    private final Set<String> initializers = new LinkedHashSet<>();
     private final Map<String, String> strings = new LinkedHashMap<>();
     private final Set<String> tibs = new LinkedHashSet<>();
     private final Set<VirtualCall> virtualCalls = new LinkedHashSet<>();
@@ -77,6 +80,9 @@ public final class Compiler {
         requireClass(STRING_CLASS);
         tibs.add(BYTE_ARRAY);
         requireClass(entryClass);
+        if (needsInit(entryClass)) {
+            requireInitializer(entryClass);
+        }
         String mainSymbol = requireMethod(main);
 
         do {
@@ -90,7 +96,8 @@ public final class Compiler {
         emitStatics();
         emitTibs();
         emitStrings();
-        emitBootStub(mainSymbol);
+        emitInitializers();
+        emitBootStub(entryClass, mainSymbol);
         emitHeapArena();
         emitLimineRequests();
         return image;
@@ -132,7 +139,7 @@ public final class Compiler {
         return "itable:" + type;
     }
 
-    /** Marks a class reachable, which also schedules its static initializer. */
+    /** Marks a class reachable: its TIB and statics go into the image. */
     void requireClass(String name) {
         if (classes.contains(name)) {
             return;
@@ -150,9 +157,75 @@ public final class Compiler {
                 requireString(s);
             }
         }
-        MethodModel clinit = pool.declaredMethod(model, "<clinit>", "()V");
-        if (clinit != null) {
-            requireMethod(new ClassPool.ResolvedMethod(model, clinit));
+    }
+
+    /** True if initializing {@code type} runs any code: it or a superclass has a static initializer. */
+    boolean needsInit(String type) {
+        for (String c = type; c != null; ) {
+            ClassModel model = pool.get(c);
+            if (pool.declaredMethod(model, "<clinit>", "()V") != null) {
+                return true;
+            }
+            if (model.flags().has(AccessFlag.INTERFACE)) {
+                return false;
+            }
+            c = pool.superName(model);
+        }
+        return false;
+    }
+
+    /**
+     * The stub that initializes {@code type} on first use (JVMS 5.5): superclass first, then its
+     * {@code <clinit>}. The flag is set before running, so re-entry from the same initializer sees
+     * the class as initialized, as the JVM's same-thread rule specifies.
+     */
+    String requireInitializer(String type) {
+        requireClass(type);
+        if (initializers.add(type)) {
+            ClassModel model = pool.get(type);
+            String superName = pool.superName(model);
+            if (superName != null && !model.flags().has(AccessFlag.INTERFACE) && needsInit(superName)) {
+                requireInitializer(superName);
+            }
+            MethodModel clinit = pool.declaredMethod(model, "<clinit>", "()V");
+            if (clinit != null) {
+                requireMethod(new ClassPool.ResolvedMethod(model, clinit));
+            }
+        }
+        return initializerSymbol(type);
+    }
+
+    static String initializerSymbol(String type) {
+        return "initialize:" + type;
+    }
+
+    private void emitInitializers() {
+        for (String type : initializers) {
+            image.bss.align(1);
+            int flag = image.bss.size();
+            image.bss.reserve(1);
+            String flagSymbol = "initialized:" + type;
+            image.define(flagSymbol, image.bss, flag, 1, Image.SymbolType.OBJECT);
+
+            Section text = image.text;
+            text.align(16);
+            int start = text.size();
+            X64 a = new X64(text);
+            X64.Label done = new X64.Label();
+            a.cmpByte(Mem.rip(flagSymbol), 0);
+            a.jcc(Cond.NE, done);
+            a.movByte(Mem.rip(flagSymbol), 1);
+            ClassModel model = pool.get(type);
+            String superName = pool.superName(model);
+            if (superName != null && initializers.contains(superName) && !model.flags().has(AccessFlag.INTERFACE)) {
+                a.call(initializerSymbol(superName));
+            }
+            if (pool.declaredMethod(model, "<clinit>", "()V") != null) {
+                a.call(methodSymbol(type, "<clinit>", "()V"));
+            }
+            a.bind(done);
+            a.ret();
+            image.define(initializerSymbol(type), text, start, text.size() - start, Image.SymbolType.FUNC);
         }
     }
 
@@ -455,8 +528,8 @@ public final class Compiler {
         }
     }
 
-    /** Switches to our own stack, runs every class initializer in order, then calls the entry point. */
-    private void emitBootStub(String mainSymbol) {
+    /** Switches to our own stack, initializes the entry class, then calls the entry point. */
+    private void emitBootStub(String entryClass, String mainSymbol) {
         image.bss.align(16);
         int stackOffset = image.bss.size();
         image.bss.reserve(BOOT_STACK_SIZE);
@@ -468,14 +541,8 @@ public final class Compiler {
         X64 a = new X64(text);
         a.lea(Reg.RSP, Mem.rip("boot.stack", BOOT_STACK_SIZE));
         a.alu(X64.Alu.XOR, false, Reg.RBP, Reg.RBP);
-        List<String> initializers = new ArrayList<>();
-        for (String name : classes) {
-            if (pool.declaredMethod(pool.get(name), "<clinit>", "()V") != null) {
-                initializers.add(methodSymbol(name, "<clinit>", "()V"));
-            }
-        }
-        for (String clinit : initializers) {
-            a.call(clinit);
+        if (initializers.contains(entryClass)) {
+            a.call(initializerSymbol(entryClass));
         }
         a.call(mainSymbol);
         X64.Label hang = new X64.Label();

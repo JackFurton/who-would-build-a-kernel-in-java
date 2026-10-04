@@ -106,6 +106,7 @@ class X64Test {
                 c("call qword ptr [rax + 48]", "ff 50 30", a -> a.call(Mem.at(RAX, 48))),
                 c("call qword ptr [rax + 0x1000]", "ff 90 00 10 00 00", a -> a.call(Mem.at(RAX, 0x1000))),
                 c("call qword ptr [r11 + 8]", "41 ff 53 08", a -> a.call(Mem.at(R11, 8))),
+                c("cmp byte ptr [rax + 8], 0", "80 78 08 00", a -> a.cmpByte(Mem.at(RAX, 8), 0)),
                 c("std", "fd", X64::std),
                 c("cld", "fc", X64::cld),
                 c("rep movsb", "f3 a4", X64::repMovsb),
@@ -143,8 +144,17 @@ class X64Test {
         a.lea(RAX, Mem.rip("sym"));
         a.aluImm(X64.Alu.CMP, false, Mem.rip("sym", 8), 1000);
         a.call("fn");
+        a.cmpByte(Mem.rip("flag"), 0);
+        a.movByte(Mem.rip("flag"), 1);
         assertEquals(new Reloc(3, Reloc.Kind.PC32, "sym", -4), s.relocs().get(0));
         assertEquals(new Reloc(9, Reloc.Kind.PC32, "sym", 8 - 4 - 4), s.relocs().get(1));
         assertEquals(new Reloc(18, Reloc.Kind.PC32, "fn", -4), s.relocs().get(2));
+        // clang: "80 3d <rel32> 00" and "c6 05 <rel32> 01"
+        assertEquals(new Reloc(24, Reloc.Kind.PC32, "flag", -4 - 1), s.relocs().get(3));
+        assertEquals(new Reloc(31, Reloc.Kind.PC32, "flag", -4 - 1), s.relocs().get(4));
+        byte[] bytes = s.toByteArray();
+        assertEquals("803d", HexFormat.of().formatHex(bytes, 22, 24));
+        assertEquals("00c605", HexFormat.of().formatHex(bytes, 28, 31));
+        assertEquals("01", HexFormat.of().formatHex(bytes, 35, 36));
     }
 }
