@@ -87,7 +87,7 @@ public class KernelTests {
                 final class Main {
 
                     interface Test {
-                        void run();
+                        void run() throws Exception;
                     }
 
                     static int passed;

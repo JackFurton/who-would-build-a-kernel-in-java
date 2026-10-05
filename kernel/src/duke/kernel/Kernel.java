@@ -45,6 +45,7 @@ public final class Kernel {
         Pic.disable();
         LocalApic.init();
         Timer.init();
+        Scheduler.init();
         IoApic.init();
         Ps2Keyboard.init();
         Serial.enableInput();

@@ -12,8 +12,9 @@ kernel/src/**/*.java ──javac --system none──▶ .class ──dukec──
 
 Right now it boots, handles interrupts and exceptions in Java, and agrees with HotSpot on every
 test in the conformance suite: objects, virtual and interface dispatch, lambdas, boxing, string
-concatenation, try/catch/finally, stack overflow. Memory management, devices and threads are next on
-the [roadmap](https://github.com/JackFurton/who-would-build-a-kernel-in-java/milestones).
+concatenation, try/catch/finally, stack overflow. It runs on its own page tables with a garbage
+collector, drives the timer, keyboard and framebuffer, and preempts kernel threads. Monitors and a
+second CPU are next on the [roadmap](https://github.com/JackFurton/who-would-build-a-kernel-in-java/milestones).
 
 ```
 Duke: hello from Java on bare metal

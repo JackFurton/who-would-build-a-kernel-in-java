@@ -70,6 +70,29 @@ public final class Magic {
 
     public static native void setStackLimit(long limit);
 
+    /** The running thread's lowest usable stack address; the overflow limits are offsets from it. */
+    public static native long stackBase();
+
+    public static native void setStackBase(long base);
+
+    /**
+     * Makes the next prologue or loop back-edge call Runtime.preempt. For the timer interrupt; does
+     * nothing while stack checks are off.
+     */
+    public static native void requestPreemption();
+
+    /** Withdraws a pending request, so stackLimit() reads the real limit again. */
+    public static native void cancelPreemption();
+
+    /**
+     * Saves rbp and rsp at {@code saveAt}, then resumes the thread whose rsp was saved by this
+     * same intrinsic (or built to look that way). Only duke.kernel.Scheduler should call this.
+     */
+    public static native void switchStack(long saveAt, long rsp);
+
+    /** Address of duke.kernel.Scheduler.threadMain, where a new thread's first switch lands. */
+    public static native long threadEntry();
+
     public static native void loadGdt(long descriptor);
 
     public static native long readCr0();

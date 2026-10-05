@@ -143,7 +143,24 @@ public final class Heap {
         }
     }
 
+    /** Inside an allocation or collection, which mustn't be preempted: neither is reentrant. */
+    static boolean allocating() {
+        return allocating || collecting;
+    }
+
+    private static boolean allocating;
+
     private static long allocate(long size) {
+        boolean outer = !allocating;
+        allocating = true;
+        long address = allocateUnpreempted(size);
+        if (outer) {
+            allocating = false;
+        }
+        return address;
+    }
+
+    private static long allocateUnpreempted(long size) {
         ensureArena();
         size = (size + 7) & ~7L;
         if (backing != null && stressInterval > 0 && ++allocationsSinceCollection >= stressInterval) {

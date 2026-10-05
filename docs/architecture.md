@@ -84,8 +84,8 @@ committed memory passes twice the last live size (32 MiB minimum), and only then
 
 `make conformance-gc` runs the whole conformance suite with a collection at every allocation
 (about 50,000 collections). A slot missing from a stack map shows up there as a wrong result or a
-GC panic. Interrupt handlers still must not allocate, and threads (M5) will need a safepoint
-protocol.
+GC panic. Interrupt handlers still must not allocate. Other threads' stacks are roots too, and
+because threads only stop at safepoints (see Threads), their frames are scanned just as precisely.
 Java objects still come from the fixed bump arena in `.bss` (see Objects below).
 
 ## Platform
@@ -116,9 +116,41 @@ its BDF by `tools/GenerateFont.java` into a string literal, so the glyphs are im
 `IoApic` routes ISA IRQs to the boot CPU, applying the MADT's polarity and trigger overrides. The
 PS/2 keyboard (IRQ 1, scan code set 1, US layout) and COM1's receive interrupt (IRQ 4) both push
 characters into `Input`, a ring buffer of image arrays, so handlers never allocate. After the boot
-log, `Kernel.main` runs `Shell`: line editing plus `help`, `uptime`, `mem`, `gc`, `cpus`, `echo`
-and `panic`. `make shell-test` boots the real kernel with serial on pipes and the QEMU monitor on a
+log, `Kernel.main` runs `Shell`: line editing plus `help`, `uptime`, `mem`, `gc`, `cpus`,
+`threads`, `echo` and `panic`. `make shell-test` boots the real kernel with serial on pipes and the QEMU monitor on a
 socket. It types over serial and as PS/2 keystrokes (`sendkey`) and checks the replies.
+
+## Threads
+
+`java.lang.Thread` runs on `duke.kernel.Scheduler`: kernel threads on one CPU, round-robin, with
+`start`, `join`, `sleep`, `yield` and `currentThread`. The boot thread becomes `main`, and an idle
+thread halts when nothing else can run. Each thread gets a 64 KiB stack from `KernelStacks`, in its
+own PML4 slot with an unmapped guard page below each stack.
+
+Preemption is timer-driven but only lands at safepoints. The timer interrupt doesn't switch
+threads itself. It calls `Magic.requestPreemption`, which stores an impossible value (-1) in the
+stack limit every method prologue already compares rsp against. The next prologue takes its slow
+path into the overflow stub, which sees -1, puts the real limit back and calls
+`Runtime.preempt`, which yields. A loop that makes no calls never reaches a prologue, so backward
+branches also compare the limit with -1 (`cmp qword [stack.limit], -1; jne`), at the cost of one
+compare per iteration. This is the stack-limit trick from Jikes RVM, and it means a parked thread
+is always stopped at a call site with a stack map. The collector walks every parked stack with
+those maps, so there is no conservative scanning and no separate safepoint flag to poll.
+
+The switch itself is `Magic.switchStack(saveAt, rsp)` inside `Scheduler.swap`: push rbp, save
+rsp, load the other thread's rsp, pop rbp. Every parked thread is suspended in that same
+instruction sequence, so the epilogue that follows returns into the other thread's caller. A new
+thread's stack is built to look like it was parked there, with `Scheduler.threadMain` as the
+return address and a zero rbp to end stack walks. Each thread has its own stack base (the overflow
+stub and the unwinder compute limits from it). Stack checks are off between saving one thread's
+limit and the next thread installing its own, so nothing compares one thread's rsp against
+another's limit.
+
+Code that must not be interrupted by another thread says so cheaply: the scheduler only switches
+when interrupts are on, so its own bookkeeping runs with them off, and the allocator and
+collector are skipped by `Runtime.preempt` while they run, since neither is reentrant. Not yet:
+monitors (`synchronized`, #23), so class initialization isn't thread-safe and two threads printing
+at once can interleave mid-line; and a second CPU (#24).
 
 ## Compiler pipeline
 

@@ -117,7 +117,7 @@ public class Conformance {
         src.append("package ").append(PACKAGE).append(";\n\n");
         src.append("import duke.kernel.Console;\nimport duke.kernel.Kernel;\n\n");
         // Full bring-up, so the suite runs on the real memory system (paging, growable heap).
-        src.append("final class Main {\n    static void main() {\n        Kernel.init();\n");
+        src.append("final class Main {\n    static void main() throws Exception {\n        Kernel.init();\n");
         if (gcStress > 0) {
             src.append("        duke.rt.Heap.stress(").append(gcStress).append(");\n");
         }

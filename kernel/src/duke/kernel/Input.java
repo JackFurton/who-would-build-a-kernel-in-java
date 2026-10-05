@@ -1,7 +1,5 @@
 package duke.kernel;
 
-import duke.rt.Magic;
-
 /**
  * Typed characters from every input device, in arrival order. Interrupt handlers put, the shell
  * takes. One producer at a time (handlers run with interrupts off) and one consumer, so plain
@@ -31,10 +29,10 @@ public final class Input {
         }
     }
 
-    /** Waits for the next character, halting between interrupts. */
+    /** Waits for the next character, letting other threads run meanwhile. */
     public static int take() {
         while (head == tail) {
-            Magic.halt();
+            Scheduler.pause();
         }
         int c = BUFFER[head];
         head = (head + 1) & (BUFFER.length - 1);
