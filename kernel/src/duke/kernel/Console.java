@@ -44,10 +44,17 @@ public final class Console {
     }
 
     public static void printHex(long value) {
-        print("0x");
+        print(hex(value));
+    }
+
+    /** Formats the 64-bit value with a 0x prefix and sixteen lowercase hexadecimal digits. */
+    public static String hex(long value) {
+        StringBuilder result = new StringBuilder(18);
+        result.append("0x");
         for (int shift = 60; shift >= 0; shift -= 4) {
             int digit = (int) ((value >>> shift) & 0xF);
-            Serial.write(digit < 10 ? '0' + digit : 'a' + digit - 10);
+            result.append((char) (digit < 10 ? '0' + digit : 'a' + digit - 10));
         }
+        return result.toString();
     }
 }
