@@ -16,7 +16,7 @@ kernel one more thing". You don't need to know the whole system to help.
 
 ## Setup
 
-You need JDK 25, `make`, `git`, `qemu-system-x86_64`, and x86_64 UEFI firmware.
+You need JDK 25, `make`, `git`, `qemu-system-x86_64`, x86_64 UEFI firmware, and `node` (the `jsc` tests compare against it).
 
 - macOS: `brew install openjdk qemu` (Homebrew's QEMU includes the firmware).
 - Debian/Ubuntu: `apt install openjdk-25-jdk qemu-system-x86 ovmf`.
@@ -44,6 +44,7 @@ make test    # everything CI runs
 | `make ktest` | `tests/kernel`: tests that run inside the booted kernel | You touch memory, interrupts, devices |
 | `make panic-tests` | `tests/panics`: kernels that must die with a specific message | You add a failure path |
 | `make shell-test` | Types into the real shell over serial and PS/2 | You add a shell command |
+| `make js-test` | `tests/js`: JavaScript programs compiled by `jsc`; output must match node | You touch `compiler/.../duke/js` |
 | `make unit-test` | JUnit tests for the compiler | You touch `compiler/` |
 
 A conformance test is a non-private, no-argument static method returning a primitive or a

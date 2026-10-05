@@ -280,6 +280,17 @@ public final class X64 {
         regOp(wide, false, kind.ext, r.code(), 0xD3);
     }
 
+    /** Shifts {@code r} by a constant; the count is masked by the CPU like {@link #shiftCl}. */
+    public void shiftImm(Shift kind, boolean wide, Reg r, int count) {
+        regOp(wide, false, kind.ext, r.code(), 0xC1);
+        out.emit8(count);
+    }
+
+    public void syscall() {
+        out.emit8(0x0F);
+        out.emit8(0x05);
+    }
+
     public void cdq() {
         out.emit8(0x99);
     }
