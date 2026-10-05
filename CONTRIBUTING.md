@@ -55,6 +55,7 @@ must not allocate.
 
 ## Pull requests
 
+- `main` only changes through pull requests: CI has to pass and someone has to approve.
 - One issue per PR; put `Closes #N` in the description.
 - Run `make test` before pushing. CI runs the same targets on your PR automatically (GitHub may
   hold the very first run from a brand-new account for approval, as a spam guard).
