@@ -109,4 +109,28 @@ public final class StringBuilder {
             value = grown;
         }
     }
+public StringBuilder insert(int index, char c) {
+        if (index < 0 || index > count) {
+            throw new StringIndexOutOfBoundsException("Range [" + index + ", " + count + ") out of bounds for length " + count);
+        }
+        if (c > 0xFF) {
+            throw new IllegalArgumentException("non-Latin-1 char " + (int) c + " (Strings are Latin-1 only for now)");
+        }
+        ensureCapacity(count + 1);
+        for (int i = count; i > index; i--) {
+            value[i] = value[i - 1];
+        }
+        value[index] = (byte) c;
+        count++;
+        return this;
+    }
+
+    public StringBuilder deleteCharAt(int index) {
+        checkIndex(index);
+        for (int i = index; i < count - 1; i++) {
+            value[i] = value[i + 1];
+        }
+        value[--count] = 0;
+        return this;
+    }
 }

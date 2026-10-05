@@ -43,15 +43,35 @@ final class StringConcat {
         return "" + a + 'b' + (char) (a + 2);
     }
 
-    static String builderOperations() {
+   static String builderOperations() {
         StringBuilder sb = new StringBuilder("duke");
         sb.append(' ').append(42).append(' ').append(false);
         sb.setCharAt(0, 'D');
+        sb.insert(1, 'X'); // "DXuke"
+        sb.deleteCharAt(1); // తిరిగి "Duke"
+        
+        // insert ఔట్ ఆఫ్ బౌండ్స్ ఎక్సెప్షన్ టెస్ట్ కోసం:
+        String exceptionMsg = "";
+        try {
+            new StringBuilder("abc").insert(5, 'x');
+        } catch (StringIndexOutOfBoundsException e) {
+            exceptionMsg = e.getMessage();
+        }
+
         String forward = sb.toString();
         sb.reverse();
         String backward = sb.toString();
         sb.setLength(3);
-        return forward + "|" + backward + "|" + sb + "|" + sb.length() + sb.charAt(1);
+        return forward + "|" + backward + "|" + sb + "|" + sb.length() + sb.charAt(1) + "|" + exceptionMsg;
+    }
+
+    static String builderExceptions() {
+        try {
+            new StringBuilder("abc").insert(5, 'x');
+            return "no exception";
+        } catch (StringIndexOutOfBoundsException e) {
+            return e.getMessage();
+        }
     }
 
     static int builderGrowsPastCapacity() {

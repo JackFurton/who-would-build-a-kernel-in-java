@@ -9,6 +9,12 @@ import duke.rt.Magic;
  */
 public final class Input {
 
+    public static final int KEY_LEFT   = 0x101;
+    public static final int KEY_RIGHT  = 0x102;
+    public static final int KEY_HOME   = 0x103;
+    public static final int KEY_END    = 0x104;
+    public static final int KEY_DELETE = 0x105;
+
     private static final int[] BUFFER = new int[256];
     private static volatile int head;
     private static volatile int tail;
