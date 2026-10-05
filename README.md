@@ -85,4 +85,5 @@ BSD-2-Clause; the license travels with it in `kernel/src/duke/kernel/Font.java`.
 
 New contributors are welcome. [CONTRIBUTING.md](CONTRIBUTING.md) covers setup and how the tests
 work, and [`good first issue`](https://github.com/JackFurton/who-would-build-a-kernel-in-java/labels/good%20first%20issue)
-lists small, self-contained places to start.
+lists small, self-contained places to start. The [project board](https://github.com/users/JackFurton/projects/1)
+shows what's open and what's done.
