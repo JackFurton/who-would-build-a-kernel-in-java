@@ -44,6 +44,7 @@ make test    # everything CI runs
 | `make ktest` | `tests/kernel`: tests that run inside the booted kernel | You touch memory, interrupts, devices |
 | `make panic-tests` | `tests/panics`: kernels that must die with a specific message | You add a failure path |
 | `make shell-test` | Types into the real shell over serial and PS/2 | You add a shell command |
+| `make js-test` | `tests/js`: JavaScript programs compiled by `jsc`; output must match node | You touch `compiler/.../duke/js` |
 | `make unit-test` | JUnit tests for the compiler | You touch `compiler/` |
 
 A conformance test is a non-private, no-argument static method returning a primitive or a

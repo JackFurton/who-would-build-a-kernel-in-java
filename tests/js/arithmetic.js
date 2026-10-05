@@ -1,0 +1,22 @@
+// Integer arithmetic, bitwise operators and comparisons. Division is always truncated with |0.
+console.log(1 + 2 * 3, (1 + 2) * 3, 10 - 4 - 3, 2 ** 10, 2 ** 3 ** 2);
+console.log((7 / 2) | 0, (-7 / 2) | 0, 7 % 3, -7 % 3, 7 % -3);
+console.log(6 & 3, 6 | 3, 6 ^ 3, ~6, 1 << 10, -16 >> 2, -16 >>> 28);
+console.log(2147483647 | 0, 2147483648 | 0, 4294967297 | 0, 1 << 31, 1 << 32);
+console.log(-5, - -5, +7, -(3 - 10));
+var x = 5;
+x += 3; x -= 1; x *= 4; x /= 2; x %= 5;
+console.log(x);
+x = 12; x <<= 2; x >>= 1; x |= 1; x &= 29; x ^= 6;
+console.log(x);
+var i = 0;
+console.log(i++, i, ++i, i, i--, i, --i, i);
+console.log(1 < 2, 2 < 1, 2 <= 2, 3 >= 4, 1 === 1, 1 !== 1, 1 == 1, 1 != 2);
+console.log(true && 5, false && 5, 0 || 7, 3 || 7, null ?? 9, 0 ?? 9, undefined ?? 1);
+console.log(!0, !1, !"", !"a", !null, !undefined, !!5);
+console.log(1 < 2 ? "yes" : "no", 2 < 1 ? "yes" : "no");
+console.log(typeof 1, typeof "a", typeof true, typeof undefined, typeof null, typeof {}, typeof [], typeof console.log);
+var big = 1;
+for (var k = 0; k < 40; k++) big = big * 2;
+console.log(big, big + 1, -big, big % 1000, (big / 3) | 0);
+console.log(123456789 * 1000, 9007199254740991 - 1);

@@ -317,3 +317,38 @@ kernel sources has to pass it: the Makefile, `tools/Harness.java` and `CompilerT
   the lines in the file's leading `// expect:` comments, in order: the panic line, then
   optionally backtrace frames. This covers the failure side of every
   runtime check (null, bounds, division, casts, array stores, allocation).
+
+## jsc, the JavaScript compiler
+
+`jsc program.js --output program` (`compiler/src/main/java/duke/js`) compiles a subset of
+JavaScript straight to x86-64 and writes a static Linux ELF. It reuses dukec's `X64` encoder,
+`Image` and `ElfWriter`, but has its own front end and nothing to do with the JVM or the kernel.
+
+```
+Lexer ─▶ Parser ─▶ Analyzer (scopes, captures, frame slots) ─▶ CodeGen (X64 into Image) ─▶ ElfWriter
+```
+
+- **Values** are 64-bit words: low bit 1 is an integer (`n << 1 | 1`), low bits `00` a pointer to a
+  heap object, low bits `10` the constants undefined, null, false and true.
+- **Closures** share variables through boxes: a variable some inner function uses lives in a heap
+  box, and the closure holds the box pointers. Top-level variables and functions are fixed
+  symbols in `.data`, so they are never captured. `for (let ...)` copies the box each iteration.
+- **Calls** push `this`, the callee and the arguments left to right; the closure goes in rdi,
+  `this` in rsi, the argument count in rdx. Callees read missing arguments as undefined.
+- **The runtime is JavaScript.** `compiler/src/main/resources/duke/js/prelude.js` is compiled
+  with every program and implements strings, arrays, objects, `console.log` and the standard
+  library methods. It reaches the machine through intrinsics the compiler expands inline
+  (`__peek`, `__poke`, `__syscall`, `__alloc`, `__arg` and a few more), the way the kernel uses
+  `Magic`. Memory is a bump allocator over one `mmap`; nothing is freed.
+- **Supported:** `let`/`const`/`var`, functions, arrows, closures, `this` and method calls, objects,
+  arrays, strings, template literals, `if`/loops (`for`, `for...of`, `while`, `do`), `break`/`continue`,
+  the usual operators, `console.log` (node-style formatting) and the common array and string methods.
+- **Not yet:** floating point (numbers are 63-bit integers, so `/` truncates, and there is no NaN or
+  Infinity), exceptions, classes and `new`, `switch`, destructuring, spread, regular expressions,
+  non-ASCII strings, a garbage collector. Each is a clear compile error or a runtime failure with
+  exit status 1. `console.log` doesn't group arrays of more than six items like node does, and
+  object keys keep insertion order even when they look like integers.
+
+`make js-test` runs every program in `tests/js` under node and as a compiled executable and
+compares output and exit status (on anything but x86-64 Linux the executables run in an amd64
+Docker container).

@@ -28,6 +28,15 @@ public final class ElfWriter {
     private record Segment(int flags, long fileOffset, long vaddr, long fileSize, long memSize) {}
 
     public static byte[] write(Image.Linked linked, long entry) {
+        return write(linked, entry, false);
+    }
+
+    /**
+     * With {@code mapHeaders}, the first page of the file (the ELF and program headers) is loaded as
+     * a read-only segment on the page below the text. The Linux kernel doesn't need that, but some
+     * loaders (Rosetta's, for one) insist that the first PT_LOAD start at file offset 0.
+     */
+    public static byte[] write(Image.Linked linked, long entry, boolean mapHeaders) {
         Map<Section.Kind, Image.Placed> byKind = new HashMap<>();
         for (Image.Placed p : linked.sections()) {
             byKind.put(p.section().kind(), p);
@@ -38,6 +47,9 @@ public final class ElfWriter {
         Image.Placed bss = byKind.get(Section.Kind.BSS);
 
         List<Segment> segments = new ArrayList<>();
+        if (mapHeaders) {
+            segments.add(new Segment(PF_R, 0, text.address() - Image.PAGE, Image.PAGE, Image.PAGE));
+        }
         addSegment(segments, PF_R | PF_X, text, text.bytes().length);
         addSegment(segments, PF_R, rodata, rodata.bytes().length);
         long dataMem = bss.address() + bss.section().size() - data.address();

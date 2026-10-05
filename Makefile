@@ -19,7 +19,7 @@ KERNEL_SRCS   := $(shell find kernel/src -name '*.java')
 KERNEL_JAVAC  := javac --system none -XDstringConcat=inline
 COMPILER_SRCS := $(shell find compiler/src/main -name '*.java') compiler/build.gradle.kts
 
-.PHONY: all compiler run test unit-test boot-test conformance conformance-gc panic-tests ktest shell-test disasm clean
+.PHONY: all compiler run test unit-test boot-test conformance conformance-gc panic-tests ktest shell-test js-test disasm clean
 
 all: $(BUILD)/esp/boot/kernel.elf
 
@@ -74,6 +74,10 @@ ktest: $(DUKEC) $(BUILD)/limine/BOOTX64.EFI
 
 shell-test: all
 	java tools/ShellTest.java
+
+# jsc programs against node: needs node, and Docker unless this is x86-64 Linux.
+js-test: $(DUKEC)
+	java tools/JsTests.java
 
 disasm: $(BUILD)/kernel.elf
 	objdump -d -M intel $(BUILD)/kernel.elf | less
