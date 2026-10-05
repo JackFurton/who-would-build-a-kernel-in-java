@@ -109,9 +109,9 @@ public final class StringBuilder {
             value = grown;
         }
     }
-    public StringBuilder insert(int index, char c) {
+public StringBuilder insert(int index, char c) {
         if (index < 0 || index > count) {
-            throw new StringIndexOutOfBoundsException("Index " + index + " out of bounds for length " + count);
+            throw new StringIndexOutOfBoundsException("Range [" + index + ", " + count + ") out of bounds for length " + count);
         }
         if (c > 0xFF) {
             throw new IllegalArgumentException("non-Latin-1 char " + (int) c + " (Strings are Latin-1 only for now)");
