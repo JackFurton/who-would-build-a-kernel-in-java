@@ -5,4 +5,3 @@ compiler/build/
 *.iml
 .vscode/
 .DS_Store
-/artifacts/boot-profile/*.json
