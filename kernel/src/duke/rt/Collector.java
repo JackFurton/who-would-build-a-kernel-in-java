@@ -1,10 +1,11 @@
 package duke.rt;
 
 import duke.kernel.Panic;
+import duke.kernel.Scheduler;
 
 /**
  * Non-moving mark-sweep. Roots are static reference fields, build-time reference arrays, and every
- * frame on the stack, read through the compiler's per-call-site stack maps. Marking uses a bit per
+ * frame on every thread's stack, read through the compiler's per-call-site stack maps. Marking uses a bit per
  * 8 heap bytes and an explicit mark stack. Sweeping walks both heap regions object by object,
  * coalesces dead runs into holes and rebuilds the free list.
  *
@@ -33,6 +34,12 @@ final class Collector {
         markStaticRoots();
         markImageRoots();
         markStack(Magic.framePointer());
+        for (int i = 0; i < Scheduler.taskCount(); i++) {
+            long frame = Scheduler.parkedFrame(i);
+            if (frame != 0) {
+                markStack(frame);
+            }
+        }
         drain();
         long live = sweep();
         collections++;

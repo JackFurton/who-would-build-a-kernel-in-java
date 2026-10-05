@@ -209,7 +209,13 @@ final class MethodCompiler {
             case ConstantInstruction c -> constant(c);
             case OperatorInstruction op -> operator(op.opcode());
             case ConvertInstruction c -> convert(c.opcode());
-            case BranchInstruction b -> branch(b.opcode(), label(b.target()));
+            case BranchInstruction b -> {
+                X64.Label target = label(b.target());
+                if (target.isBound()) {
+                    preemptionPoll();
+                }
+                branch(b.opcode(), target);
+            }
             case TableSwitchInstruction t -> lookup(t.cases(), t.defaultTarget());
             case LookupSwitchInstruction l -> lookup(l.cases(), l.defaultTarget());
             case StackInstruction s -> stack(s.opcode());
@@ -456,6 +462,20 @@ final class MethodCompiler {
             case GOTO, GOTO_W -> a.jmp(target);
             default -> throw error("unsupported branch " + op.name().toLowerCase());
         }
+    }
+
+    /**
+     * A loop that makes no calls never reaches a prologue, so back-edges check for a preemption
+     * request too. Emitted before the branch pops its operands, so the stack map is the
+     * instruction's entry state and the stub is free to clobber rax.
+     */
+    private void preemptionPoll() {
+        program.requireStackOverflowStub();
+        X64.Label ok = new X64.Label();
+        a.aluImm(Alu.CMP, true, Mem.rip(Compiler.STACK_LIMIT), Compiler.PREEMPT);
+        a.jcc(Cond.NE, ok);
+        emitCall(Compiler.STACK_OVERFLOW);
+        a.bind(ok);
     }
 
     private static Cond condition(Opcode op) {
@@ -958,8 +978,52 @@ final class MethodCompiler {
             }
             case "breakpoint" -> a.int3();
             case "resetStackLimit" -> {
-                a.lea(RAX, Mem.rip("boot.stack", Compiler.STACK_RESERVE));
+                a.load(8, false, RAX, Mem.rip(Compiler.STACK_BASE));
+                a.lea(RAX, Mem.at(RAX, Compiler.STACK_RESERVE));
                 a.store(8, Mem.rip(Compiler.STACK_LIMIT), RAX);
+            }
+            case "stackBase" -> {
+                a.load(8, false, RAX, Mem.rip(Compiler.STACK_BASE));
+                pushLong(RAX);
+            }
+            case "setStackBase" -> {
+                popLong(RAX);
+                a.store(8, Mem.rip(Compiler.STACK_BASE), RAX);
+            }
+            case "requestPreemption" -> {
+                // Leaves a disabled (0) or already requested limit alone.
+                X64.Label done = new X64.Label();
+                a.load(8, false, RAX, Mem.rip(Compiler.STACK_LIMIT));
+                a.test(true, RAX, RAX);
+                a.jcc(Cond.E, done);
+                a.aluImm(Alu.CMP, true, RAX, Compiler.PREEMPT);
+                a.jcc(Cond.E, done);
+                a.store(8, Mem.rip(Compiler.STACK_LIMIT_SAVED), RAX);
+                a.movImm64(RAX, Compiler.PREEMPT);
+                a.store(8, Mem.rip(Compiler.STACK_LIMIT), RAX);
+                a.bind(done);
+            }
+            case "cancelPreemption" -> {
+                X64.Label done = new X64.Label();
+                a.aluImm(Alu.CMP, true, Mem.rip(Compiler.STACK_LIMIT), Compiler.PREEMPT);
+                a.jcc(Cond.NE, done);
+                a.load(8, false, RAX, Mem.rip(Compiler.STACK_LIMIT_SAVED));
+                a.store(8, Mem.rip(Compiler.STACK_LIMIT), RAX);
+                a.bind(done);
+            }
+            case "switchStack" -> {
+                // switchStack(saveAt, rsp): the other thread suspended in this same intrinsic, so
+                // its frame and operand stack have the same shape as ours at this point.
+                popLong(RSI);
+                popLong(Reg.RDI);
+                a.push(RBP);
+                a.store(8, Mem.at(Reg.RDI), RSP);
+                a.mov(RSP, RSI);
+                a.pop(RBP);
+            }
+            case "threadEntry" -> {
+                a.lea(RAX, Mem.rip(program.requireThreadEntry()));
+                pushLong(RAX);
             }
             case "resumeAt" -> {
                 // resumeAt(handler, rsp, rbp, exception): the JVM's handler entry state is an

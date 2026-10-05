@@ -49,6 +49,15 @@ public final class Compiler {
             Reg.R8, Reg.R9, Reg.R10, Reg.R11, Reg.R12, Reg.R13, Reg.R14, Reg.R15};
 
     static final String STACK_LIMIT = "stack.limit";
+    /** The running thread's lowest usable stack address; the limits are offsets from it. */
+    static final String STACK_BASE = "stack.base";
+    /** The real limit while stack.limit holds {@link #PREEMPT}. */
+    static final String STACK_LIMIT_SAVED = "stack.limit.saved";
+    /**
+     * A stack limit no rsp can satisfy. The timer stores it to make the next prologue or loop
+     * back-edge take the slow path, which yields instead of throwing.
+     */
+    static final int PREEMPT = -1;
     static final String STACK_OVERFLOW = "stack.overflow";
     /** Below the normal limit: room for constructing and throwing StackOverflowError. */
     static final int STACK_RESERVE = 16 * 1024;
@@ -517,27 +526,46 @@ public final class Compiler {
             stackOverflowStub = true;
             requireMethod("duke/rt/Runtime", "stackOverflow", "()V");
             requireMethod("duke/rt/Runtime", "stackExhausted", "()V");
+            requireMethod("duke/rt/Runtime", "preempt", "()V");
         }
     }
 
+    /** Where a new thread's first switch returns to (Magic.threadEntry). */
+    String requireThreadEntry() {
+        return requireMethod("duke/kernel/Scheduler", "threadMain", "()V");
+    }
+
     /**
-     * Called from a prologue that found rsp below the limit. The first time, it lowers the limit to
-     * the emergency mark and tail-jumps to Runtime.stackOverflow, which throws from inside the
-     * reserve. Overflowing again before the unwinder resets the limit means even the reserve is
-     * gone: checks are disabled and Runtime.stackExhausted panics.
+     * Called from a prologue that found rsp below the limit, or from a loop back-edge that found a
+     * preemption request. A request ({@link #PREEMPT} in the limit) puts the real limit back and
+     * tail-jumps to Runtime.preempt, which returns to the caller once the thread runs again.
+     * Otherwise it's an overflow. The first time, it lowers the limit to the emergency mark and
+     * tail-jumps to Runtime.stackOverflow, which throws from inside the reserve. Overflowing again
+     * before the unwinder resets the limit means even the reserve is gone: checks are disabled and
+     * Runtime.stackExhausted panics.
      */
     private void emitStackOverflowStub() {
         image.data.align(8);
-        int limit = image.data.size();
-        image.data.emit64(0);
-        image.define(STACK_LIMIT, image.data, limit, 8, Image.SymbolType.OBJECT);
+        for (String symbol : List.of(STACK_LIMIT, STACK_LIMIT_SAVED, STACK_BASE)) {
+            int offset = image.data.size();
+            image.data.emit64(0);
+            image.define(symbol, image.data, offset, 8, Image.SymbolType.OBJECT);
+        }
 
         Section text = image.text;
         text.align(16);
         int start = text.size();
         X64 a = new X64(text);
+        X64.Label overflow = new X64.Label();
         X64.Label exhausted = new X64.Label();
-        a.lea(Reg.RAX, Mem.rip("boot.stack", STACK_EMERGENCY));
+        a.aluImm(X64.Alu.CMP, true, Mem.rip(STACK_LIMIT), PREEMPT);
+        a.jcc(Cond.NE, overflow);
+        a.load(8, false, Reg.RAX, Mem.rip(STACK_LIMIT_SAVED));
+        a.store(8, Mem.rip(STACK_LIMIT), Reg.RAX);
+        a.jmp(methodSymbol("duke/rt/Runtime", "preempt", "()V"));
+        a.bind(overflow);
+        a.load(8, false, Reg.RAX, Mem.rip(STACK_BASE));
+        a.lea(Reg.RAX, Mem.at(Reg.RAX, STACK_EMERGENCY));
         a.alu(X64.Alu.CMP, true, Mem.rip(STACK_LIMIT), Reg.RAX);
         a.jcc(Cond.E, exhausted);
         a.store(8, Mem.rip(STACK_LIMIT), Reg.RAX);
@@ -967,6 +995,8 @@ public final class Compiler {
         a.lea(Reg.RSP, Mem.rip("boot.stack", BOOT_STACK_SIZE));
         a.alu(X64.Alu.XOR, false, Reg.RBP, Reg.RBP);
         if (stackOverflowStub) {
+            a.lea(Reg.RAX, Mem.rip("boot.stack", 0));
+            a.store(8, Mem.rip(STACK_BASE), Reg.RAX);
             a.lea(Reg.RAX, Mem.rip("boot.stack", STACK_RESERVE));
             a.store(8, Mem.rip(STACK_LIMIT), Reg.RAX);
         }

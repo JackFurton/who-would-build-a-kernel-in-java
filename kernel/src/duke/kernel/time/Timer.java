@@ -1,5 +1,6 @@
 package duke.kernel.time;
 
+import duke.kernel.Scheduler;
 import duke.kernel.x86.Interrupts;
 import duke.kernel.x86.LocalApic;
 import duke.kernel.x86.LocalApicTimer;
@@ -27,6 +28,7 @@ public final class Timer {
         Interrupts.register(VECTOR, frame -> {
             ticks++;
             LocalApic.endOfInterrupt();
+            Scheduler.tick();
         });
         LocalApicTimer.startPeriodic(VECTOR, apicTicksPerSecond / HZ);
     }

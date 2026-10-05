@@ -1,6 +1,7 @@
 package duke.rt;
 
 import duke.kernel.Panic;
+import duke.kernel.Scheduler;
 
 /** Entry points the compiler calls inline when a runtime check fails. Messages match HotSpot's. */
 public final class Runtime {
@@ -18,6 +19,13 @@ public final class Runtime {
 
     static void stackOverflow() {
         throw new StackOverflowError();
+    }
+
+    /** A prologue or loop back-edge found a preemption request (Magic.requestPreemption). */
+    static void preempt() {
+        if (!Heap.allocating()) {
+            Scheduler.preempted();
+        }
     }
 
     static void stackExhausted() {
