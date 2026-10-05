@@ -40,6 +40,9 @@ public final class Magic {
     /** memmove: correct for overlapping ranges in either direction. */
     public static native void copyMemory(long destination, long source, long bytes);
 
+    /** Zero exactly {@code words * 8} bytes of aligned ordinary RAM; {@code words} must be nonnegative. */
+    public static native void zeroMemoryWords(long destination, long words);
+
     /** memset: {@code bytes} copies of the low byte of {@code value} at {@code destination}. */
     public static native void fillMemory(long destination, int value, long bytes);
 
