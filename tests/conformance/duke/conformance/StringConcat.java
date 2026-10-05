@@ -43,35 +43,48 @@ final class StringConcat {
         return "" + a + 'b' + (char) (a + 2);
     }
 
-   static String builderOperations() {
+    static String builderOperations() {
         StringBuilder sb = new StringBuilder("duke");
         sb.append(' ').append(42).append(' ').append(false);
         sb.setCharAt(0, 'D');
-        sb.insert(1, 'X'); // "DXuke"
-        sb.deleteCharAt(1); // తిరిగి "Duke"
-        
-        // insert ఔట్ ఆఫ్ బౌండ్స్ ఎక్సెప్షన్ టెస్ట్ కోసం:
-        String exceptionMsg = "";
-        try {
-            new StringBuilder("abc").insert(5, 'x');
-        } catch (StringIndexOutOfBoundsException e) {
-            exceptionMsg = e.getMessage();
-        }
-
         String forward = sb.toString();
         sb.reverse();
         String backward = sb.toString();
         sb.setLength(3);
-        return forward + "|" + backward + "|" + sb + "|" + sb.length() + sb.charAt(1) + "|" + exceptionMsg;
+        return forward + "|" + backward + "|" + sb + "|" + sb.length() + sb.charAt(1);
     }
 
-    static String builderExceptions() {
+    static String builderInsertAndDelete() {
+        StringBuilder sb = new StringBuilder("duke 42");
+        sb.insert(4, '!').insert(0, '>').insert(sb.length(), '?');
+        String inserted = sb.toString();
+        sb.deleteCharAt(0).deleteCharAt(5).deleteCharAt(sb.length() - 1);
+        return inserted + "|" + sb + "|" + sb.length();
+    }
+
+    static String builderIndexMessages() {
+        StringBuilder sb = new StringBuilder();
         try {
             new StringBuilder("abc").insert(5, 'x');
-            return "no exception";
         } catch (StringIndexOutOfBoundsException e) {
-            return e.getMessage();
+            sb.append(e.getMessage()).append(';');
         }
+        try {
+            new StringBuilder("abc").insert(-1, 'x');
+        } catch (StringIndexOutOfBoundsException e) {
+            sb.append(e.getMessage()).append(';');
+        }
+        try {
+            new StringBuilder("abc").deleteCharAt(3);
+        } catch (StringIndexOutOfBoundsException e) {
+            sb.append(e.getMessage()).append(';');
+        }
+        try {
+            new StringBuilder("abc").deleteCharAt(-1);
+        } catch (StringIndexOutOfBoundsException e) {
+            sb.append(e.getMessage());
+        }
+        return sb.toString();
     }
 
     static int builderGrowsPastCapacity() {
