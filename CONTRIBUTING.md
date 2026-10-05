@@ -9,6 +9,8 @@ kernel one more thing". You don't need to know the whole system to help.
 - [`good first issue`](https://github.com/JackFurton/who-would-build-a-kernel-in-java/labels/good%20first%20issue)
   issues are small and self-contained, and say how to prove they're done.
 - Comment on an issue to claim it before you start, so two people don't build the same thing.
+- The [project board](https://github.com/users/JackFurton/projects/1) shows everything open and
+  what's done.
 - Bigger work is grouped into [milestones](https://github.com/JackFurton/who-would-build-a-kernel-in-java/milestones).
   Ask in the issue if you want to take one on.
 
