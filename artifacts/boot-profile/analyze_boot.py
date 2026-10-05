@@ -17,6 +17,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 VARIANTS = ["stock", "detail", "widezero", "widezero-stock"]
+if not (HERE / "results.json").exists():
+    raise SystemExit("Run profile_boot.py summarize, or download results.json from the evidence link in PR #91.")
 RECORDED = json.loads((HERE / "results.json").read_text())
 TRIALS = sorted(set.intersection(*[
     {r["trial"] for r in RECORDED["runs"] if r["variant"] == v} for v in VARIANTS]))
@@ -92,7 +94,8 @@ data = {
                                    for p in RUNS["detail"][0]["details"]},
     "instrumentation_wall_medians_ms": {
         v: median(r["host_ms"]["prompt"] for r in RUNS[v]) for v in VARIANTS},
-    "validation": json.loads((HERE / "validation.json").read_text()),
+    "validation": (json.loads((HERE / "validation.json").read_text())
+                   if (HERE / "validation.json").exists() else {"status": "not recorded"}),
 }
 rng = random.Random(20261005)
 samples = []
