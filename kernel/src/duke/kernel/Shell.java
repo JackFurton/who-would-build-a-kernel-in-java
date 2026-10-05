@@ -29,21 +29,89 @@ public final class Shell {
 
     private static String readLine() {
         StringBuilder line = new StringBuilder();
+        int pos = 0;
+
         while (true) {
             int c = Input.take();
             if (c == '\n') {
                 Console.println("");
                 return line.toString();
             }
-            if (c == '\b' || c == 0x7F) {
-                if (line.length() > 0) {
-                    line.setLength(line.length() - 1);
-                    Console.print("\b \b");
+
+            switch (c) {
+                case Ps2Keyboard.KEY_LEFT -> {
+                    if (pos > 0) {
+                        pos--;
+                        Console.print("\b");
+                    }
                 }
-            } else if (c >= ' ' && c < 0x7F) {
-                line.append((char) c);
-                Console.write(c);
+                case Ps2Keyboard.KEY_RIGHT -> {
+                    if (pos < line.length()) {
+                        Console.write(line.charAt(pos));
+                        pos++;
+                    }
+                }
+                case Ps2Keyboard.KEY_HOME -> {
+                    while (pos > 0) {
+                        pos--;
+                        Console.print("\b");
+                    }
+                }
+                case Ps2Keyboard.KEY_END -> {
+                    while (pos < line.length()) {
+                        Console.write(line.charAt(pos));
+                        pos++;
+                    }
+                }
+                case Ps2Keyboard.KEY_DELETE -> {
+                    if (pos < line.length()) {
+                        deleteCharAt(line, pos);
+                        redrawFrom(line, pos);
+                    }
+                }
+                case '\b', 0x7F -> {
+                    if (pos > 0) {
+                        deleteCharAt(line, pos - 1);
+                        pos--;
+                        Console.print("\b");
+                        redrawFrom(line, pos);
+                    }
+                }
+                default -> {
+                    if (c >= ' ' && c < 0x7F) {
+                        insertChar(line, pos, (char) c);
+                        pos++;
+                        Console.write(c);
+                        redrawFrom(line, pos);
+                    }
+                }
             }
+        }
+    }
+
+    private static void insertChar(StringBuilder sb, int index, char c) {
+        String s = sb.toString();
+        sb.setLength(0);
+        sb.append(s.substring(0, index));
+        sb.append(c);
+        sb.append(s.substring(index));
+    }
+
+    private static void deleteCharAt(StringBuilder sb, int index) {
+        String s = sb.toString();
+        sb.setLength(0);
+        sb.append(s.substring(0, index));
+        sb.append(s.substring(index + 1));
+    }
+
+    private static void redrawFrom(StringBuilder line, int pos) {
+        for (int i = pos; i < line.length(); i++) {
+            Console.write(line.charAt(i));
+        }
+        Console.print(" ");
+        int backSteps = line.length() - pos + 1;
+        for (int i = 0; i < backSteps; i++) {
+            Console.print("\b");
         }
     }
 

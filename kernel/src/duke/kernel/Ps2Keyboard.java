@@ -10,6 +10,12 @@ public final class Ps2Keyboard {
 
     public static final int VECTOR = 0x21;
 
+    public static final int KEY_LEFT   = 0x101;
+    public static final int KEY_RIGHT  = 0x102;
+    public static final int KEY_HOME   = 0x103;
+    public static final int KEY_END    = 0x104;
+    public static final int KEY_DELETE = 0x105;
+
     private static final int DATA = 0x60;
     private static final int STATUS = 0x64;
     private static final int OUTPUT_FULL = 1;
@@ -20,6 +26,13 @@ public final class Ps2Keyboard {
     private static final int CAPS_LOCK = 0x3A;
     private static final int EXTENDED = 0xE0;
     private static final int RELEASE = 0x80;
+
+    // Scan codes for extended keys
+    private static final int SCAN_HOME   = 0x47;
+    private static final int SCAN_LEFT   = 0x4B;
+    private static final int SCAN_RIGHT  = 0x4D;
+    private static final int SCAN_END    = 0x4F;
+    private static final int SCAN_DELETE = 0x53;
 
     // Index is the make code; 0 means no character.
     private static final String PLAIN = "\0\u001b1234567890-=\b\tqwertyuiop[]\n\0asdfghjkl;'`\0\\zxcvbnm,./\0*\0 ";
@@ -53,10 +66,23 @@ public final class Ps2Keyboard {
         boolean released = (code & RELEASE) != 0;
         int key = code & ~RELEASE;
         if (extended) {
-            // Arrows, keypad enter and the right-hand modifiers: not mapped yet.
             extended = false;
             if (key == CONTROL) {
                 control = !released;
+                return;
+            }
+            if (!released) {
+                int customKey = switch (key) {
+                    case SCAN_LEFT   -> KEY_LEFT;
+                    case SCAN_RIGHT  -> KEY_RIGHT;
+                    case SCAN_HOME   -> KEY_HOME;
+                    case SCAN_END    -> KEY_END;
+                    case SCAN_DELETE -> KEY_DELETE;
+                    default          -> 0;
+                };
+                if (customKey != 0) {
+                    Input.put(customKey);
+                }
             }
             return;
         }
