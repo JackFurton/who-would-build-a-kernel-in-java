@@ -36,6 +36,9 @@ jobs:
       - name: Compiler unit tests
         run: make unit-test
 
+      - name: JavaScript compiler (jsc vs node)
+        run: make js-test
+
       - name: Boot test
         run: make boot-test
 

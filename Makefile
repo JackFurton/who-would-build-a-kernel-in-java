@@ -49,7 +49,7 @@ $(BUILD)/esp/boot/kernel.elf: $(BUILD)/kernel.elf $(BUILD)/limine/BOOTX64.EFI bo
 run: all
 	tools/qemu.sh $(BUILD)/esp -serial mon:stdio
 
-test: unit-test boot-test conformance panic-tests ktest shell-test
+test: unit-test js-test boot-test conformance panic-tests ktest shell-test
 
 unit-test:
 	./gradlew -q :compiler:test

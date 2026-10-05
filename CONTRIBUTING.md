@@ -16,7 +16,7 @@ kernel one more thing". You don't need to know the whole system to help.
 
 ## Setup
 
-You need JDK 25, `make`, `git`, `qemu-system-x86_64`, and x86_64 UEFI firmware.
+You need JDK 25, `make`, `git`, `qemu-system-x86_64`, x86_64 UEFI firmware, and `node` (the `jsc` tests compare against it).
 
 - macOS: `brew install openjdk qemu` (Homebrew's QEMU includes the firmware).
 - Debian/Ubuntu: `apt install openjdk-25-jdk qemu-system-x86 ovmf`.

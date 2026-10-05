@@ -68,7 +68,7 @@ public class JsTests {
         if (native64) {
             return List.of(exe.toString());
         }
-        return List.of("docker", "run", "--rm", "--platform", "linux/amd64", "-v", OUT + ":/t", "alpine",
+        return List.of("docker", "run", "-q", "--rm", "--platform", "linux/amd64", "-v", OUT + ":/t", "alpine",
                 "/t/" + exe.getFileName());
     }
 
