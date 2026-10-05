@@ -109,7 +109,7 @@ public final class StringBuilder {
             value = grown;
         }
     }
-public StringBuilder insert(int index, char c) {
+    public StringBuilder insert(int index, char c) {
         if (index < 0 || index > count) {
             throw new StringIndexOutOfBoundsException("Range [" + index + ", " + count + ") out of bounds for length " + count);
         }
