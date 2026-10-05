@@ -106,7 +106,16 @@ public final class Shell {
             return;
         }
         switch (words.get(0)) {
-            case "help" -> Console.println("commands: help, uptime, mem, gc, cpus, threads, echo <text>, clear, panic");
+            case "help" -> {
+                Console.println("commands: help, uptime, mem, gc, cpus, threads, echo <text>, clear, panic");
+                if (!JsHost.commandNames().isEmpty()) {
+                    StringBuilder js = new StringBuilder("written in JavaScript:");
+                    for (String name : JsHost.commandNames()) {
+                        js.append(' ').append(name);
+                    }
+                    Console.println(js.toString());
+                }
+            }
             case "clear" -> FramebufferConsole.clear();
             case "uptime" -> Console.println("up " + Timer.uptimeMillis() + " ms (" + Timer.ticks() + " ticks)");
             case "mem" -> Console.println("frames: " + PhysicalMemory.freeFrames() + " free ("
@@ -124,7 +133,11 @@ public final class Shell {
             case "threads" -> Scheduler.list();
             case "echo" -> Console.println(line.substring(4).strip());
             case "panic" -> Panic.panic("requested from the shell");
-            default -> Console.println("unknown command: " + words.get(0) + " (try help)");
+            default -> {
+                if (!JsHost.run(words.get(0), words)) {
+                    Console.println("unknown command: " + words.get(0) + " (try help)");
+                }
+            }
         }
     }
 

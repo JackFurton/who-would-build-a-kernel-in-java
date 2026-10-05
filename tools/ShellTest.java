@@ -23,6 +23,15 @@ public class ShellTest {
     static final Path OUT = Harness.ROOT.resolve("build/shell-test");
     static final long TIMEOUT_MILLIS = 120_000;
 
+    /** What the churn command's second loop adds up: the ids 0, 100, ... plus the lengths of "item<id>". */
+    static long sumIds() {
+        long sum = 0;
+        for (int i = 0; i < 200000; i += 100) {
+            sum += i + ("item" + i).length();
+        }
+        return sum;
+    }
+
     static final StringBuffer output = new StringBuffer();
 
     public static void main(String[] args) throws Exception {
@@ -55,6 +64,14 @@ public class ShellTest {
             failures += check("mem", () -> type(serial, "mem\n"), "frames: ");
             failures += check("threads", () -> type(serial, "threads\n"), "main: running");
             failures += check("ps/2 insert", () -> keys(monitor, "e c h o spc d u e left k ret"), "duke");
+            failures += check("javascript command", () -> type(serial, "hello\n"),
+                    "hello from JavaScript running in the Duke kernel");
+            failures += check("javascript arguments", () -> type(serial, "fib 20\n"), "fib(20) = 6765");
+            failures += check("javascript objects", () -> type(serial, "meminfo\n"), "freeFrames:");
+            failures += check("javascript under gc", () -> type(serial, "churn\n"),
+                    "churn: kept 2000, total 20000100000, ids 19900000"
+                            .replace("19900000", String.valueOf(sumIds())) + ", collections ran");
+            failures += check("help lists javascript", () -> type(serial, "help\n"), "written in JavaScript: hello fib meminfo");
             failures += framebuffer(serial, monitor);
             failures += check("panic", () -> type(serial, "panic\n"), "PANIC: requested from the shell");
         } finally {

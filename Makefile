@@ -1,5 +1,6 @@
 BUILD := build
 DUKEC := compiler/build/install/dukec/bin/dukec
+JSC   := compiler/build/install/dukec/bin/jsc
 
 # v11.x-binary. Bump deliberately: the Limine protocol changes between majors.
 LIMINE_REPO := https://github.com/Limine-Bootloader/limine.git
@@ -14,6 +15,10 @@ OVMF ?= $(firstword $(wildcard \
 export OVMF
 
 KERNEL_SRCS   := $(shell find kernel/src -name '*.java')
+# JavaScript modules: jsc translates them to Java under build/jsgen, and the kernel compiles that
+# as one more source root. The generated Boot class is the entry point, so nothing in kernel/src
+# refers to generated code.
+JS_SRCS       := $(wildcard kernel/js/*.js)
 # Keep in sync with tools/Harness.java and CompilerTest. javac's default string concatenation is
 # invokedynamic; inline makes it plain StringBuilder calls the compiler can handle.
 KERNEL_JAVAC  := javac --system none -XDstringConcat=inline
@@ -29,13 +34,19 @@ $(DUKEC): $(COMPILER_SRCS)
 	./gradlew -q :compiler:installDist
 	touch $@
 
-$(BUILD)/kclasses.stamp: $(KERNEL_SRCS)
+$(BUILD)/jsgen.stamp: $(JS_SRCS) $(DUKEC)
+	rm -rf $(BUILD)/jsgen
+	$(JSC) --java $(BUILD)/jsgen $(JS_SRCS)
+	touch $@
+
+$(BUILD)/kclasses.stamp: $(KERNEL_SRCS) $(BUILD)/jsgen.stamp
 	rm -rf $(BUILD)/kclasses
-	$(KERNEL_JAVAC) --module-source-path java.base=kernel/src -d $(BUILD)/kclasses $(KERNEL_SRCS)
+	$(KERNEL_JAVAC) --module-source-path java.base=kernel/src:$(BUILD)/jsgen -d $(BUILD)/kclasses \
+		$(KERNEL_SRCS) $$(find $(BUILD)/jsgen -name '*.java')
 	touch $@
 
 $(BUILD)/kernel.elf: $(DUKEC) $(BUILD)/kclasses.stamp
-	$(DUKEC) --classes $(BUILD)/kclasses --entry duke/kernel/Kernel.main --output $@ --map $(BUILD)/kernel.map
+	$(DUKEC) --classes $(BUILD)/kclasses --entry duke/js/gen/Boot.main --output $@ --map $(BUILD)/kernel.map
 
 $(BUILD)/limine/BOOTX64.EFI:
 	rm -rf $(BUILD)/limine
@@ -75,7 +86,8 @@ ktest: $(DUKEC) $(BUILD)/limine/BOOTX64.EFI
 shell-test: all
 	java tools/ShellTest.java
 
-# jsc programs against node: needs node, and Docker unless this is x86-64 Linux.
+# jsc programs against node, through both back ends. Needs node, and the x86 back end needs Docker
+# unless this is x86-64 Linux; JS_BACKENDS=java skips it.
 js-test: $(DUKEC)
 	java tools/JsTests.java
 

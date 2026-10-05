@@ -86,6 +86,7 @@ final class Analyzer {
     }
 
     private final String file;
+    private final Set<String> externals;
     private final Scope preludeScope;
     private final FuncInfo main;
     private int symbolCounter;
@@ -99,7 +100,13 @@ final class Analyzer {
     private Scope current;
 
     Analyzer(String file, List<Stmt> prelude, List<Stmt> program) {
+        this(file, prelude, program, INTRINSICS);
+    }
+
+    /** {@code externals} are names that need no declaration: intrinsics, or globals the runtime provides. */
+    Analyzer(String file, List<Stmt> prelude, List<Stmt> program, Set<String> externals) {
         this.file = file;
+        this.externals = externals;
         this.main = new FuncInfo(new Function("main", List.of(), List.of(), false, 0), null, true);
         main.symbol = "fn.main";
         this.preludeScope = new Scope(null, main, true);
@@ -333,7 +340,7 @@ final class Analyzer {
             case Ident id -> {
                 Var v = lookup(id.name());
                 if (v == null) {
-                    if (!INTRINSICS.contains(id.name())) {
+                    if (!externals.contains(id.name())) {
                         throw new JsException(file, id.line(), id.name() + " is not defined");
                     }
                 } else {

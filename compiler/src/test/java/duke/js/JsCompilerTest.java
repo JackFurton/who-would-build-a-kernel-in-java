@@ -5,7 +5,14 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.stream.Stream;
+import javax.tools.ToolProvider;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -70,5 +77,69 @@ class JsCompilerTest {
                 const f = make();
                 for (let i = 0; i < 3; i++) console.log(f(), [i, { i }]);
                 """);
+    }
+
+    // ---- the Java back end, which is how JavaScript gets into the kernel ----
+
+    @Test
+    void translatesModulesToJavaWithAnEntryPoint() {
+        Map<String, String> modules = new LinkedHashMap<>();
+        modules.put("kernel/js/commands.js", "console.log(1);");
+        modules.put("kernel/js/fs-tools.js", "var x = 2;");
+        Map<String, String> classes = Main.translateAll(modules);
+        assertEquals(List.of("Commands", "FsTools", "Modules", "Boot"), List.copyOf(classes.keySet()));
+        assertTrue(classes.get("Modules").contains("Commands.run();"));
+        assertTrue(classes.get("Modules").indexOf("Commands.run();") < classes.get("Modules").indexOf("FsTools.run();"));
+        assertTrue(classes.get("Boot").contains("Kernel.beforeShell"));
+    }
+
+    @Test
+    void rejectsModulesThatCollideAfterNaming() {
+        Map<String, String> modules = new LinkedHashMap<>();
+        modules.put("a/fs-tools.js", "");
+        modules.put("b/fsTools.js", "");
+        assertEquals("b/fsTools.js:1: another module is already called FsTools",
+                assertThrows(JsException.class, () -> Main.translateAll(modules)).getMessage());
+    }
+
+    @Test
+    void javaBackendRejectsWhatTheOtherBackendDoes() {
+        assertTrue(assertThrows(JsException.class, () -> Main.translate("t.js", "const a = 1; a = 2;", "T"))
+                .getMessage().contains("Assignment to constant variable 'a'"));
+        assertTrue(assertThrows(JsException.class, () -> Main.translate("t.js", "nope();", "T"))
+                .getMessage().contains("nope is not defined"));
+    }
+
+    @Test
+    void generatedJavaCompilesAgainstTheKernelRuntime() throws IOException {
+        // Every construct the translator handles, so a change that emits invalid Java fails here
+        // instead of in a kernel build.
+        String source = """
+                const answer = 42;
+                let counter = 0;
+                var items = [1, 2, 3], o = { a: 1, "b-c": [answer] };
+                function twice(f, x) { return f(f(x)); }
+                function early(n) { if (n > 1) return "big"; else return "small"; console.log("dead"); }
+                const bump = () => counter++;
+                for (let i = 0; i < 3; i++) { bump(); if (i == 1) continue; items.push(() => i); }
+                for (const x of items) { if (x === 3) break; }
+                while (counter < 10) counter += 2;
+                do { counter--; } while (counter > 8);
+                o.a += 1; o["z"] = o.a++ + --o.a;
+                counter ||= 5; counter ??= 6; counter &&= 7;
+                var t = `${answer}-${counter}`, u = typeof t === "string" ? -answer : ~answer;
+                var nested = function self(n) { return n ? self(n - 1) : this; };
+                console.log(t, u, twice((x) => x * 2, 3), early(2), nested(3), (1, 2));
+                """;
+        Path dir = Files.createTempDirectory("jsgen");
+        Path module = dir.resolve("Sample.java");
+        Files.writeString(module, Main.translate("sample.js", source, "Sample"));
+        List<String> args = new ArrayList<>(List.of("-nowarn", "-d", dir.resolve("classes").toString(), module.toString()));
+        try (Stream<Path> runtime = Files.list(Path.of(System.getProperty("duke.kernelSources"), "duke/js/rt"))) {
+            runtime.map(Path::toString).forEach(args::add);
+        }
+        Files.createDirectories(dir.resolve("classes"));
+        assertEquals(0, ToolProvider.getSystemJavaCompiler().run(null, null, null, args.toArray(String[]::new)),
+                () -> Main.translate("sample.js", source, "Sample"));
     }
 }

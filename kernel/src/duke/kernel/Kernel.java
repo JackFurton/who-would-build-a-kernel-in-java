@@ -54,6 +54,9 @@ public final class Kernel {
 
     private static long reclaimed;
 
+    /** Runs once the kernel is up and before the shell starts. The generated JavaScript entry point sets it. */
+    public static Runnable beforeShell;
+
     /** The entry point: the compiler's _start stub calls this. */
     public static void main() {
         init();
@@ -90,6 +93,10 @@ public final class Kernel {
         Console.println("timer: local APIC timer at " + Timer.apicFrequency() / 1000 + " kHz (calibrated against the HPET), "
                 + Timer.HZ + " Hz tick; slept 100 ms, uptime advanced " + (Timer.uptimeMillis() - before) + " ms");
         Console.println("DUKE-BOOT-OK");
+        JsHost.install();
+        if (beforeShell != null) {
+            beforeShell.run();
+        }
         Shell.run();
     }
 

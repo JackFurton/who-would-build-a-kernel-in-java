@@ -71,7 +71,8 @@ The first build downloads a pinned Limine release into `build/limine`.
 | --- | --- |
 | `compiler/` | `dukec`: class loading, code generation (`MethodCompiler`), x86-64 encoder (`asm/`), ELF writer (`image/`) |
 | `kernel/src/` | The kernel's `java.base`: `java.lang`, `duke.rt` (runtime and intrinsics), `duke.kernel` |
-| `compiler/src/main/java/duke/js/` | `jsc`: a JavaScript-subset compiler that emits x86-64 Linux executables (see [architecture](docs/architecture.md#jsc-the-javascript-compiler)) |
+| `compiler/src/main/java/duke/js/` | `jsc`: a JavaScript-subset compiler, to x86-64 Linux executables or to Java for the kernel (see [architecture](docs/architecture.md#jsc-the-javascript-compiler)) |
+| `kernel/js/` | Kernel code written in JavaScript: shell commands so far |
 | `tests/conformance/` | Differential tests, run on HotSpot and in the kernel |
 | `tests/panics/` | Kernels that must die with a specific panic and backtrace |
 | `tests/kernel/` | Tests that run inside the booted kernel (`make ktest`) |
