@@ -349,6 +349,13 @@ Lexer ─▶ Parser ─▶ Analyzer (scopes, captures, frame slots) ─▶ CodeG
   exit status 1. `console.log` doesn't group arrays of more than six items like node does, and
   object keys keep insertion order even when they look like integers.
 
+**Where this is going.** The goal is kernel code written in JavaScript. The Linux executables
+above are a first step: they prove the front end and give it a test suite. The plan is a second
+back end that emits JVM bytecode, so `dukec` compiles JS into the kernel image alongside the Java.
+JS and Java would then share one heap, GC and calling convention, with the runtime written in
+Java under `kernel/src` and a small hand-written facade for JS to call the kernel. The first
+milestone is a shell command written in JS. That work lands in a separate PR.
+
 `make js-test` runs every program in `tests/js` under node and as a compiled executable and
 compares output and exit status (on anything but x86-64 Linux the executables run in an amd64
 Docker container).
