@@ -10,12 +10,6 @@ public final class Ps2Keyboard {
 
     public static final int VECTOR = 0x21;
 
-    public static final int KEY_LEFT   = 0x101;
-    public static final int KEY_RIGHT  = 0x102;
-    public static final int KEY_HOME   = 0x103;
-    public static final int KEY_END    = 0x104;
-    public static final int KEY_DELETE = 0x105;
-
     private static final int DATA = 0x60;
     private static final int STATUS = 0x64;
     private static final int OUTPUT_FULL = 1;
@@ -73,11 +67,11 @@ public final class Ps2Keyboard {
             }
             if (!released) {
                 int customKey = switch (key) {
-                    case SCAN_LEFT   -> KEY_LEFT;
-                    case SCAN_RIGHT  -> KEY_RIGHT;
-                    case SCAN_HOME   -> KEY_HOME;
-                    case SCAN_END    -> KEY_END;
-                    case SCAN_DELETE -> KEY_DELETE;
+                    case SCAN_LEFT   -> Input.KEY_LEFT;
+                    case SCAN_RIGHT  -> Input.KEY_RIGHT;
+                    case SCAN_HOME   -> Input.KEY_HOME;
+                    case SCAN_END    -> Input.KEY_END;
+                    case SCAN_DELETE -> Input.KEY_DELETE;
                     default          -> 0;
                 };
                 if (customKey != 0) {

@@ -39,39 +39,39 @@ public final class Shell {
             }
 
             switch (c) {
-                case Ps2Keyboard.KEY_LEFT -> {
+                case Input.KEY_LEFT -> {
                     if (pos > 0) {
                         pos--;
                         Console.print("\b");
                     }
                 }
-                case Ps2Keyboard.KEY_RIGHT -> {
+                case Input.KEY_RIGHT -> {
                     if (pos < line.length()) {
                         Console.write(line.charAt(pos));
                         pos++;
                     }
                 }
-                case Ps2Keyboard.KEY_HOME -> {
+                case Input.KEY_HOME -> {
                     while (pos > 0) {
                         pos--;
                         Console.print("\b");
                     }
                 }
-                case Ps2Keyboard.KEY_END -> {
+                case Input.KEY_END -> {
                     while (pos < line.length()) {
                         Console.write(line.charAt(pos));
                         pos++;
                     }
                 }
-                case Ps2Keyboard.KEY_DELETE -> {
+                case Input.KEY_DELETE -> {
                     if (pos < line.length()) {
-                        deleteCharAt(line, pos);
+                        line.deleteCharAt(pos);
                         redrawFrom(line, pos);
                     }
                 }
                 case '\b', 0x7F -> {
                     if (pos > 0) {
-                        deleteCharAt(line, pos - 1);
+                        line.deleteCharAt(pos - 1);
                         pos--;
                         Console.print("\b");
                         redrawFrom(line, pos);
@@ -79,7 +79,7 @@ public final class Shell {
                 }
                 default -> {
                     if (c >= ' ' && c < 0x7F) {
-                        insertChar(line, pos, (char) c);
+                        line.insert(pos, (char) c);
                         pos++;
                         Console.write(c);
                         redrawFrom(line, pos);
@@ -87,21 +87,6 @@ public final class Shell {
                 }
             }
         }
-    }
-
-    private static void insertChar(StringBuilder sb, int index, char c) {
-        String s = sb.toString();
-        sb.setLength(0);
-        sb.append(s.substring(0, index));
-        sb.append(c);
-        sb.append(s.substring(index));
-    }
-
-    private static void deleteCharAt(StringBuilder sb, int index) {
-        String s = sb.toString();
-        sb.setLength(0);
-        sb.append(s.substring(0, index));
-        sb.append(s.substring(index + 1));
     }
 
     private static void redrawFrom(StringBuilder line, int pos) {

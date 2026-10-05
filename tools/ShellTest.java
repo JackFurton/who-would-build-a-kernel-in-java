@@ -53,6 +53,7 @@ public class ShellTest {
             failures += check("ps/2 keyboard", () -> keys(monitor, "u p t i m e ret"), "up ");
             failures += check("ps/2 shift", () -> keys(monitor, "e c h o spc shift-d u k e shift-1 ret"), "Duke!");
             failures += check("mem", () -> type(serial, "mem\n"), "frames: ");
+            failures += check("ps/2 insert", () -> keys(monitor, "e c h o spc d u e left k ret"), "duke");
             failures += framebuffer(serial, monitor);
             failures += check("panic", () -> type(serial, "panic\n"), "PANIC: requested from the shell");
         } finally {
