@@ -51,6 +51,8 @@ final class Node {
 
     record Call(Expr callee, List<Expr> args, int line) implements Expr {}
 
+    record New(Expr callee, List<Expr> args, int line) implements Expr {}
+
     record Member(Expr object, String name, int line) implements Expr {}
 
     record Index(Expr object, Expr index, int line) implements Expr {}
@@ -76,7 +78,8 @@ final class Node {
     /** {@code init} is a VarDecl, an ExprStmt or null. */
     record For(Stmt init, Expr test, Expr update, Stmt body, int line) implements Stmt {}
 
-    record ForOf(String kind, String name, Expr iterable, Stmt body, int line) implements Stmt {}
+    /** {@code for (x of iterable)}, or {@code for (x in object)} when {@code in} is set. */
+    record ForOf(String kind, String name, Expr iterable, Stmt body, int line, boolean in) implements Stmt {}
 
     record Block(List<Stmt> body, int line) implements Stmt {}
 

@@ -47,7 +47,9 @@ public class JsTests {
             }
             ran++;
             Result expected = run(List.of("node", program.toString()));
-            if (BACKENDS.contains("x86")) {
+            // A program whose first line is "// backends: java" uses features only the Java back end has.
+            boolean javaOnly = Files.readAllLines(program).get(0).equals("// backends: java");
+            if (BACKENDS.contains("x86") && !javaOnly) {
                 failures += check(name + " (x86)", expected, () -> runX86(program, name));
             }
             if (BACKENDS.contains("java")) {

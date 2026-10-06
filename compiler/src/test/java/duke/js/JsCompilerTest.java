@@ -56,7 +56,6 @@ class JsCompilerTest {
         return Stream.of(
                 Arguments.of("var x = 1.5;", "floating-point numbers are not supported"),
                 Arguments.of("class A {}", "'class' is not supported yet"),
-                Arguments.of("new Foo();", "'new' is not supported yet"),
                 Arguments.of("try { } catch (e) { }", "'try' is not supported yet"),
                 Arguments.of("var s = \"\u00e9\";", "only ASCII strings"),
                 Arguments.of("var x = 1 +;", "unexpected ';'"),
@@ -68,6 +67,13 @@ class JsCompilerTest {
     @MethodSource("unsupported")
     void explainsUnsupportedSyntax(String source, String message) {
         assertTrue(error(source).contains(message), () -> error(source));
+    }
+
+    @Test
+    void x86BackEndRefusesWhatOnlyTheJavaBackEndHas() {
+        assertTrue(error("function F() {}\nnew F();").contains("'new' is not supported by the x86 back end"));
+        assertTrue(error("for (var k in {}) {}").contains("'for...in' is not supported by the x86 back end"));
+        assertTrue(error("var a = 1 instanceof Object;").contains("unsupported operator instanceof"));
     }
 
     @Test
@@ -134,7 +140,12 @@ class JsCompilerTest {
                 counter ||= 5; counter ??= 6; counter &&= 7;
                 var t = `${answer}-${counter}`, u = typeof t === "string" ? -answer : ~answer;
                 var nested = function self(n) { return n ? self(n - 1) : this; };
-                console.log(t, u, twice((x) => x * 2, 3), early(2), nested(3), (1, 2));
+                function Point(x) { this.x = x; }
+                var p = new Point(1), q = new Point;
+                var has = "x" in p && p instanceof Point && delete p.x && void 0 === undefined;
+                for (var key in o) { if (key === "a") continue; }
+                for (let k2 in items) items[k2]++;
+                console.log(t, u, twice((x) => x * 2, 3), early(2), nested(3), (1, 2), has, q);
                 """;
         Path dir = Files.createTempDirectory("jsgen");
         Path module = dir.resolve("Sample.java");

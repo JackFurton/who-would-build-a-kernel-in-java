@@ -462,9 +462,8 @@ JS and Java share one heap, collector, calling convention and exception system, 
 - **What JS can touch** is whatever `duke.kernel.JsHost` puts in the `Kernel` global: printing, uptime,
   free memory, and `Kernel.command(name, fn)`, which registers a shell command with `Commands`. It's
   deliberately small and explicit. `kernel/js/commands.js` has the first commands (`hello`, `fib`, `meminfo`).
-- **Limits** are the same as for the x86 back end (integers only, no exceptions or classes), plus the
-  kernel's: JS code must stay out of interrupt handlers, since those can't allocate, and the stack it runs
-  on is small, so deep recursion in a command overflows it. The runtime keeps static state (the global
+- **Limits:** what the language covers is in [js-language.md](js-language.md). On the kernel's side, JS code
+  must stay out of interrupt handlers, since those can't allocate, and the stack it runs on is small, so deep recursion in a command overflows it. The runtime keeps static state (the global
   table, the command registry, `console.log`'s formatting depth), so JS runs only on the thread that runs
   the shell; it is not safe to call from several threads yet.
 

@@ -374,6 +374,10 @@ final class Analyzer {
                 visit(c.callee());
                 c.args().forEach(this::visit);
             }
+            case New n -> {
+                visit(n.callee());
+                n.args().forEach(this::visit);
+            }
             case Member m -> visit(m.object());
             case Index i -> {
                 visit(i.object());
