@@ -418,6 +418,13 @@ public final class X64 {
         out.emit8(0xA4);
     }
 
+    /** Copies rcx eight-byte words from [rsi] to [rdi], in the direction the DF flag says. */
+    public void repMovsq() {
+        out.emit8(0xF3);
+        out.emit8(0x48);
+        out.emit8(0xA5);
+    }
+
     /** Stores rax into rcx eight-byte words at [rdi]. */
     public void repStosq() {
         out.emit8(0xF3);

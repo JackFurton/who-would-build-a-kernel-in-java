@@ -1119,7 +1119,7 @@ final class MethodCompiler {
         }
     }
 
-    /** rep movsb, run backwards when the destination overlaps the end of the source. */
+    /** memmove in words, then bytes; neither end may be rounded out into an unmapped page. */
     private void copyMemory() {
         popLong(RCX);
         popLong(RSI);
@@ -1127,14 +1127,35 @@ final class MethodCompiler {
         X64.Label forward = new X64.Label();
         X64.Label done = new X64.Label();
         a.alu(Alu.CMP, true, Reg.RDI, RSI);
+        a.jcc(Cond.E, done);
         a.jcc(Cond.BE, forward);
+        // A higher destination only needs the backward path when the ranges actually overlap.
+        // Subtraction avoids wrapping source + length when comparing unsigned addresses.
+        a.mov(RDX, Reg.RDI);
+        a.alu(Alu.SUB, true, RDX, RSI);
+        a.alu(Alu.CMP, true, RDX, RCX);
+        a.jcc(Cond.AE, forward);
+
         a.lea(RSI, Mem.at(RSI, RCX, 1, -1));
         a.lea(Reg.RDI, Mem.at(Reg.RDI, RCX, 1, -1));
+        a.mov(RDX, RCX);
+        a.aluImm(Alu.AND, true, RCX, 7);
         a.std();
+        // Peel the high tail first; a backward MOVSQ starts at the low byte of each word.
         a.repMovsb();
+        a.aluImm(Alu.SUB, true, RSI, 7);
+        a.aluImm(Alu.SUB, true, Reg.RDI, 7);
+        a.mov(RCX, RDX);
+        a.shiftImm(Shift.SHR, true, RCX, 3);
+        a.repMovsq();
         a.cld();
         a.jmp(done);
         a.bind(forward);
+        a.mov(RDX, RCX);
+        a.shiftImm(Shift.SHR, true, RCX, 3);
+        a.repMovsq();
+        a.mov(RCX, RDX);
+        a.aluImm(Alu.AND, true, RCX, 7);
         a.repMovsb();
         a.bind(done);
     }

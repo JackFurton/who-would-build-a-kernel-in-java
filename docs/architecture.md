@@ -43,6 +43,12 @@ for now: the bump allocator isn't reentrant.
 tracked in a `FrameBitmap` (one bit per page, next-fit search). Frame 0 is never handed out.
 Frames are named by physical address and touched through the higher-half direct map.
 
+Bulk copies use `Magic.copyMemory`: whole words with `rep movsq`, then the exact byte remainder.
+Unaligned addresses work, and neither end is rounded beyond the requested span. Only a destination
+inside the source range needs the backward path; it copies the high byte tail first, then words,
+and clears DF before returning. This is for RAM and linear framebuffers, not device registers.
+`System.arraycopy` checks array types and ranges before reaching the intrinsic.
+
 `KernelAddressSpace.activate()` then builds our own 4-level tables (`PageTable`) and switches
 CR3. The kernel image is mapped from the compiler's section boundaries (`Magic.imageLayout()`):
 text read-only and executable, rodata read-only, data and bss writable, and both NX when the CPU
