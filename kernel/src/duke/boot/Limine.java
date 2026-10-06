@@ -23,6 +23,8 @@ public final class Limine {
     static final long[] EXECUTABLE_ADDRESS = {MAGIC_0, MAGIC_1, 0x71ba76863cc55f63L, 0xb2644a48c516a487L, 0, 0};
     static final long[] FRAMEBUFFER = {MAGIC_0, MAGIC_1, 0x9d5827dcd881dd75L, 0xa3148604f6fab11bL, 0, 0};
     static final long[] RSDP = {MAGIC_0, MAGIC_1, 0xc5e77b6b397e7b43L, 0x27637845accdcf3cL, 0, 0};
+    /** Multiprocessor: Limine starts the other CPUs and parks them; [6] is flags (0: no x2APIC). */
+    static final long[] MP = {MAGIC_0, MAGIC_1, 0x95a67b819a1b857eL, 0xa0b61b723b6a73e0L, 0, 0, 0};
 
     public static final int MEMMAP_USABLE = 0;
     public static final int MEMMAP_RESERVED = 1;
@@ -168,6 +170,15 @@ public final class Limine {
     public static long rsdp() {
         snapshot();
         return rsdp;
+    }
+
+    /**
+     * The other CPUs, as Limine parked them: each a limine_mp_info (processor id u32, LAPIC id u32,
+     * reserved, goto address, extra argument). They live in bootloader-reclaimable memory, so they
+     * are only valid until the kernel reclaims it. 0 when Limine started no other CPUs.
+     */
+    public static long mpResponse() {
+        return MP[RESPONSE];
     }
 
     private static long firstFramebuffer() {

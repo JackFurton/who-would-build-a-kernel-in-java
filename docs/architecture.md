@@ -94,7 +94,7 @@ Java objects still come from the fixed bump arena in `.bss` (see Objects below).
 checksum. It parses the MADT (CPUs, I/O APICs, ISA interrupt overrides) and the HPET's address.
 Device registers live in reserved physical memory outside the direct map, so
 `KernelAddressSpace.mapDevice` maps them uncached into their own PML4 slot. QEMU runs with
-`-smp 2`, so the CPU count is a real check.
+`-smp 4`, so the CPU count is a real check.
 
 Time comes from the local APIC timer. `Pic.disable()` remaps the legacy PICs to vectors
 0xE0-0xEF and masks them, so a spurious IRQ can't land on a CPU exception vector. The APIC timer
@@ -323,6 +323,18 @@ that GS points at (`IA32_GS_BASE`), so every CPU checks against its own running 
 compiler addresses them as `gs:[offset]`, the same cost as the RIP-relative globals they replaced
 plus a prefix byte. `_start` points GS at the boot CPU's block before any Java runs, and
 `Magic.loadSegments` leaves GS alone, since loading a selector into it would zero the base.
+
+### Other CPUs
+
+`Smp.start` brings up the application processors through Limine's MP request. Limine starts them
+and parks each one spinning on its `limine_mp_info`, on Limine's page tables and stacks in
+bootloader-reclaimable memory, so this has to happen before the kernel reclaims that memory, and
+`Kernel.init` now reclaims last. For each CPU the boot CPU prepares a block (its GS), a stack from
+`KernelStacks`, and a GDT, TSS and double-fault stack, then writes the block into the info's extra
+argument and `Magic.apEntry` into its goto address. The entry stub reads CR3 and the stack from
+the block (image data, so Limine's tables map it too), moves onto them, points GS at the block and
+calls `Smp.apMain`, which loads the CPU's GDT and the shared IDT, enables its local APIC, checks in
+and halts. Nothing runs on those CPUs yet (#93), but the boot log shows each one online.
 
 An uncaught exception panics with `uncaught <toString>`, its stack trace and its causes.
 `Throwable` captures return addresses at construction. The compiler flags Throwable constructors

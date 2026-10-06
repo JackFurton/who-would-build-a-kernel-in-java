@@ -37,8 +37,6 @@ public final class Kernel {
         KernelAddressSpace.activate();
         KernelHeap.init();
         FramebufferConsole.init();
-        // After paging and the GDT: until here the CPU could still be reading Limine's.
-        reclaimed = PhysicalMemory.reclaimBootloaderMemory();
         Acpi.init();
         Madt.init();
         Hpet.init();
@@ -46,6 +44,11 @@ public final class Kernel {
         LocalApic.init();
         Timer.init();
         Scheduler.init();
+        // Not before: the boot CPU's old GDT and page tables, and the other CPUs while Limine had
+        // them parked, all lived in this memory. A CPU that never checked in might still be there.
+        if (Smp.start()) {
+            reclaimed = PhysicalMemory.reclaimBootloaderMemory();
+        }
         IoApic.init();
         Ps2Keyboard.init();
         Serial.enableInput();
@@ -83,6 +86,11 @@ public final class Kernel {
         Console.println("gc: allocated 512 MiB on a 256 MiB machine; " + Heap.collections() + " collections, heap "
                 + (Heap.committed() >> 20) + " MiB committed");
         printPlatform();
+        StringBuilder apics = new StringBuilder();
+        for (int i = 0; i < Smp.cpuCount(); i++) {
+            apics.append(i == 0 ? "" : ", ").append(Smp.apicId(i)).append(Smp.online(i) ? "" : " (no response)");
+        }
+        Console.println("smp: " + Smp.onlineCount() + " of " + Smp.cpuCount() + " CPUs online (apic " + apics + ")");
         Console.println("framebuffer: " + Limine.framebufferWidth() + "x" + Limine.framebufferHeight() + ", "
                 + FramebufferConsole.columns() + "x" + FramebufferConsole.rows() + " text");
         long before = Timer.uptimeMillis();

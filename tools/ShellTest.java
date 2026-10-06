@@ -54,10 +54,20 @@ public class ShellTest {
         int failures = 0;
         try {
             if (!await("duke> ", 0)) {
+                // A triple fault exits silently under -no-reboot, which looks just like a hang.
+                String state = qemu.isAlive() ? "still running" : "exited with status " + qemu.exitValue();
+                System.out.println("shell-test: " + Runtime.getRuntime().availableProcessors() + " cores; busiest processes:");
+                new ProcessBuilder("sh", "-c", "ps -eo pid,pcpu,etime,args --sort=-pcpu 2>/dev/null | head -12 || ps -Ao pid,pcpu,etime,command -r | head -12")
+                        .inheritIO().start().waitFor();
+                if (qemu.isAlive()) {
+                    System.out.println("shell-test: where each CPU is (look the RIPs up in build/kernel.map):");
+                    System.out.println(query(monitor, "info registers -a").indent(4));
+                }
                 qemu.destroy();
                 qemu.waitFor(10, TimeUnit.SECONDS);
                 Files.writeString(OUT.resolve("serial.log"), output.toString());
-                System.out.println("shell-test: the kernel never reached its prompt; QEMU said:\n" + clean(output.toString()).indent(4));
+                System.out.println("shell-test: the kernel never reached its prompt (QEMU " + state + "); QEMU said:\n"
+                        + clean(output.toString()).indent(4));
                 System.exit(1);
             }
             failures += check("serial", () -> type(serial, "echo hello over serial\n"), "hello over serial");
@@ -151,6 +161,22 @@ public class ShellTest {
             channel.connect(UnixDomainSocketAddress.of(monitor));
             channel.write(ByteBuffer.wrap((line + "\n").getBytes(StandardCharsets.US_ASCII)));
             Thread.sleep(300);
+        }
+    }
+
+    /** Sends a monitor command and returns what QEMU answered. */
+    static String query(Path monitor, String line) throws Exception {
+        try (SocketChannel channel = SocketChannel.open(StandardProtocolFamily.UNIX)) {
+            channel.connect(UnixDomainSocketAddress.of(monitor));
+            channel.write(ByteBuffer.wrap((line + "\n").getBytes(StandardCharsets.US_ASCII)));
+            Thread.sleep(1000);
+            channel.configureBlocking(false);
+            StringBuilder answer = new StringBuilder();
+            ByteBuffer buffer = ByteBuffer.allocate(1 << 16);
+            for (int n; (n = channel.read(buffer)) > 0; buffer.clear()) {
+                answer.append(new String(buffer.array(), 0, n, StandardCharsets.US_ASCII));
+            }
+            return clean(answer.toString());
         }
     }
 

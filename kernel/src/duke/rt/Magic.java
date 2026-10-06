@@ -99,6 +99,13 @@ public final class Magic {
      */
     public static native void switchStack(long saveAt, long rsp);
 
+    /**
+     * Address of the stub Limine starts each application processor in: it moves the CPU onto the
+     * CR3 and stack in its block (Limine's mp_info extra argument), points GS at the block and calls
+     * duke.kernel.Smp.apMain.
+     */
+    public static native long apEntry();
+
     /** Address of duke.kernel.Scheduler.threadMain, where a new thread's first switch lands. */
     public static native long threadEntry();
 
