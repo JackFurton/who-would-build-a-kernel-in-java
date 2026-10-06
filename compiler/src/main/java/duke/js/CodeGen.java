@@ -593,8 +593,8 @@ final class CodeGen {
                 callRuntime("__newObject", 0);
                 asm.push(RAX);
                 for (Property p : o.properties()) {
-                    if (p.key() == null) {
-                        throw error(o.line(), "computed keys and spread in object literals are not supported by the x86 back end");
+                    if (p.key() == null || p.kind() != 'i') {
+                        throw error(o.line(), "computed keys, spread and accessors in object literals are not supported by the x86 back end");
                     }
                     asm.push(Mem.at(RSP));
                     loadString(p.key());

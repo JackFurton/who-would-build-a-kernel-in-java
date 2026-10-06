@@ -85,7 +85,15 @@ final class Inspect {
         lastDepth = depth;
         ArrayList<String> parts = new ArrayList<>();
         for (String key : keys) {
-            parts.add((isIdentifier(key) ? key : quote(key)) + ": " + format(o.getOwn(key), depth + 1));
+            Object raw = o.getOwnRaw(key);
+            String shown;
+            if (raw instanceof JsObject.Accessor) {
+                JsObject.Accessor a = (JsObject.Accessor) raw;
+                shown = a.getter != null && a.setter != null ? "[Getter/Setter]" : a.getter != null ? "[Getter]" : "[Setter]";
+            } else {
+                shown = format(raw, depth + 1);
+            }
+            parts.add((isIdentifier(key) ? key : quote(key)) + ": " + shown);
         }
         return combine(parts, open, close, depth);
     }

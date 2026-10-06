@@ -115,13 +115,41 @@ public final class JS {
         return result;
     }
 
-    /** {@code {a: 1, ...other, b: 2}}: members in order, each a key and a value or a lone spread of an object. */
+    /** A getter or setter written in an object literal, among the parts handed to {@link #objectSpread}. */
+    private static final class Accessing {
+        final Object key;
+        final JsFunction function;
+        final boolean getter;
+
+        Accessing(Object key, JsFunction function, boolean getter) {
+            this.key = key;
+            this.function = function;
+            this.getter = getter;
+        }
+    }
+
+    public static Object getter(Object key, Object function) {
+        return new Accessing(key, (JsFunction) function, true);
+    }
+
+    public static Object setter(Object key, Object function) {
+        return new Accessing(key, (JsFunction) function, false);
+    }
+
+    /**
+     * {@code {a: 1, ...other, b: 2, get c() {...}}}: members in order, each a key and a value, a lone spread of an
+     * object, or a lone getter or setter.
+     */
     public static Object objectSpread(Object... parts) {
         JsObject o = new JsObject();
         o.proto = Globals.objectPrototype();
         for (int i = 0; i < parts.length; ) {
             if (parts[i] instanceof Spreading) {
                 copyOwn(o, ((Spreading) parts[i]).value);
+                i++;
+            } else if (parts[i] instanceof Accessing) {
+                Accessing a = (Accessing) parts[i];
+                o.defineAccessor(keyString(a.key), a.getter ? a.function : null, a.getter ? null : a.function);
                 i++;
             } else {
                 o.set(keyString(parts[i]), parts[i + 1]);
@@ -561,7 +589,7 @@ public final class JS {
 
     public static Object set(Object o, Object key, Object value) {
         if (o instanceof JsObject) {
-            ((JsObject) o).set(keyString(key), value);
+            ((JsObject) o).assign(keyString(key), value);
         } else if (o instanceof JsArray) {
             JsArray array = (JsArray) o;
             if (key instanceof Long && ((Long) key).longValue() < 0) {
@@ -578,7 +606,7 @@ public final class JS {
             if ("prototype".equals(key) && value instanceof JsObject) {
                 f.setPrototype((JsObject) value);
             } else {
-                f.props().set(keyString(key), value);
+                f.props().assign(keyString(key), value);
             }
         } else if (nullish(o)) {
             throw new JsError("TypeError: Cannot set properties of " + str(o) + " (setting '" + str(key) + "')");
@@ -688,7 +716,10 @@ public final class JS {
     /** {@code delete o[key]}: true unless the property can't be removed. */
     public static Object delete(Object o, Object key) {
         if (o instanceof JsObject) {
-            ((JsObject) o).remove(keyString(key));
+            JsObject object = (JsObject) o;
+            if (!object.remove(keyString(key)) && object.hasOwn(keyString(key))) {
+                throw new JsError("TypeError: Cannot delete property '" + keyString(key) + "' of #<Object>");
+            }
         } else if (o instanceof JsArray && key instanceof Long) {
             // Arrays have no holes here, so a deleted element reads as undefined.
             JsArray array = (JsArray) o;
