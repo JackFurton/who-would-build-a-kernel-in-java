@@ -45,6 +45,15 @@ final class JavaGen {
     private final Map<Var, String> copies = new IdentityHashMap<>();
     /** One entry per enclosing loop: the label to break out of the body for {@code continue}, or null. */
     private final Deque<String> continueLabels = new ArrayDeque<>();
+    /** Labels in scope, innermost first, with the Java statements that break out of or continue each one. */
+    private final Deque<Target> targets = new ArrayDeque<>();
+    /** Labels written directly before the loop that is about to be generated. */
+    private final List<String> pendingLabels = new ArrayList<>();
+
+    private record Target(String name, String breakStatement, String continueStatement) {}
+
+    /** The Java label put on a loop that has JavaScript labels, and how many targets it registered. */
+    private record Loop(String javaLabel, int registered) {}
     private StringBuilder out = new StringBuilder();
     private List<String> temps = new ArrayList<>();
     private FuncInfo fn;
@@ -216,6 +225,8 @@ final class JavaGen {
         List<String> savedTemps = temps;
         FuncInfo savedFn = fn;
         Deque<String> savedLoops = new ArrayDeque<>(continueLabels);
+        Deque<Target> savedTargets = new ArrayDeque<>(targets);
+        targets.clear();
         out = new StringBuilder();
         temps = new ArrayList<>();
         fn = info;
@@ -248,6 +259,8 @@ final class JavaGen {
         fn = savedFn;
         continueLabels.clear();
         continueLabels.addAll(savedLoops);
+        targets.clear();
+        targets.addAll(savedTargets);
         return (f.arrow() ? "JS.arrow(" : "JS.fn(") + quote(name == null ? "" : name) + ", (" + callee + ", " + self + ", " + args
                 + ") -> {\n" + body + "    ".repeat(indent) + "})";
     }
@@ -277,19 +290,25 @@ final class JavaGen {
                 line("}");
             }
             case While w -> {
-                line("while (" + cond(w.test()) + ") {");
+                Loop loop = enterLoop(null);
+                line(prefix(loop) + "while (" + cond(w.test()) + ") {");
                 continueLabels.push("");
                 body(w.body());
                 continueLabels.pop();
                 line("}");
+                exitLoop(loop);
             }
             case DoWhile w -> {
-                line("do {");
+                Loop loop = enterLoop(null);
+                line(prefix(loop) + "do {");
                 continueLabels.push("");
                 body(w.body());
                 continueLabels.pop();
                 line("} while (" + cond(w.test()) + ");");
+                exitLoop(loop);
             }
+            case Labeled l -> genLabeled(l);
+            case Switch sw -> genSwitch(sw);
             case For f -> genFor(f);
             case ForOf f -> genForOf(f);
             case Block b -> {
@@ -308,10 +327,18 @@ final class JavaGen {
             }
             case Throw t -> line("if (JS.T) throw JS.thrown(" + expr(t.value()) + ");");
             case Try t -> genTry(t);
-            case Break b -> line("if (JS.T) break;");
+            case Break b -> line("if (JS.T) " + (b.label() == null ? "break;" : target(b.label(), b.line()).breakStatement()));
             case Continue c -> {
-                String label = continueLabels.peek();
-                line(label == null || label.isEmpty() ? "if (JS.T) continue;" : "if (JS.T) break " + label + ";");
+                if (c.label() != null) {
+                    String jump = target(c.label(), c.line()).continueStatement();
+                    if (jump == null) {
+                        throw error(c.line(), "illegal continue: '" + c.label() + "' does not label a loop");
+                    }
+                    line("if (JS.T) " + jump);
+                } else {
+                    String label = continueLabels.peek();
+                    line(label == null || label.isEmpty() ? "if (JS.T) continue;" : "if (JS.T) break " + label + ";");
+                }
             }
             case FunctionDecl d -> { }
             case Empty e -> { }
@@ -370,7 +397,9 @@ final class JavaGen {
         if (f.init() != null) {
             stmt(f.init());
         }
-        line("for (;;) {");
+        String label = "body" + ++labels;
+        Loop loop = enterLoop("break " + label + ";");
+        line(prefix(loop) + "for (;;) {");
         indent++;
         if (f.test() != null) {
             line("if (!(" + cond(f.test()) + ")) break;");
@@ -389,7 +418,6 @@ final class JavaGen {
             line("final Object[] " + copy + " = { " + name(v) + "[0] };");
             copies.put(v, copy);
         }
-        String label = "body" + ++labels;
         line(label + ": {");
         continueLabels.push(label);
         body(f.body());
@@ -404,6 +432,7 @@ final class JavaGen {
         }
         indent--;
         line("}");
+        exitLoop(loop);
         indent--;
         line("}");
     }
@@ -439,7 +468,8 @@ final class JavaGen {
         indent++;
         line("final Object " + items + " = " + (f.in() ? "JS.forInKeys(" + expr(f.iterable()) + ")" : expr(f.iterable()))
                 + ";");
-        line("for (long " + index + " = 0; " + index + " < JS.length(" + items + "); " + index + "++) {");
+        Loop loop = enterLoop(null);
+        line(prefix(loop) + "for (long " + index + " = 0; " + index + " < JS.length(" + items + "); " + index + "++) {");
         indent++;
         String element = "JS.getIndex(" + items + ", " + index + ")";
         if (scope.vars.containsKey(f.name()) && !v.global) {
@@ -450,6 +480,100 @@ final class JavaGen {
         continueLabels.push("");
         body(f.body());
         continueLabels.pop();
+        indent--;
+        line("}");
+        exitLoop(loop);
+        indent--;
+        line("}");
+    }
+
+    /** Takes the labels waiting for this loop and registers them; null continue statement means "continue javaLabel". */
+    private Loop enterLoop(String continueStatement) {
+        if (pendingLabels.isEmpty()) {
+            return new Loop(null, 0);
+        }
+        String javaLabel = "L" + ++uid;
+        for (String name : pendingLabels) {
+            targets.push(new Target(name, "break " + javaLabel + ";",
+                    continueStatement == null ? "continue " + javaLabel + ";" : continueStatement));
+        }
+        int count = pendingLabels.size();
+        pendingLabels.clear();
+        return new Loop(javaLabel, count);
+    }
+
+    private void exitLoop(Loop loop) {
+        for (int i = 0; i < loop.registered(); i++) {
+            targets.pop();
+        }
+    }
+
+    private static String prefix(Loop loop) {
+        return loop.javaLabel() == null ? "" : loop.javaLabel() + ": ";
+    }
+
+    private Target target(String label, int line) {
+        for (Target t : targets) {
+            if (t.name().equals(label)) {
+                return t;
+            }
+        }
+        throw error(line, "undefined label '" + label + "'");
+    }
+
+    private void genLabeled(Labeled l) {
+        Stmt inner = l.body();
+        if (inner instanceof While || inner instanceof DoWhile || inner instanceof For || inner instanceof ForOf
+                || inner instanceof Labeled) {
+            pendingLabels.add(l.label());
+            stmt(inner);
+            return;
+        }
+        // Any other statement can only be left with a labeled break, which Java has for blocks.
+        String javaLabel = "L" + ++uid;
+        line(javaLabel + ": {");
+        indent++;
+        targets.push(new Target(l.label(), "break " + javaLabel + ";", null));
+        stmt(inner);
+        targets.pop();
+        indent--;
+        line("}");
+    }
+
+    /**
+     * A switch becomes: pick the matching clause's index by testing the cases in order (the default last,
+     * wherever it was written), then a Java switch on that index, whose clauses fall through as JavaScript's do.
+     */
+    private void genSwitch(Switch sw) {
+        Scope scope = an.scopes.get(sw);
+        String value = "d" + ++uid;
+        String chosen = "sw" + uid;
+        line("{");
+        indent++;
+        declareLocals(scope);
+        hoist(scope);
+        line("final Object " + value + " = " + expr(sw.discriminant()) + ";");
+        line("int " + chosen + " = -1;");
+        int defaultIndex = -1;
+        boolean first = true;
+        for (int i = 0; i < sw.cases().size(); i++) {
+            Case c = sw.cases().get(i);
+            if (c.test() == null) {
+                defaultIndex = i;
+                continue;
+            }
+            line((first ? "if" : "else if") + " (JS.seq(" + value + ", " + expr(c.test()) + ")) " + chosen + " = " + i + ";");
+            first = false;
+        }
+        line((first ? "" : "else ") + chosen + " = " + defaultIndex + ";");
+        line("switch (" + chosen + ") {");
+        indent++;
+        for (int i = 0; i < sw.cases().size(); i++) {
+            line("case " + i + ":");
+            indent++;
+            sw.cases().get(i).body().forEach(this::stmt);
+            indent--;
+        }
         indent--;
         line("}");
         indent--;
@@ -626,6 +750,23 @@ final class JavaGen {
                     default -> "JS.call(" + expr(c.callee()) + tail + ")";
                 };
             }
+            case Chain c -> {
+                Expr base = c.base();
+                List<ChainOp> ops = c.ops();
+                if (ops.get(0).kind() == 'c' && (base instanceof Member || base instanceof Index)) {
+                    // In o.f?.() the call is on a property, so o is its this: make the property the first step.
+                    ops = new ArrayList<>(ops);
+                    if (base instanceof Member m) {
+                        ops.add(0, new ChainOp('m', m.name(), null, null, false));
+                        base = m.object();
+                    } else {
+                        Index ix = (Index) base;
+                        ops.add(0, new ChainOp('i', null, ix.index(), null, false));
+                        base = ix.object();
+                    }
+                }
+                return chain(expr(base), ops, 0);
+            }
             case New n -> {
                 String args = list(n.args());
                 return "JS.construct(" + expr(n.callee()) + (args.isEmpty() ? "" : ", " + args) + ")";
@@ -644,6 +785,49 @@ final class JavaGen {
                 return result;
             }
         }
+    }
+
+    /**
+     * Applies chain steps to {@code current}. A step written with {@code ?.} tests what it is applied to and, if that
+     * is null or undefined, makes the whole rest of the chain undefined, so the remaining steps go inside the conditional.
+     * A call that follows a property step is one operation, so the property's object becomes {@code this}.
+     */
+    private String chain(String current, List<ChainOp> ops, int i) {
+        if (i == ops.size()) {
+            return current;
+        }
+        ChainOp op = ops.get(i);
+        boolean method = op.kind() != 'c' && i + 1 < ops.size() && ops.get(i + 1).kind() == 'c';
+        if (method) {
+            ChainOp call = ops.get(i + 1);
+            String key = op.kind() == 'm' ? quote(op.name()) : expr(op.index());
+            String args = list(call.args());
+            String tail = args.isEmpty() ? "" : ", " + args;
+            String object = newTemp();
+            String function = newTemp();
+            String receiver = op.optional() ? object : "(" + object + " = " + current + ")";
+            String invoke = call.optional()
+                    ? "(JS.nullish(" + function + " = JS.get(" + receiver + ", " + key + ")) ? JS.U : "
+                            + chain("JS.callMethod(" + function + ", " + object + tail + ")", ops, i + 2) + ")"
+                    : chain("JS.invoke(" + receiver + ", " + key + tail + ")", ops, i + 2);
+            if (!op.optional()) {
+                return invoke;
+            }
+            return "(JS.nullish(" + object + " = " + current + ") ? JS.U : " + invoke + ")";
+        }
+        String step;
+        String subject = op.optional() ? newTemp() : null;
+        String operand = subject != null ? subject : current;
+        switch (op.kind()) {
+            case 'm' -> step = "JS.get(" + operand + ", " + quote(op.name()) + ")";
+            case 'i' -> step = "JS.get(" + operand + ", " + expr(op.index()) + ")";
+            default -> {
+                String args = list(op.args());
+                step = "JS.call(" + operand + (args.isEmpty() ? "" : ", " + args) + ")";
+            }
+        }
+        String rest = chain(step, ops, i + 1);
+        return subject == null ? rest : "(JS.nullish(" + subject + " = " + current + ") ? JS.U : " + rest + ")";
     }
 
     private String list(List<Expr> exprs) {

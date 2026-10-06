@@ -59,6 +59,15 @@ final class Node {
 
     record Sequence(List<Expr> exprs, int line) implements Expr {}
 
+    /**
+     * One step of a property or call chain. {@code kind} is 'm' (member: {@code name}), 'i' (index: {@code index})
+     * or 'c' (call: {@code args}); {@code optional} is set when the step was written with {@code ?.}.
+     */
+    record ChainOp(char kind, String name, Expr index, List<Expr> args, boolean optional) {}
+
+    /** A chain containing at least one {@code ?.}: when one of those meets null or undefined the whole chain is undefined. */
+    record Chain(Expr base, List<ChainOp> ops, int line) implements Expr {}
+
     sealed interface Stmt {
         int line();
     }
@@ -90,9 +99,17 @@ final class Node {
     /** {@code param} is null for {@code catch {}}; {@code handler} or {@code finalizer} may be null, but not both. */
     record Try(Block block, String param, Block handler, Block finalizer, int line) implements Stmt {}
 
-    record Break(int line) implements Stmt {}
+    /** {@code label} is null for a plain break or continue. */
+    record Break(String label, int line) implements Stmt {}
 
-    record Continue(int line) implements Stmt {}
+    record Continue(String label, int line) implements Stmt {}
+
+    record Labeled(String label, Stmt body, int line) implements Stmt {}
+
+    /** {@code test} is null for {@code default}. */
+    record Case(Expr test, List<Stmt> body) {}
+
+    record Switch(Expr discriminant, List<Case> cases, int line) implements Stmt {}
 
     record FunctionDecl(Function function, int line) implements Stmt {}
 

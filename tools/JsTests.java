@@ -86,9 +86,19 @@ public class JsTests {
         return compiled.exit() != 0 ? compiled : run(executable(exe));
     }
 
-    /** The module class generated for {@code name.js}: first letter upper-cased, as jsc does. */
+    /** The module class jsc generates for {@code name.js}: words split on punctuation, each capitalized. */
     static String moduleClass(String name) {
-        return Character.toUpperCase(name.charAt(0)) + name.substring(1);
+        StringBuilder sb = new StringBuilder();
+        boolean upper = true;
+        for (char c : name.toCharArray()) {
+            if (Character.isLetterOrDigit(c)) {
+                sb.append(upper ? Character.toUpperCase(c) : c);
+                upper = false;
+            } else {
+                upper = true;
+            }
+        }
+        return sb.toString();
     }
 
     static final String HOST_MAIN = """
