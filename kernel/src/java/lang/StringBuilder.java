@@ -117,9 +117,7 @@ public final class StringBuilder {
             throw new IllegalArgumentException("non-Latin-1 char " + (int) c + " (Strings are Latin-1 only for now)");
         }
         ensureCapacity(count + 1);
-        for (int i = count; i > index; i--) {
-            value[i] = value[i - 1];
-        }
+        System.arraycopy(value, index, value, index + 1, count - index);
         value[index] = (byte) c;
         count++;
         return this;
@@ -127,9 +125,7 @@ public final class StringBuilder {
 
     public StringBuilder deleteCharAt(int index) {
         checkIndex(index);
-        for (int i = index; i < count - 1; i++) {
-            value[i] = value[i + 1];
-        }
+        System.arraycopy(value, index + 1, value, index, count - index - 1);
         value[--count] = 0;
         return this;
     }
