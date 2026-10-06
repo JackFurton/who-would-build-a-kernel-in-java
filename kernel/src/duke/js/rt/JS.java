@@ -44,8 +44,14 @@ public final class JS {
         return b ? Boolean.TRUE : Boolean.FALSE;
     }
 
+    /** A function declaration or expression, which {@code new} can use. */
     public static JsFunction fn(String name, JsFunction.Body body) {
-        return new JsFunction(name, body);
+        return new JsFunction(name, body, true);
+    }
+
+    /** An arrow function: no {@code prototype}, and {@code new} is a TypeError. */
+    public static JsFunction arrow(String name, JsFunction.Body body) {
+        return new JsFunction(name, body, false);
     }
 
     public static Object array(Object... elements) {
@@ -55,6 +61,7 @@ public final class JS {
     /** {@code object("a", 1, "b", 2)} builds {@code {a: 1, b: 2}}. */
     public static Object object(Object... keysAndValues) {
         JsObject o = new JsObject();
+        o.proto = Globals.objectPrototype();
         for (int i = 0; i < keysAndValues.length; i += 2) {
             o.set((String) keysAndValues[i], keysAndValues[i + 1]);
         }
@@ -117,6 +124,13 @@ public final class JS {
         }
         if (v instanceof JsFunction) {
             return "function () { [native code] }";
+        }
+        Object toString = ((JsObject) v).get("toString");
+        if (toString instanceof JsFunction) {
+            Object text = ((JsFunction) toString).call(v, new Object[0]);
+            if (text instanceof String) {
+                return (String) text;
+            }
         }
         return "[object Object]";
     }
@@ -363,8 +377,8 @@ public final class JS {
         }
         if (o instanceof JsArray) {
             JsArray array = (JsArray) o;
-            if (key instanceof Long) {
-                return array.get((int) ((Long) key).longValue());
+            if (indexOf(key) >= 0 || key instanceof Long) {
+                return array.get((int) indexOf(key));
             }
             if ("length".equals(key)) {
                 return Long.valueOf(array.length());
@@ -373,8 +387,8 @@ public final class JS {
         }
         if (o instanceof String) {
             String s = (String) o;
-            if (key instanceof Long) {
-                long i = ((Long) key).longValue();
+            if (indexOf(key) >= 0 || key instanceof Long) {
+                long i = indexOf(key);
                 return i >= 0 && i < s.length() ? s.substring((int) i, (int) i + 1) : null;
             }
             if ("length".equals(key)) {
@@ -383,8 +397,7 @@ public final class JS {
             return Builtins.method(o, keyString(key));
         }
         if (o instanceof JsFunction) {
-            JsFunction f = (JsFunction) o;
-            return f.hasProps() ? f.props().get(keyString(key)) : null;
+            return Builtins.functionProperty((JsFunction) o, keyString(key));
         }
         if (o instanceof Long || o instanceof Boolean) {
             return null;
@@ -401,23 +414,38 @@ public final class JS {
             ((JsObject) o).set(keyString(key), value);
         } else if (o instanceof JsArray) {
             JsArray array = (JsArray) o;
-            if (key instanceof Long) {
-                long i = ((Long) key).longValue();
-                if (i < 0) {
-                    throw new JsError("RangeError: negative array indexes are not supported");
-                }
-                array.set((int) i, value);
+            if (key instanceof Long && ((Long) key).longValue() < 0) {
+                throw new JsError("RangeError: negative array indexes are not supported");
+            } else if (indexOf(key) >= 0) {
+                array.set((int) indexOf(key), value);
             } else if ("length".equals(key)) {
                 array.setLength((int) toNumber(value));
             } else {
                 throw new JsError("TypeError: arrays cannot have a property named '" + str(key) + "' yet");
             }
         } else if (o instanceof JsFunction) {
-            ((JsFunction) o).props().set(keyString(key), value);
+            JsFunction f = (JsFunction) o;
+            if ("prototype".equals(key) && value instanceof JsObject) {
+                f.setPrototype((JsObject) value);
+            } else {
+                f.props().set(keyString(key), value);
+            }
         } else if (nullish(o)) {
             throw new JsError("TypeError: Cannot set properties of " + str(o) + " (setting '" + str(key) + "')");
         }
         return value;
+    }
+
+    /** The array index {@code key} names (a number, or a string like "3"), or -1 if it isn't one. */
+    static long indexOf(Object key) {
+        if (key instanceof Long) {
+            long i = ((Long) key).longValue();
+            return i >= 0 ? i : -1;
+        }
+        if (key instanceof String && JsObject.isIndex((String) key)) {
+            return Long.parseLong((String) key);
+        }
+        return -1;
     }
 
     static String keyString(Object key) {
@@ -434,6 +462,101 @@ public final class JS {
         throw new JsError("TypeError: " + typeof(o) + " is not iterable");
     }
 
+    /** {@code new f(...args)}. */
+    public static Object construct(Object f, Object... args) {
+        if (!(f instanceof JsFunction)) {
+            throw new JsError("TypeError: " + str(f) + " is not a constructor");
+        }
+        return ((JsFunction) f).construct(args);
+    }
+
+    /** {@code a instanceof f}: is f.prototype on a's prototype chain? */
+    public static boolean instanceOf(Object a, Object f) {
+        if (!(f instanceof JsFunction)) {
+            throw new JsError("TypeError: Right-hand side of 'instanceof' is not callable");
+        }
+        JsFunction function = (JsFunction) f;
+        JsObject target = function.prototype();
+        if (a instanceof JsObject) {
+            for (JsObject p = ((JsObject) a).proto; p != null; p = p.proto) {
+                if (p == target) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        if (a instanceof JsArray) {
+            return f == Globals.lookup("Array") || f == Globals.lookup("Object");
+        }
+        if (a instanceof JsFunction) {
+            return f == Globals.lookup("Function") || f == Globals.lookup("Object");
+        }
+        return false;
+    }
+
+    /** {@code key in o}. */
+    public static boolean in(Object key, Object o) {
+        if (o instanceof JsObject) {
+            return ((JsObject) o).has(keyString(key));
+        }
+        if (o instanceof JsArray) {
+            JsArray array = (JsArray) o;
+            long i = indexOf(key);
+            return i >= 0 ? i < array.length() : "length".equals(key);
+        }
+        if (o instanceof JsFunction) {
+            return Builtins.functionProperty((JsFunction) o, keyString(key)) != null
+                    || "name".equals(key) || "prototype".equals(key);
+        }
+        throw new JsError("TypeError: Cannot use 'in' operator to search for '" + str(key) + "' in " + str(o));
+    }
+
+    /** {@code delete o[key]}: true unless the property can't be removed. */
+    public static Object delete(Object o, Object key) {
+        if (o instanceof JsObject) {
+            ((JsObject) o).remove(keyString(key));
+        } else if (o instanceof JsArray && key instanceof Long) {
+            // Arrays have no holes here, so a deleted element reads as undefined.
+            JsArray array = (JsArray) o;
+            int i = (int) ((Long) key).longValue();
+            if (i >= 0 && i < array.length()) {
+                array.set(i, null);
+            }
+        } else if (o instanceof JsFunction) {
+            ((JsFunction) o).props().remove(keyString(key));
+        } else if (nullish(o)) {
+            throw new JsError("TypeError: Cannot convert undefined or null to object");
+        }
+        return Boolean.TRUE;
+    }
+
+    /** The keys {@code for (k in o)} visits: own enumerable ones, then inherited ones not already seen. */
+    public static Object forInKeys(Object o) {
+        JsArray out = new JsArray();
+        if (o instanceof JsObject) {
+            for (JsObject p = (JsObject) o; p != null; p = p.proto) {
+                for (String key : p.keys()) {
+                    boolean seen = false;
+                    for (int i = 0; i < out.length(); i++) {
+                        seen = seen || key.equals(out.get(i));
+                    }
+                    if (!seen) {
+                        out.add(key);
+                    }
+                }
+            }
+        } else if (o instanceof JsArray || o instanceof String) {
+            for (long i = 0; i < length(o); i++) {
+                out.add(Long.toString(i));
+            }
+        } else if (o instanceof JsFunction && ((JsFunction) o).hasProps()) {
+            for (String key : ((JsFunction) o).props().keys()) {
+                out.add(key);
+            }
+        }
+        return out;
+    }
+
     /** Calls {@code f} with {@code this} undefined. */
     public static Object call(Object f, Object... args) {
         return callWith(f, null, args);
@@ -441,7 +564,7 @@ public final class JS {
 
     /** Calls {@code o[key](...args)} with {@code this} bound to {@code o}. */
     public static Object invoke(Object o, Object key, Object... args) {
-        if (key instanceof String && (o instanceof JsArray || o instanceof String)) {
+        if (key instanceof String && (o instanceof JsArray || o instanceof String || o instanceof JsFunction)) {
             Object result = Builtins.invoke(o, (String) key, args);
             if (result != Builtins.NO_METHOD) {
                 return result;

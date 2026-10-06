@@ -13,6 +13,7 @@ final class Parser {
             Map.entry("??", 1), Map.entry("||", 2), Map.entry("&&", 3), Map.entry("|", 4), Map.entry("^", 5),
             Map.entry("&", 6), Map.entry("==", 7), Map.entry("!=", 7), Map.entry("===", 7), Map.entry("!==", 7),
             Map.entry("<", 8), Map.entry(">", 8), Map.entry("<=", 8), Map.entry(">=", 8),
+            Map.entry("instanceof", 8), Map.entry("in", 8),
             Map.entry("<<", 9), Map.entry(">>", 9), Map.entry(">>>", 9),
             Map.entry("+", 10), Map.entry("-", 10), Map.entry("*", 11), Map.entry("/", 11), Map.entry("%", 11),
             Map.entry("**", 12));
@@ -20,8 +21,7 @@ final class Parser {
     private static final Set<String> ASSIGN = Set.of("=", "+=", "-=", "*=", "/=", "%=", "&=", "|=", "^=", "<<=",
             ">>=", ">>>=", "**=", "&&=", "||=", "??=");
 
-    private static final Set<String> UNSUPPORTED = Set.of("new", "throw", "try", "class", "delete", "in",
-            "instanceof", "void", "switch");
+    private static final Set<String> UNSUPPORTED = Set.of("throw", "try", "class", "switch");
 
     private final String file;
     private final List<Token> tokens;
@@ -159,14 +159,15 @@ final class Parser {
         Stmt init = null;
         if (peek().is("let") || peek().is("const") || peek().is("var")) {
             String kind = peek().text();
-            if (tokens.get(pos + 1).kind() == Token.Kind.IDENT && tokens.get(pos + 2).kind() == Token.Kind.IDENT
-                    && tokens.get(pos + 2).text().equals("of")) {
+            boolean forOf = tokens.get(pos + 2).kind() == Token.Kind.IDENT && tokens.get(pos + 2).text().equals("of");
+            boolean forIn = tokens.get(pos + 2).is("in");
+            if (tokens.get(pos + 1).kind() == Token.Kind.IDENT && (forOf || forIn)) {
                 pos++;
                 String name = expectIdent();
                 pos++;
-                Expr iterable = assignment();
+                Expr iterable = forIn ? expression() : assignment();
                 expect(")");
-                return new ForOf(kind, name, iterable, statement(), line);
+                return new ForOf(kind, name, iterable, statement(), line, forIn);
             }
             init = varDecl();
         } else if (!peek().is(";")) {
@@ -283,7 +284,8 @@ final class Parser {
         Expr left = unary();
         while (true) {
             Token t = peek();
-            Integer prec = t.kind() == Token.Kind.PUNCT ? BINARY.get(t.text()) : null;
+            boolean operator = t.kind() == Token.Kind.PUNCT || t.is("instanceof") || t.is("in");
+            Integer prec = operator ? BINARY.get(t.text()) : null;
             if (prec == null || prec < minPrecedence) {
                 return left;
             }
@@ -299,7 +301,7 @@ final class Parser {
 
     private Expr unary() {
         Token t = peek();
-        if (t.is("!") || t.is("-") || t.is("+") || t.is("~") || t.is("typeof")) {
+        if (t.is("!") || t.is("-") || t.is("+") || t.is("~") || t.is("typeof") || t.is("delete") || t.is("void")) {
             pos++;
             return new Unary(t.text(), unary(), t.line());
         }
@@ -325,8 +327,44 @@ final class Parser {
         }
     }
 
+    /** {@code new C(args)}: C is a member expression, so {@code new a.b.C(x).d()} constructs before it calls. */
+    private Expr newExpression() {
+        int line = tokens.get(pos++).line();
+        Expr callee = peek().is("new") ? newExpression() : primary();
+        while (true) {
+            Token t = peek();
+            if (t.is(".")) {
+                pos++;
+                Token name = tokens.get(pos++);
+                if (name.kind() != Token.Kind.IDENT && name.kind() != Token.Kind.KEYWORD) {
+                    throw error(name, "expected a property name but found " + name);
+                }
+                callee = new Member(callee, name.text(), t.line());
+            } else if (t.is("[")) {
+                pos++;
+                Expr index = expression();
+                expect("]");
+                callee = new Index(callee, index, t.line());
+            } else {
+                break;
+            }
+        }
+        List<Expr> args = new ArrayList<>();
+        if (peek().is("(")) {
+            pos++;
+            while (!peek().is(")")) {
+                args.add(assignment());
+                if (!peek().is(")")) {
+                    expect(",");
+                }
+            }
+            pos++;
+        }
+        return new New(callee, args, line);
+    }
+
     private Expr callOrMember() {
-        Expr e = primary();
+        Expr e = peek().is("new") ? newExpression() : primary();
         while (true) {
             Token t = peek();
             if (t.is(".")) {

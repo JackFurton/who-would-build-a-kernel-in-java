@@ -36,10 +36,75 @@ final class Builtins {
     }
 
     static Object invoke(Object o, String name, Object[] args) {
+        if (o instanceof JsFunction) {
+            return functionMethod((JsFunction) o, name, args);
+        }
         if (o instanceof JsArray) {
             return contains(ARRAY_METHODS, name) ? arrayMethod((JsArray) o, name, args) : NO_METHOD;
         }
         return contains(STRING_METHODS, name) ? stringMethod((String) o, name, args) : NO_METHOD;
+    }
+
+    // ---- functions ----
+
+    /** {@code f.key}: the built-in properties, then whatever the program stored on the function. */
+    static Object functionProperty(JsFunction f, String key) {
+        if (key.equals("prototype")) {
+            return f.prototype();
+        }
+        if (key.equals("name")) {
+            return f.name();
+        }
+        if (key.equals("call") || key.equals("apply") || key.equals("bind")) {
+            return new JsFunction(key, (callee, self, args) -> functionMethod((JsFunction) self, key, args));
+        }
+        return f.hasProps() ? f.props().get(key) : null;
+    }
+
+    /** {@code f.call(this, ...)}, {@code f.apply(this, array)} and {@code f.bind(this, ...)}. */
+    private static Object functionMethod(JsFunction f, String name, Object[] args) {
+        switch (name) {
+            case "call":
+                return f.call(arg(args, 0), rest(args, 1));
+            case "apply": {
+                Object list = arg(args, 1);
+                Object[] spread = new Object[0];
+                if (list instanceof JsArray) {
+                    JsArray a = (JsArray) list;
+                    spread = new Object[a.length()];
+                    for (int i = 0; i < spread.length; i++) {
+                        spread[i] = a.get(i);
+                    }
+                } else if (!JS.nullish(list)) {
+                    throw new JsError("TypeError: CreateListFromArrayLike called on non-object");
+                }
+                return f.call(arg(args, 0), spread);
+            }
+            case "bind": {
+                Object boundThis = arg(args, 0);
+                Object[] boundArgs = rest(args, 1);
+                return new JsFunction(f.name(), (callee, self, later) -> {
+                    Object[] all = new Object[boundArgs.length + later.length];
+                    for (int i = 0; i < boundArgs.length; i++) {
+                        all[i] = boundArgs[i];
+                    }
+                    for (int i = 0; i < later.length; i++) {
+                        all[boundArgs.length + i] = later[i];
+                    }
+                    return f.call(boundThis, all);
+                });
+            }
+            default:
+                return NO_METHOD;
+        }
+    }
+
+    private static Object[] rest(Object[] args, int from) {
+        Object[] out = new Object[args.length > from ? args.length - from : 0];
+        for (int i = 0; i < out.length; i++) {
+            out[i] = args[from + i];
+        }
+        return out;
     }
 
     // ---- helpers ----

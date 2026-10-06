@@ -193,6 +193,18 @@ final class JavaGen {
     // ---- functions ----
 
     private String function(Function f) {
+        return function(f, f.name());
+    }
+
+    /** An anonymous function bound to a name takes that name, as in JavaScript ({@code const f = () => 1}). */
+    private String named(Expr e, String hint) {
+        if (e instanceof FuncExpr fe && fe.function().name() == null) {
+            return function(fe.function(), hint);
+        }
+        return expr(e);
+    }
+
+    private String function(Function f, String name) {
         FuncInfo info = an.functions.get(f);
         int id = ++uid;
         String callee = "callee" + id;
@@ -235,7 +247,7 @@ final class JavaGen {
         fn = savedFn;
         continueLabels.clear();
         continueLabels.addAll(savedLoops);
-        return "JS.fn(" + quote(f.name() == null ? "" : f.name()) + ", (" + callee + ", " + self + ", " + args
+        return (f.arrow() ? "JS.arrow(" : "JS.fn(") + quote(name == null ? "" : name) + ", (" + callee + ", " + self + ", " + args
                 + ") -> {\n" + body + "    ".repeat(indent) + "})";
     }
 
@@ -247,7 +259,7 @@ final class JavaGen {
                 for (Declarator decl : d.declarators()) {
                     Var v = an.resolved.get(decl);
                     if (decl.init() != null) {
-                        line(store(v, expr(decl.init())) + ";");
+                        line(store(v, named(decl.init(), decl.name())) + ";");
                     } else if (!d.kind().equals("var")) {
                         line(store(v, "JS.U") + ";");
                     }
@@ -332,7 +344,7 @@ final class JavaGen {
         if (e instanceof Assign a && a.target() instanceof Ident id && !a.op().endsWith("&&=")
                 && !a.op().equals("||=") && !a.op().equals("??=")) {
             Var v = assignable(id);
-            String value = a.op().equals("=") ? expr(a.value())
+            String value = a.op().equals("=") ? named(a.value(), id.name())
                     : operator(a.op().substring(0, a.op().length() - 1)) + "(" + read(v) + ", " + expr(a.value()) + ")";
             line(store(v, value) + ";");
             return;
@@ -400,7 +412,8 @@ final class JavaGen {
         String index = "i" + uid;
         line("{");
         indent++;
-        line("final Object " + items + " = " + expr(f.iterable()) + ";");
+        line("final Object " + items + " = " + (f.in() ? "JS.forInKeys(" + expr(f.iterable()) + ")" : expr(f.iterable()))
+                + ";");
         line("for (long " + index + " = 0; " + index + " < JS.length(" + items + "); " + index + "++) {");
         indent++;
         String element = "JS.getIndex(" + items + ", " + index + ")";
@@ -458,6 +471,8 @@ final class JavaGen {
             case ">=" -> "JS.ge";
             case "===", "!==" -> "JS.seq";
             case "==", "!=" -> "JS.leq";
+            case "instanceof" -> "JS.instanceOf";
+            case "in" -> "JS.in";
             default -> null;
         };
         if (method == null) {
@@ -528,7 +543,7 @@ final class JavaGen {
                 List<String> parts = new ArrayList<>();
                 for (Property p : o.properties()) {
                     parts.add(quote(p.key()));
-                    parts.add(expr(p.value()));
+                    parts.add(named(p.value(), p.key()));
                 }
                 return "JS.object(" + String.join(", ", parts) + ")";
             }
@@ -542,6 +557,12 @@ final class JavaGen {
                     case "+" -> "JS.plus(" + expr(u.operand()) + ")";
                     case "~" -> "JS.bnot(" + expr(u.operand()) + ")";
                     case "typeof" -> "JS.typeof(" + expr(u.operand()) + ")";
+                    case "void" -> "JS.second(" + expr(u.operand()) + ", JS.U)";
+                    case "delete" -> switch (u.operand()) {
+                        case Member m -> "JS.delete(" + expr(m.object()) + ", " + quote(m.name()) + ")";
+                        case Index i -> "JS.delete(" + expr(i.object()) + ", " + expr(i.index()) + ")";
+                        default -> "JS.second(" + expr(u.operand()) + ", Boolean.TRUE)";
+                    };
                     default -> throw error(u.line(), "unsupported operator " + u.op());
                 };
             }
@@ -579,6 +600,10 @@ final class JavaGen {
                     case Index i -> "JS.invoke(" + expr(i.object()) + ", " + expr(i.index()) + tail + ")";
                     default -> "JS.call(" + expr(c.callee()) + tail + ")";
                 };
+            }
+            case New n -> {
+                String args = list(n.args());
+                return "JS.construct(" + expr(n.callee()) + (args.isEmpty() ? "" : ", " + args) + ")";
             }
             case Member m -> {
                 return "JS.get(" + expr(m.object()) + ", " + quote(m.name()) + ")";
@@ -659,7 +684,7 @@ final class JavaGen {
             case Ident id -> {
                 Var v = assignable(id);
                 if (op.equals("=")) {
-                    return write(v, expr(a.value()));
+                    return write(v, named(a.value(), id.name()));
                 }
                 if (op.equals("&&=") || op.equals("||=") || op.equals("??=")) {
                     String test = switch (op) {

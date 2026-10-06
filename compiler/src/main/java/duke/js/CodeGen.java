@@ -483,6 +483,9 @@ final class CodeGen {
     }
 
     private void genForOf(ForOf f) {
+        if (f.in()) {
+            throw error(f.line(), "'for...in' is not supported by the x86 back end");
+        }
         int[] hidden = an.iterationSlots.get(f);
         Scope scope = an.scopes.get(f);
         Var v = an.resolved.get(f);
@@ -612,6 +615,7 @@ final class CodeGen {
                 asm.bind(end);
             }
             case Call c -> genCall(c);
+            case New n -> throw error(n.line(), "'new' is not supported by the x86 back end");
             case Member m -> {
                 gen(m.object());
                 asm.push(RAX);

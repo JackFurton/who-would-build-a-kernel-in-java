@@ -43,24 +43,47 @@ final class Inspect {
         }
         if (v instanceof JsObject) {
             JsObject o = (JsObject) v;
+            String name = constructorName(o);
+            String prefix = o.proto == null ? "[Object: null prototype] " : name == null || name.equals("Object") ? "" : name + " ";
             if (depth > 2) {
-                return "[Object]";
+                return "[" + (o.proto == null ? "Object: null prototype" : name == null ? "Object" : name) + "]";
             }
-            if (o.size() == 0) {
-                return "{}";
-            }
-            lastDepth = depth;
-            ArrayList<String> parts = new ArrayList<>();
-            for (int i = 0; i < o.size(); i++) {
-                String key = o.keyAt(i);
-                parts.add((isIdentifier(key) ? key : quote(key)) + ": " + format(o.valueAt(i), depth + 1));
-            }
-            return combine(parts, "{", "}", depth);
+            return container(o.keys(), o, prefix + "{", "}", depth, prefix + "{}");
         }
         if (v instanceof JsFunction) {
-            return "[Function (anonymous)]";
+            JsFunction f = (JsFunction) v;
+            String head = f.name().isEmpty() ? "[Function (anonymous)]" : "[Function: " + f.name() + "]";
+            String[] keys = f.hasProps() ? f.props().keys() : new String[0];
+            if (keys.length == 0 || depth > 2) {
+                return head;
+            }
+            return container(keys, f.props(), head + " {", "}", depth, head);
         }
         return JS.str(v);
+    }
+
+    /** The name of the nearest constructor on the prototype chain, or null if there is none. */
+    private static String constructorName(JsObject o) {
+        for (JsObject p = o.proto; p != null; p = p.proto) {
+            Object c = p.getOwn("constructor");
+            if (c instanceof JsFunction) {
+                return ((JsFunction) c).name();
+            }
+        }
+        return null;
+    }
+
+    /** Formats {@code keys} of {@code o} as {@code key: value} entries inside braces, or {@code empty} if there are none. */
+    private static String container(String[] keys, JsObject o, String open, String close, int depth, String empty) {
+        if (keys.length == 0) {
+            return empty;
+        }
+        lastDepth = depth;
+        ArrayList<String> parts = new ArrayList<>();
+        for (String key : keys) {
+            parts.add((isIdentifier(key) ? key : quote(key)) + ": " + format(o.getOwn(key), depth + 1));
+        }
+        return combine(parts, open, close, depth);
     }
 
     /** One line if it fits in 72 columns and nests at most three deep, else one entry per line. */
