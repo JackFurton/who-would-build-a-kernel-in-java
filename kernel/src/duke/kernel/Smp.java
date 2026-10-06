@@ -4,6 +4,7 @@ import duke.boot.Limine;
 import duke.kernel.mm.KernelAddressSpace;
 import duke.kernel.mm.KernelStacks;
 import duke.kernel.time.HpetClock;
+import duke.kernel.time.Timer;
 import duke.kernel.x86.Gdt;
 import duke.kernel.x86.Idt;
 import duke.kernel.x86.LocalApic;
@@ -14,8 +15,8 @@ import duke.rt.Magic;
  * bootloader-reclaimable memory, on its own page tables. The boot CPU gives each one a block (its
  * GS), a stack, and a GDT and TSS, then sends it to Magic.apEntry, which moves it onto our page
  * tables and stack before any Java runs. {@link #start} must finish before that memory is
- * reclaimed. Each CPU then loads its tables, enables its local APIC, checks in, and halts: running
- * threads on it is #93.
+ * reclaimed. Each CPU then loads its tables, starts its local APIC and timer, checks in, and
+ * becomes the idle thread the scheduler made for it.
  */
 public final class Smp {
 
@@ -71,6 +72,7 @@ public final class Smp {
             Magic.pokeLong(block + CR3, KernelAddressSpace.table().root());
             Magic.pokeLong(block + GDT, Gdt.prepare(index));
             APIC_IDS[index] = apic;
+            Scheduler.addIdle(index, stack);
             // Limine's spec: the extra argument first, then the goto address, which releases the CPU.
             Magic.pokeLong(info + 24, block);
             Magic.pokeLong(info + 16, Magic.apEntry());
@@ -85,15 +87,12 @@ public final class Smp {
     /** Where Magic.apEntry lands, on the new CPU, with GS at its block and interrupts off. */
     static void apMain() {
         Magic.resetStackLimit();
-        long block = Magic.cpuBlock();
-        Gdt.install(Magic.peekLong(block + GDT));
+        Gdt.install(Magic.peekLong(Magic.cpuBlock() + GDT));
         Idt.loadOnThisCpu();
         LocalApic.enableOnThisCpu();
-        ONLINE[(int) Magic.peekLong(block + INDEX)] = true;
-        while (true) {
-            Magic.disableInterrupts();
-            Magic.halt();
-        }
+        Timer.startOnThisCpu();
+        ONLINE[Magic.cpuIndex()] = true;
+        Scheduler.enterIdle();
     }
 
     public static int cpuCount() {

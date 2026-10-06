@@ -964,6 +964,16 @@ final class MethodCompiler {
                 a.load(8, false, RAX, Compiler.CPU_SELF);
                 pushLong(RAX);
             }
+            case "cpuIndex" -> {
+                a.load(4, false, RAX, Compiler.CPU_INDEX);
+                a.push(RAX);
+            }
+            case "exchangeInt" -> {
+                a.pop(RAX);
+                popLong(RSI);
+                a.xchg(false, Mem.at(RSI), RAX);
+                a.push(RAX);
+            }
             case "stackLimit" -> {
                 a.load(8, false, RAX, Compiler.STACK_LIMIT);
                 pushLong(RAX);

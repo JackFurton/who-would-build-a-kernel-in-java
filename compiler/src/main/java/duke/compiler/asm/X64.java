@@ -357,6 +357,11 @@ public final class X64 {
         memOp(false, false, 2, descriptor, 0, 0x0F, 0x01);
     }
 
+    /** {@code xchg [m], src}: atomic without a lock prefix, which xchg with memory implies. */
+    public void xchg(boolean wide, Mem m, Reg src) {
+        memOp(wide, false, src.code(), m, 0, 0x87);
+    }
+
     public void invlpg(Mem address) {
         memOp(false, false, 7, address, 0, 0x0F, 0x01);
     }

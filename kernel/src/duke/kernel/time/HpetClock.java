@@ -29,7 +29,9 @@ public final class HpetClock {
 
     /** Nanoseconds since the HPET was enabled. */
     public static long nanos() {
-        return Magic.peekLong(base + MAIN_COUNTER) * femtosecondsPerTick / 1_000_000;
+        // In two steps: the product alone overflows after a couple of hours at a 10 MHz HPET.
+        long counter = Magic.peekLong(base + MAIN_COUNTER);
+        return counter / 1_000_000 * femtosecondsPerTick + counter % 1_000_000 * femtosecondsPerTick / 1_000_000;
     }
 
     public static void spinNanos(long duration) {

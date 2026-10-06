@@ -82,6 +82,12 @@ public final class Magic {
      */
     public static native long cpuBlock();
 
+    /** This CPU's index: 0 for the boot CPU, then in the order Smp started them. */
+    public static native int cpuIndex();
+
+    /** Atomically stores {@code value} at {@code address} and returns what was there. */
+    public static native int exchangeInt(long address, int value);
+
     /** The rsp below which method prologues throw StackOverflowError; 0 disables the checks. */
     public static native long stackLimit();
 

@@ -11,7 +11,7 @@ import duke.rt.Magic;
  * frames, so the object outlives the entry. Releasing a monitor hands it straight to the first
  * blocked thread, so a releasing thread can't barge back in ahead of it.
  *
- * <p>Like the scheduler, all of this runs with interrupts off.
+ * <p>All of this runs under the scheduler's lock.
  */
 public final class Monitors {
 
@@ -38,8 +38,7 @@ public final class Monitors {
         if (self == null) {
             return;
         }
-        long flags = Magic.flags();
-        Magic.disableInterrupts();
+        long flags = Scheduler.lock();
         long address = Magic.addressOf(object);
         Monitor monitor = find(address);
         if (monitor == null) {
@@ -61,7 +60,7 @@ public final class Monitors {
             // Comes back owning the monitor: release() hands it over.
             Scheduler.switchTo(Scheduler.next());
         }
-        Scheduler.restore(flags);
+        Scheduler.unlock(flags);
     }
 
     public static void exit(Object object) {
@@ -80,11 +79,10 @@ public final class Monitors {
             throw new IllegalArgumentException("timeout value is negative");
         }
         Task self = Scheduler.current();
-        long flags = Magic.flags();
-        Magic.disableInterrupts();
+        long flags = Scheduler.lock();
         Monitor monitor = owned(object, self);
         if (monitor == null) {
-            Scheduler.restore(flags);
+            Scheduler.unlock(flags);
             throw new IllegalMonitorStateException("current thread is not owner");
         }
         self.monitor = monitor;
@@ -97,16 +95,15 @@ public final class Monitors {
         }
         release(monitor);
         Scheduler.switchTo(Scheduler.next());
-        Scheduler.restore(flags);
+        Scheduler.unlock(flags);
     }
 
     public static void notify(Object object, boolean all) {
         Task self = Scheduler.current();
-        long flags = Magic.flags();
-        Magic.disableInterrupts();
+        long flags = Scheduler.lock();
         Monitor monitor = owned(object, self);
         if (monitor == null) {
-            Scheduler.restore(flags);
+            Scheduler.unlock(flags);
             throw new IllegalMonitorStateException("current thread is not owner");
         }
         do {
@@ -117,21 +114,20 @@ public final class Monitors {
             unlinkWaiting(monitor, waiter);
             block(monitor, waiter);
         } while (all);
-        Scheduler.restore(flags);
+        Scheduler.unlock(flags);
     }
 
     public static boolean holds(Object object) {
         if (object == null) {
             throw new NullPointerException();
         }
-        long flags = Magic.flags();
-        Magic.disableInterrupts();
+        long flags = Scheduler.lock();
         boolean held = owned(object, Scheduler.current()) != null;
-        Scheduler.restore(flags);
+        Scheduler.unlock(flags);
         return held;
     }
 
-    /** A timed wait ran out: from the scheduler, with interrupts off. */
+    /** A timed wait ran out: from the scheduler, under its lock. */
     static void timedOut(Task task) {
         Monitor monitor = task.monitor;
         unlinkWaiting(monitor, task);
@@ -150,13 +146,12 @@ public final class Monitors {
         if (self == null) {
             return true;
         }
-        long flags = Magic.flags();
-        Magic.disableInterrupts();
+        long flags = Scheduler.lock();
         Monitor monitor = owned(object, self);
         if (monitor != null && --monitor.count == 0) {
             release(monitor);
         }
-        Scheduler.restore(flags);
+        Scheduler.unlock(flags);
         return monitor != null;
     }
 
