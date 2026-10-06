@@ -36,5 +36,5 @@ var shiftedSum = 0;
 while (shifted.length > 0) shiftedSum += shifted.shift();
 console.log(shiftedSum, shifted.shift(), shifted.pop());
 shifted.push(42);
-shifted.unshift(1, 2, 3);
+shifted.unshift(3); shifted.unshift(2); shifted.unshift(1);
 console.log(shifted);
