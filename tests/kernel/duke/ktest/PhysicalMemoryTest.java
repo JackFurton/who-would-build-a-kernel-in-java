@@ -57,6 +57,7 @@ final class PhysicalMemoryTest {
             all[i] = PhysicalMemory.allocate();
         }
         assertEquals(0, PhysicalMemory.freeFrames(), "all allocated");
+        assertEquals(-1, PhysicalMemory.tryAllocateZeroed(), "zeroed allocation fails without touching memory");
         assertThrows(OutOfMemoryError.class, PhysicalMemory::allocate, "nothing left");
         for (long frame : all) {
             PhysicalMemory.free(frame);

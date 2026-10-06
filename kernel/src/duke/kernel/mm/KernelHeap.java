@@ -1,7 +1,6 @@
 package duke.kernel.mm;
 
 import duke.rt.Heap;
-import duke.rt.Magic;
 
 /** Moves the Java heap off the early .bss arena into a region backed by frames on demand. */
 public final class KernelHeap {
@@ -22,11 +21,10 @@ public final class KernelHeap {
         // Runs inside the allocator, so it must not allocate objects itself.
         Heap.growInto(BASE, LIMIT, MARKS, MARK_STACK, (address, bytes) -> {
             for (long page = address; page < address + bytes; page += PhysicalMemory.PAGE_SIZE) {
-                long frame = PhysicalMemory.tryAllocate();
+                long frame = PhysicalMemory.tryAllocateZeroed();
                 if (frame < 0) {
                     return false;
                 }
-                Magic.fillMemory(PhysicalMemory.toVirtual(frame), 0, PhysicalMemory.PAGE_SIZE);
                 table.map(page, frame, PageTable.WRITABLE | nx);
             }
             return true;
