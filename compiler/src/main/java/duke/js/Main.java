@@ -7,15 +7,26 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
-/** {@code jsc program.js --output program}: compiles JavaScript to a static x86-64 Linux executable. */
+/**
+ * {@code jsc program.js --output program} compiles JavaScript to a static x86-64 Linux executable.
+ * {@code jsc --java DIR a.js b.js ...} instead translates each module to a Java class under DIR. Each
+ * registers itself with {@code duke.js.rt.Modules} from a static initializer.
+ */
 public final class Main {
 
     private Main() {
     }
 
     public static void main(String[] args) throws IOException {
+        if (args.length > 0 && args[0].equals("--java")) {
+            javaMain(args);
+            return;
+        }
         Path input = null;
         Path output = null;
         for (int i = 0; i < args.length; i++) {
@@ -58,6 +69,73 @@ public final class Main {
         return ElfWriter.write(linked, linked.address("_start"), true);
     }
 
+    private static void javaMain(String[] args) throws IOException {
+        if (args.length < 2) {
+            usage("--java needs an output directory");
+        }
+        Path dir = Path.of(args[1]);
+        List<Path> inputs = new ArrayList<>();
+        for (int i = 2; i < args.length; i++) {
+            inputs.add(Path.of(args[i]));
+        }
+        Map<String, String> sources = new LinkedHashMap<>();
+        for (Path input : inputs) {
+            sources.put(input.toString(), Files.readString(input));
+        }
+        try {
+            // The build uses DIR as a source root, and javac rejects one that doesn't exist.
+            Files.createDirectories(dir);
+            for (Map.Entry<String, String> e : translateAll(sources).entrySet()) {
+                Path file = dir.resolve(e.getKey());
+                Files.createDirectories(file.getParent());
+                Files.writeString(file, e.getValue());
+            }
+        } catch (JsException e) {
+            System.err.println("jsc: error: " + e.getMessage());
+            System.exit(1);
+        }
+    }
+
+    /**
+     * Translates modules (path to source) into Java, one class per module under {@code duke/js/gen}.
+     * Returns file path (relative) to Java source.
+     */
+    public static Map<String, String> translateAll(Map<String, String> modules) {
+        Map<String, String> files = new LinkedHashMap<>();
+        for (Map.Entry<String, String> module : modules.entrySet()) {
+            String className = className(module.getKey());
+            String path = "duke/js/gen/" + className + ".java";
+            if (files.containsKey(path)) {
+                throw new JsException(module.getKey(), 1, "another module is already called " + className);
+            }
+            files.put(path, translate(module.getKey(), module.getValue(), className));
+        }
+        return files;
+    }
+
+    /** Translates one JavaScript module to the source of the Java class {@code className}. */
+    public static String translate(String file, String source, String className) {
+        List<Node.Stmt> program = new Parser(file, source).parseProgram();
+        Analyzer analyzer = new Analyzer(file, List.of(), program, JavaGen.GLOBALS);
+        return new JavaGen(file, analyzer, className).generate(program);
+    }
+
+    /** {@code fs-tools.js} becomes {@code FsTools}. */
+    static String className(String path) {
+        String base = Path.of(path).getFileName().toString().replaceAll("\\.js$", "");
+        StringBuilder sb = new StringBuilder();
+        boolean upper = true;
+        for (char c : base.toCharArray()) {
+            if (Character.isLetterOrDigit(c)) {
+                sb.append(upper ? Character.toUpperCase(c) : c);
+                upper = false;
+            } else {
+                upper = true;
+            }
+        }
+        return Character.isDigit(sb.charAt(0)) ? "M" + sb : sb.toString();
+    }
+
     private static String prelude() throws IOException {
         try (InputStream in = Main.class.getResourceAsStream("prelude.js")) {
             if (in == null) {
@@ -70,6 +148,7 @@ public final class Main {
     private static void usage(String problem) {
         System.err.println("jsc: " + problem);
         System.err.println("usage: jsc program.js --output program");
+        System.err.println("       jsc --java DIR module.js...");
         System.exit(2);
     }
 }

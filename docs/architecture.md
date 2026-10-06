@@ -411,13 +411,28 @@ Lexer ─▶ Parser ─▶ Analyzer (scopes, captures, frame slots) ─▶ CodeG
   exit status 1. `console.log` doesn't group arrays of more than six items like node does, and
   object keys keep insertion order even when they look like integers.
 
-**Where this is going.** The goal is kernel code written in JavaScript. The Linux executables
-above are a first step: they prove the front end and give it a test suite. The plan is a second
-back end that emits JVM bytecode, so `dukec` compiles JS into the kernel image alongside the Java.
-JS and Java would then share one heap, GC and calling convention, with the runtime written in
-Java under `kernel/src` and a small hand-written facade for JS to call the kernel. The first
-milestone is a shell command written in JS. That work lands in a separate PR.
+### JavaScript as Java
 
-`make js-test` runs every program in `tests/js` under node and as a compiled executable and
-compares output and exit status (on anything but x86-64 Linux the executables run in an amd64
-Docker container).
+`jsc --java DIR modules...` is a second back end. It translates each JS module to a Java class under
+`duke/js/gen`. That is ordinary Java: any JVM runs it with the runtime in `kernel/src/duke/js/rt`,
+and `dukec` can compile it like any other class. The translator (`JavaGen`) reuses the lexer, parser
+and analyzer.
+
+- **Values** are plain Java objects: `Long` numbers, `String`, `Boolean`, `JsArray`, `JsObject`,
+  `JsFunction`, Java `null` for undefined and `JS.NULL` for null. Operators and property access are
+  calls into `duke.js.rt.JS`.
+- **Variables:** top-level ones are static fields. Others are Java locals, or one-element arrays when
+  a closure captures them, since Java lambdas need effectively final variables. Functions are lambdas,
+  and every generated name carries a number, because Java forbids a lambda to shadow an enclosing name.
+- **Modules:** each generated class has a `run()` with the module's top-level code, and a static
+  initializer that registers it with `duke.js.rt.Modules`. `Modules.runAll()` runs what has signed up.
+- **The runtime** is plain Java with no kernel dependencies, built only from what the kernel's own
+  `java.lang` and `java.util` offer, so it compiles both ways. That lets `make js-test` check the
+  translator against node on a normal JVM.
+- **Limits** are the same as for the x86 back end: integers only, no exceptions or classes. The runtime
+  keeps static state (the global table, `console.log`'s formatting depth), so it is not safe to call
+  from several threads.
+
+`make js-test` runs every program in `tests/js` under node, as an x86-64 executable and through
+the Java back end on this JVM, and compares output and exit status (off x86-64 Linux the
+executables run in an amd64 Docker container; `JS_BACKENDS=java` skips them).
