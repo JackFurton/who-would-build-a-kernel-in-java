@@ -597,6 +597,11 @@ public final class JS {
         return callWith(get(o, key), o, args);
     }
 
+    /** Calls {@code f} with {@code this} bound to {@code self}: the call in {@code o.f?.()}. */
+    public static Object callMethod(Object f, Object self, Object... args) {
+        return callWith(f, self, args);
+    }
+
     static Object callWith(Object f, Object self, Object[] args) {
         if (!(f instanceof JsFunction)) {
             throw new JsError("TypeError: " + (f == null ? "undefined" : str(f)) + " is not a function");

@@ -81,13 +81,25 @@ final class Lexer {
     private Token number(boolean newline) {
         int start = pos;
         long value;
-        if (src.startsWith("0x", pos) || src.startsWith("0X", pos)) {
+        if (src.startsWith("0b", pos) || src.startsWith("0B", pos) || src.startsWith("0o", pos)
+                || src.startsWith("0O", pos)) {
+            int radix = Character.toLowerCase(src.charAt(pos + 1)) == 'b' ? 2 : 8;
             pos += 2;
             int digits = pos;
-            while (pos < src.length() && Character.digit(src.charAt(pos), 16) >= 0) {
+            while (pos < src.length() && (Character.digit(src.charAt(pos), radix) >= 0 || src.charAt(pos) == '_')) {
                 pos++;
             }
-            value = Long.parseLong(src.substring(digits, pos), 16);
+            if (pos == digits) {
+                throw error("missing digits after the number prefix");
+            }
+            value = Long.parseLong(src.substring(digits, pos).replace("_", ""), radix);
+        } else if (src.startsWith("0x", pos) || src.startsWith("0X", pos)) {
+            pos += 2;
+            int digits = pos;
+            while (pos < src.length() && (Character.digit(src.charAt(pos), 16) >= 0 || src.charAt(pos) == '_')) {
+                pos++;
+            }
+            value = Long.parseLong(src.substring(digits, pos).replace("_", ""), 16);
         } else {
             while (pos < src.length() && (Character.isDigit(src.charAt(pos)) || src.charAt(pos) == '_')) {
                 pos++;

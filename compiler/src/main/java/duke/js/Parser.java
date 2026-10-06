@@ -21,7 +21,7 @@ final class Parser {
     private static final Set<String> ASSIGN = Set.of("=", "+=", "-=", "*=", "/=", "%=", "&=", "|=", "^=", "<<=",
             ">>=", ">>>=", "**=", "&&=", "||=", "??=");
 
-    private static final Set<String> UNSUPPORTED = Set.of("class", "switch");
+    private static final Set<String> UNSUPPORTED = Set.of("class");
 
     private final String file;
     private final List<Token> tokens;
@@ -138,19 +138,58 @@ final class Parser {
             }
             return new Try(block, param, handler, finalizer, line);
         }
-        if (t.is("break")) {
+        if (t.is("break") || t.is("continue")) {
             pos++;
+            String label = null;
+            if (peek().kind() == Token.Kind.IDENT && !peek().newlineBefore()) {
+                label = tokens.get(pos++).text();
+            }
             semicolon();
-            return new Break(line);
+            return t.is("break") ? new Break(label, line) : new Continue(label, line);
         }
-        if (t.is("continue")) {
-            pos++;
-            semicolon();
-            return new Continue(line);
+        if (t.is("switch")) {
+            return switchStatement();
+        }
+        if (t.kind() == Token.Kind.IDENT && tokens.get(pos + 1).is(":")) {
+            pos += 2;
+            return new Labeled(t.text(), statement(), line);
         }
         Expr e = expression();
         semicolon();
         return new ExprStmt(e, line);
+    }
+
+    private Stmt switchStatement() {
+        int line = tokens.get(pos++).line();
+        expect("(");
+        Expr discriminant = expression();
+        expect(")");
+        expect("{");
+        List<Case> cases = new ArrayList<>();
+        boolean sawDefault = false;
+        while (!peek().is("}")) {
+            Expr test = null;
+            if (accept("default")) {
+                if (sawDefault) {
+                    throw error(peek(), "more than one default clause in switch");
+                }
+                sawDefault = true;
+            } else {
+                expect("case");
+                test = expression();
+            }
+            expect(":");
+            List<Stmt> body = new ArrayList<>();
+            while (!peek().is("case") && !peek().is("default") && !peek().is("}")) {
+                if (peek().kind() == Token.Kind.EOF) {
+                    throw error(peek(), "expected '}'");
+                }
+                body.add(statement());
+            }
+            cases.add(new Case(test, body));
+        }
+        pos++;
+        return new Switch(discriminant, cases, line);
     }
 
     private Block block() {
@@ -395,37 +434,80 @@ final class Parser {
 
     private Expr callOrMember() {
         Expr e = peek().is("new") ? newExpression() : primary();
+        List<ChainOp> ops = null;
         while (true) {
             Token t = peek();
+            boolean optional = t.is("?.");
+            if (optional) {
+                pos++;
+                t = peek();
+                if (ops == null) {
+                    ops = new ArrayList<>();
+                }
+                if (t.is("(")) {
+                    pos++;
+                    ops.add(new ChainOp('c', null, null, arguments(), true));
+                } else if (t.is("[")) {
+                    pos++;
+                    Expr index = expression();
+                    expect("]");
+                    ops.add(new ChainOp('i', null, index, null, true));
+                } else {
+                    ops.add(new ChainOp('m', propertyName(), null, null, true));
+                }
+                continue;
+            }
             if (t.is(".")) {
                 pos++;
-                Token name = tokens.get(pos++);
-                if (name.kind() != Token.Kind.IDENT && name.kind() != Token.Kind.KEYWORD) {
-                    throw error(name, "expected a property name but found " + name);
+                String name = propertyName();
+                if (ops != null) {
+                    ops.add(new ChainOp('m', name, null, null, false));
+                } else {
+                    e = new Member(e, name, t.line());
                 }
-                e = new Member(e, name.text(), t.line());
             } else if (t.is("[")) {
                 pos++;
                 Expr index = expression();
                 expect("]");
-                e = new Index(e, index, t.line());
+                if (ops != null) {
+                    ops.add(new ChainOp('i', null, index, null, false));
+                } else {
+                    e = new Index(e, index, t.line());
+                }
             } else if (t.is("(")) {
                 pos++;
-                List<Expr> args = new ArrayList<>();
-                while (!peek().is(")")) {
-                    args.add(assignment());
-                    if (!peek().is(")")) {
-                        expect(",");
-                    }
+                List<Expr> args = arguments();
+                if (ops != null) {
+                    ops.add(new ChainOp('c', null, null, args, false));
+                } else {
+                    e = new Call(e, args, t.line());
                 }
-                pos++;
-                e = new Call(e, args, t.line());
-            } else if (t.is("?.")) {
-                throw error(t, "optional chaining is not supported yet");
             } else {
-                return e;
+                return ops == null ? e : new Chain(e, ops, e.line());
             }
         }
+    }
+
+    /** A property name after a dot: an identifier or a keyword. */
+    private String propertyName() {
+        Token name = tokens.get(pos++);
+        if (name.kind() != Token.Kind.IDENT && name.kind() != Token.Kind.KEYWORD) {
+            throw error(name, "expected a property name but found " + name);
+        }
+        return name.text();
+    }
+
+    /** Call arguments, after the opening parenthesis. */
+    private List<Expr> arguments() {
+        List<Expr> args = new ArrayList<>();
+        while (!peek().is(")")) {
+            args.add(assignment());
+            if (!peek().is(")")) {
+                expect(",");
+            }
+        }
+        pos++;
+        return args;
     }
 
     private Expr primary() {

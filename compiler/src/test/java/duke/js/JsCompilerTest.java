@@ -57,6 +57,8 @@ class JsCompilerTest {
                 Arguments.of("var x = 1.5;", "floating-point numbers are not supported"),
                 Arguments.of("class A {}", "'class' is not supported yet"),
                 Arguments.of("try { }", "missing catch or finally after try"),
+                Arguments.of("switch (1) { default: default: }", "more than one default clause in switch"),
+                Arguments.of("var n = 0b;", "missing digits after the number prefix"),
                 Arguments.of("throw\n1;", "a line break is not allowed after 'throw'"),
                 Arguments.of("var s = \"\u00e9\";", "only ASCII strings"),
                 Arguments.of("var x = 1 +;", "unexpected ';'"),
@@ -71,10 +73,21 @@ class JsCompilerTest {
     }
 
     @Test
+    void javaBackEndExplainsLabelMistakes() {
+        assertTrue(assertThrows(JsException.class, () -> Main.translate("t.js", "for (;;) { break nope; }", "T"))
+                .getMessage().contains("undefined label 'nope'"));
+        assertTrue(assertThrows(JsException.class, () -> Main.translate("t.js", "a: { continue a; }", "T"))
+                .getMessage().contains("does not label a loop"));
+    }
+
+    @Test
     void x86BackEndRefusesWhatOnlyTheJavaBackEndHas() {
         assertTrue(error("function F() {}\nnew F();").contains("'new' is not supported by the x86 back end"));
         assertTrue(error("for (var k in {}) {}").contains("'for...in' is not supported by the x86 back end"));
         assertTrue(error("var a = 1 instanceof Object;").contains("unsupported operator instanceof"));
+        assertTrue(error("switch (1) { }").contains("'switch' is not supported by the x86 back end"));
+        assertTrue(error("a: for (;;) { break a; }").contains("labels are not supported by the x86 back end"));
+        assertTrue(error("var o; o?.x;").contains("optional chaining is not supported by the x86 back end"));
         assertTrue(error("throw 1;").contains("'throw' is not supported by the x86 back end"));
         assertTrue(error("try { } finally { }").contains("'try' is not supported by the x86 back end"));
     }

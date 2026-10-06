@@ -429,15 +429,23 @@ final class CodeGen {
                 asm.leave();
                 asm.ret();
             }
+            case Switch sw -> throw error(sw.line(), "'switch' is not supported by the x86 back end");
+            case Labeled l -> throw error(l.line(), "labels are not supported by the x86 back end");
             case Throw t -> throw error(t.line(), "'throw' is not supported by the x86 back end");
             case Try t -> throw error(t.line(), "'try' is not supported by the x86 back end");
             case Break b -> {
+                if (b.label() != null) {
+                    throw error(b.line(), "labels are not supported by the x86 back end");
+                }
                 if (loops.isEmpty()) {
                     throw error(b.line(), "'break' outside a loop");
                 }
                 asm.jmp(loops.peek().breakTo());
             }
             case Continue c -> {
+                if (c.label() != null) {
+                    throw error(c.line(), "labels are not supported by the x86 back end");
+                }
                 if (loops.isEmpty()) {
                     throw error(c.line(), "'continue' outside a loop");
                 }
@@ -618,6 +626,7 @@ final class CodeGen {
             }
             case Call c -> genCall(c);
             case New n -> throw error(n.line(), "'new' is not supported by the x86 back end");
+            case Chain c -> throw error(c.line(), "optional chaining is not supported by the x86 back end");
             case Member m -> {
                 gen(m.object());
                 asm.push(RAX);

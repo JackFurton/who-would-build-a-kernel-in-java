@@ -218,6 +218,14 @@ final class Analyzer {
                     hoistVars(inner, fnScope);
                 }
             }
+            case Labeled l -> hoistVars(l.body(), fnScope);
+            case Switch sw -> {
+                for (Case c : sw.cases()) {
+                    for (Stmt inner : c.body()) {
+                        hoistVars(inner, fnScope);
+                    }
+                }
+            }
             case Try t -> {
                 hoistVars(t.block(), fnScope);
                 if (t.handler() != null) {
@@ -291,6 +299,22 @@ final class Analyzer {
                 if (r.value() != null) {
                     visit(r.value());
                 }
+            }
+            case Labeled l -> visit(l.body());
+            case Switch sw -> {
+                visit(sw.discriminant());
+                // The whole switch body is one scope, so a let in one case is visible in the others.
+                inScope(sw, () -> {
+                    List<Stmt> all = new ArrayList<>();
+                    sw.cases().forEach(c -> all.addAll(c.body()));
+                    declareBlock(all, current);
+                    for (Case c : sw.cases()) {
+                        if (c.test() != null) {
+                            visit(c.test());
+                        }
+                        c.body().forEach(this::visit);
+                    }
+                });
             }
             case Throw t -> visit(t.value());
             case Try t -> {
@@ -398,6 +422,17 @@ final class Analyzer {
             case Call c -> {
                 visit(c.callee());
                 c.args().forEach(this::visit);
+            }
+            case Chain c -> {
+                visit(c.base());
+                for (ChainOp op : c.ops()) {
+                    if (op.index() != null) {
+                        visit(op.index());
+                    }
+                    if (op.args() != null) {
+                        op.args().forEach(this::visit);
+                    }
+                }
             }
             case New n -> {
                 visit(n.callee());
