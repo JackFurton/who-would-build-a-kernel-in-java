@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="820" height="412" viewBox="0 0 820 412" role="img" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif">
+<title>Calibration</title>
+<desc>dkempner: L5, Senior Software Engineer, JavaScript, 109 merged, 0 in review. Firebathero: L5, Senior Software Engineer, Performance, 79 merged, 0 in review. Kethankumar99: L4, Software Engineer II, Device Drivers, 31 merged, 0 in review. senthilkumar-r: L3, Software Engineer, Device Drivers, 16 merged, 0 in review. </desc>
+<rect x="0.0" y="0.0" width="820.0" height="412.0" rx="0" fill="#fcfcfb"/>
+<text x="16.0" y="28.0" fill="#0b0b0b" font-size="18" font-weight="700" text-anchor="start">Calibration</text>
+<text x="16.0" y="48.0" fill="#52514e" font-size="12" font-weight="400" text-anchor="start">Leveled on merged code. Darker: in review. Faded: 30 days at today's pace.</text>
+<rect x="312.1" y="74.0" width="16.9" height="274.0" rx="0" fill="#f3f2ee"/>
+<text x="350.8" y="86.0" fill="#2a78d6" font-size="11" font-weight="700" text-anchor="middle">L5</text>
+<rect x="372.6" y="74.0" width="96.8" height="274.0" rx="0" fill="#f3f2ee"/>
+<text x="421.0" y="86.0" fill="#7c5cd6" font-size="11" font-weight="700" text-anchor="middle">L6</text>
+<text x="578.3" y="86.0" fill="#eb6834" font-size="11" font-weight="700" text-anchor="middle">L7</text>
+<rect x="687.2" y="74.0" width="96.8" height="274.0" rx="0" fill="#f3f2ee"/>
+<text x="735.6" y="86.0" fill="#c2185b" font-size="11" font-weight="700" text-anchor="middle">L8</text>
+<rect x="16.0" y="100.0" width="34.0" height="26.0" rx="5" fill="#2a78d6"/>
+<text x="33.0" y="118.0" fill="#ffffff" font-size="13" font-weight="700" text-anchor="middle">L5</text>
+<text x="60.0" y="111.0" fill="#0b0b0b" font-size="14" font-weight="700" text-anchor="start">dkempner</text>
+<text x="60.0" y="127.0" fill="#52514e" font-size="11" font-weight="400" text-anchor="start">Senior Software Engineer, JavaScript</text>
+<text x="60.0" y="142.0" fill="#898781" font-size="10" font-weight="400" text-anchor="start">3 merged · L6 promo in ~3 days</text>
+<rect x="300.0" y="104.0" width="280.1" height="20.0" rx="5" fill="#2a78d6" fill-opacity="0.22"/>
+<rect x="300.0" y="104.0" width="53.0" height="20.0" rx="5" fill="#2a78d6" fill-opacity="0.55"/>
+<rect x="300.0" y="104.0" width="53.0" height="20.0" rx="5" fill="#2a78d6"/>
+<text x="586.1" y="119.0" fill="#0b0b0b" font-size="11" font-weight="700" text-anchor="start">109</text>
+<rect x="16.0" y="164.0" width="34.0" height="26.0" rx="5" fill="#2a78d6"/>
+<text x="33.0" y="182.0" fill="#ffffff" font-size="13" font-weight="700" text-anchor="middle">L5</text>
+<text x="60.0" y="175.0" fill="#0b0b0b" font-size="14" font-weight="700" text-anchor="start">Firebathero</text>
+<text x="60.0" y="191.0" fill="#52514e" font-size="11" font-weight="400" text-anchor="start">Senior Software Engineer, Performance</text>
+<text x="60.0" y="206.0" fill="#898781" font-size="10" font-weight="400" text-anchor="start">1 merged · L6 promo in ~7 days</text>
+<rect x="300.0" y="168.0" width="203.4" height="20.0" rx="5" fill="#2a78d6" fill-opacity="0.22"/>
+<rect x="300.0" y="168.0" width="38.5" height="20.0" rx="5" fill="#2a78d6" fill-opacity="0.55"/>
+<rect x="300.0" y="168.0" width="38.5" height="20.0" rx="5" fill="#2a78d6"/>
+<text x="509.4" y="183.0" fill="#0b0b0b" font-size="11" font-weight="700" text-anchor="start">79</text>
+<rect x="16.0" y="228.0" width="34.0" height="26.0" rx="5" fill="#1baf7a"/>
+<text x="33.0" y="246.0" fill="#ffffff" font-size="13" font-weight="700" text-anchor="middle">L4</text>
+<text x="60.0" y="239.0" fill="#0b0b0b" font-size="14" font-weight="700" text-anchor="start">Kethankumar99</text>
+<text x="60.0" y="255.0" fill="#52514e" font-size="11" font-weight="400" text-anchor="start">Software Engineer II, Device Drivers</text>
+<text x="60.0" y="270.0" fill="#898781" font-size="10" font-weight="400" text-anchor="start">1 merged · L5 promo in ~7 days</text>
+<rect x="300.0" y="232.0" width="78.8" height="20.0" rx="5" fill="#1baf7a" fill-opacity="0.22"/>
+<rect x="300.0" y="232.0" width="14.9" height="20.0" rx="5" fill="#1baf7a" fill-opacity="0.55"/>
+<rect x="300.0" y="232.0" width="14.9" height="20.0" rx="5" fill="#1baf7a"/>
+<text x="384.8" y="247.0" fill="#0b0b0b" font-size="11" font-weight="700" text-anchor="start">31</text>
+<rect x="16.0" y="292.0" width="34.0" height="26.0" rx="5" fill="#898781"/>
+<text x="33.0" y="310.0" fill="#ffffff" font-size="13" font-weight="700" text-anchor="middle">L3</text>
+<text x="60.0" y="303.0" fill="#0b0b0b" font-size="14" font-weight="700" text-anchor="start">senthilkumar-r</text>
+<text x="60.0" y="319.0" fill="#52514e" font-size="11" font-weight="400" text-anchor="start">Software Engineer, Device Drivers</text>
+<text x="60.0" y="334.0" fill="#898781" font-size="10" font-weight="400" text-anchor="start">1 merged · L4 promo in ~5 days</text>
+<rect x="300.0" y="296.0" width="40.7" height="20.0" rx="5" fill="#898781" fill-opacity="0.22"/>
+<rect x="300.0" y="296.0" width="7.7" height="20.0" rx="5" fill="#898781" fill-opacity="0.55"/>
+<rect x="300.0" y="296.0" width="7.7" height="20.0" rx="5" fill="#898781"/>
+<text x="346.7" y="311.0" fill="#0b0b0b" font-size="11" font-weight="700" text-anchor="start">16</text>
+<text x="300.0" y="364.0" fill="#898781" font-size="10" font-weight="400" text-anchor="middle">0</text>
+<text x="421.0" y="364.0" fill="#898781" font-size="10" font-weight="400" text-anchor="middle">250</text>
+<text x="542.0" y="364.0" fill="#898781" font-size="10" font-weight="400" text-anchor="middle">500</text>
+<text x="663.0" y="364.0" fill="#898781" font-size="10" font-weight="400" text-anchor="middle">750</text>
+<text x="784.0" y="364.0" fill="#898781" font-size="10" font-weight="400" text-anchor="middle">1000</text>
+<text x="16.0" y="392.0" fill="#898781" font-size="11" font-weight="400" text-anchor="start">JackFurton: Founder &amp; CEO. Not calibrated; does the calibrating.</text>
+</svg>
