@@ -31,7 +31,8 @@ import java.util.Set;
 final class JavaGen {
 
     /** Globals the runtime defines; other undeclared names are compile errors. */
-    static final Set<String> GLOBALS = Set.of("console", "Math", "String", "Number", "Array", "Object", "Function", "Symbol", "Map", "Set", "WeakMap", "WeakSet",
+    static final Set<String> GLOBALS = Set.of("console", "Math", "String", "Number", "Array", "Object", "Function", "Symbol", "Map", "Set", "WeakMap", "WeakSet", "Boolean", "isNaN", "isFinite", "globalThis",
+            "encodeURIComponent", "decodeURIComponent", "encodeURI", "decodeURI", "escape", "unescape", "btoa", "atob",
             "parseInt", "Kernel", "Error", "TypeError", "RangeError", "ReferenceError", "SyntaxError", "EvalError",
             "URIError");
 

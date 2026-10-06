@@ -114,6 +114,32 @@ public final class JsArray {
         return value;
     }
 
+    /** Removes {@code count} elements at {@code from}, puts {@code insert} there, and returns what was removed. */
+    JsArray replace(int from, int count, Object[] insert) {
+        checkWritable();
+        if (sealed && count != insert.length) {
+            throw new JsError("TypeError: Cannot add or remove elements of a sealed array");
+        }
+        JsArray removed = new JsArray();
+        for (int i = 0; i < count; i++) {
+            removed.add(items[from + i]);
+        }
+        Object[] rebuilt = new Object[Math.max(4, length - count + insert.length)];
+        int n = 0;
+        for (int i = 0; i < from; i++) {
+            rebuilt[n++] = items[i];
+        }
+        for (Object o : insert) {
+            rebuilt[n++] = o;
+        }
+        for (int i = from + count; i < length; i++) {
+            rebuilt[n++] = items[i];
+        }
+        items = rebuilt;
+        length = n;
+        return removed;
+    }
+
     public void addFirst(Object value) {
         add(null);
         for (int i = length - 1; i > 0; i--) {
