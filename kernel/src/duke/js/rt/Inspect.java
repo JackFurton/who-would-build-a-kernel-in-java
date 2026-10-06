@@ -26,6 +26,9 @@ final class Inspect {
         if (v instanceof String) {
             return quote((String) v);
         }
+        if (v instanceof JsSymbol) {
+            return v.toString();
+        }
         if (v instanceof JsArray) {
             JsArray a = (JsArray) v;
             if (depth > 2) {
@@ -83,12 +86,20 @@ final class Inspect {
 
     /** Formats {@code keys} of {@code o} as {@code key: value} entries inside braces, or {@code empty} if there are none. */
     private static String container(String[] keys, JsObject o, String open, String close, int depth, String empty) {
-        if (keys.length == 0) {
+        JsSymbol[] symbols = o.symbolKeys(false);
+        if (keys.length == 0 && symbols.length == 0) {
             return empty;
         }
         lastDepth = depth;
         ArrayList<String> parts = new ArrayList<>();
-        for (String key : keys) {
+        Object[] all = new Object[keys.length + symbols.length];
+        for (int i = 0; i < keys.length; i++) {
+            all[i] = keys[i];
+        }
+        for (int i = 0; i < symbols.length; i++) {
+            all[keys.length + i] = symbols[i];
+        }
+        for (Object key : all) {
             Object raw = o.getOwnRaw(key);
             String shown;
             if (raw instanceof JsObject.Accessor) {
@@ -97,7 +108,9 @@ final class Inspect {
             } else {
                 shown = format(raw, depth + 1);
             }
-            parts.add((isIdentifier(key) ? key : quote(key)) + ": " + shown);
+            String name = key instanceof JsSymbol ? "[" + key + "]"
+                    : isIdentifier((String) key) ? (String) key : quote((String) key);
+            parts.add(name + ": " + shown);
         }
         return combine(parts, open, close, depth);
     }

@@ -6,7 +6,7 @@ final class Builtins {
     /** Returned by {@link #invoke} when the receiver has no such method. */
     static final Object NO_METHOD = new Object();
 
-    private static final String[] ARRAY_METHODS = {"push", "pop", "shift", "unshift", "slice", "concat", "join",
+    private static final String[] ARRAY_METHODS = {"values", "keys", "entries", "push", "pop", "shift", "unshift", "slice", "concat", "join",
         "indexOf", "includes", "reverse", "forEach", "map", "filter", "reduce", "some", "every", "find",
         "findIndex", "sort"};
 
@@ -24,6 +24,38 @@ final class Builtins {
             }
         }
         return false;
+    }
+
+    /** {@code o[symbol]} for arrays and strings: their {@code Symbol.iterator}. */
+    static Object symbolMethod(Object o, JsSymbol key) {
+        if (key == Globals.ITERATOR) {
+            return new JsFunction("[Symbol.iterator]", (callee, self, args) -> iterate(self, 1));
+        }
+        return o instanceof JsArray && ((JsArray) o).named() != null ? ((JsArray) o).named().get(key) : null;
+    }
+
+    /** An iterator object over an array (or string) of keys (0), values (1) or [key, value] pairs (2). */
+    private static Object iterate(Object o, int kind) {
+        if (o instanceof String) {
+            return Globals.iteratorObject(new JsIter.StringIter((String) o));
+        }
+        JsArray a = (JsArray) o;
+        return Globals.iteratorObject(new JsIter() {
+            private int index = -1;
+
+            @Override
+            public boolean next() {
+                return ++index < a.length();
+            }
+
+            @Override
+            public Object value() {
+                if (kind == 0) {
+                    return Long.valueOf(index);
+                }
+                return kind == 1 ? a.get(index) : new JsArray(new Object[] {Long.valueOf(index), a.get(index)});
+            }
+        });
     }
 
     /** {@code o.name} for a method: a function bound to nothing; its caller supplies {@code this}. */
@@ -48,15 +80,18 @@ final class Builtins {
     // ---- functions ----
 
     /** {@code f.key}: the built-in properties, then whatever the program stored on the function. */
-    static Object functionProperty(JsFunction f, String key) {
-        if (key.equals("prototype")) {
-            return f.prototype();
-        }
-        if (key.equals("name")) {
-            return f.name();
-        }
-        if (key.equals("call") || key.equals("apply") || key.equals("bind")) {
-            return new JsFunction(key, (callee, self, args) -> functionMethod((JsFunction) self, key, args));
+    static Object functionProperty(JsFunction f, Object key) {
+        if (key instanceof String) {
+            String name = (String) key;
+            if (name.equals("prototype")) {
+                return f.prototype();
+            }
+            if (name.equals("name")) {
+                return f.name();
+            }
+            if (name.equals("call") || name.equals("apply") || name.equals("bind")) {
+                return new JsFunction(name, (callee, self, args) -> functionMethod((JsFunction) self, name, args));
+            }
         }
         if (f.hasProps() && f.props().has(key)) {
             return f.props().getFor(key, f);
@@ -155,6 +190,12 @@ final class Builtins {
     private static Object arrayMethod(JsArray a, String name, Object[] args) {
         int n = a.length();
         switch (name) {
+            case "values":
+                return iterate(a, 1);
+            case "keys":
+                return iterate(a, 0);
+            case "entries":
+                return iterate(a, 2);
             case "push":
                 for (Object v : args) {
                     a.add(v);

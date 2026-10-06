@@ -24,13 +24,13 @@ public final class JsObject {
     /** The prototype, or null for none. */
     public JsObject proto;
 
-    private String[] keys = new String[4];
+    private Object[] keys = new Object[4];
     private Object[] values = new Object[4];
     private byte[] flags = new byte[4];
     private int size;
     private boolean extensible = true;
 
-    private int find(String key) {
+    private int find(Object key) {
         for (int i = 0; i < size; i++) {
             if (keys[i].equals(key)) {
                 return i;
@@ -40,7 +40,7 @@ public final class JsObject {
     }
 
     /** The value of {@code key} on this object or its prototype chain, running a getter with this object as {@code this}. */
-    public Object get(String key) {
+    public Object get(Object key) {
         for (JsObject o = this; o != null; o = o.proto) {
             int i = o.find(key);
             if (i >= 0) {
@@ -51,7 +51,7 @@ public final class JsObject {
     }
 
     /** Like {@link #get}, but a getter runs with {@code receiver} as {@code this}: for {@code super.x}. */
-    Object getFor(String key, Object receiver) {
+    Object getFor(Object key, Object receiver) {
         for (JsObject o = this; o != null; o = o.proto) {
             int i = o.find(key);
             if (i >= 0) {
@@ -66,7 +66,7 @@ public final class JsObject {
         return null;
     }
 
-    public Object getOwn(String key) {
+    public Object getOwn(Object key) {
         int i = find(key);
         return i < 0 ? null : resolve(values[i]);
     }
@@ -80,17 +80,17 @@ public final class JsObject {
     }
 
     /** The stored value or accessor of an own property, unresolved. */
-    Object getOwnRaw(String key) {
+    Object getOwnRaw(Object key) {
         int i = find(key);
         return i < 0 ? null : values[i];
     }
 
-    public boolean hasOwn(String key) {
+    public boolean hasOwn(Object key) {
         return find(key) >= 0;
     }
 
     /** True if {@code key} is on this object or its prototype chain. */
-    public boolean has(String key) {
+    public boolean has(Object key) {
         for (JsObject o = this; o != null; o = o.proto) {
             if (o.find(key) >= 0) {
                 return true;
@@ -103,17 +103,17 @@ public final class JsObject {
      * Sets an own data property without checking attributes or running setters: for the runtime's own use.
      * A new property is enumerable unless its name starts with '#', which marks a private field.
      */
-    public void set(String key, Object value) {
+    public void set(Object key, Object value) {
         int i = find(key);
         if (i >= 0) {
             values[i] = value;
             return;
         }
-        append(key, value, key.startsWith("#") ? HIDDEN : 0);
+        append(key, value, isPrivate(key) ? HIDDEN : 0);
     }
 
     /** Sets an own property that enumeration skips, like the methods on a built-in prototype. */
-    public void setHidden(String key, Object value) {
+    public void setHidden(Object key, Object value) {
         int i = find(key);
         if (i >= 0) {
             values[i] = value;
@@ -123,9 +123,9 @@ public final class JsObject {
         append(key, value, HIDDEN);
     }
 
-    private void append(String key, Object value, int attributes) {
+    private void append(Object key, Object value, int attributes) {
         if (size == keys.length) {
-            String[] newKeys = new String[size * 2];
+            Object[] newKeys = new Object[size * 2];
             Object[] newValues = new Object[size * 2];
             byte[] newFlags = new byte[size * 2];
             for (int j = 0; j < size; j++) {
@@ -147,7 +147,7 @@ public final class JsObject {
      * {@code this[key] = value} as JavaScript does it in strict code: a setter runs if one is found on the chain, a
      * read-only property or a frozen object throws, and otherwise the property is created or updated here.
      */
-    public void assign(String key, Object value) {
+    public void assign(Object key, Object value) {
         for (JsObject o = this; o != null; o = o.proto) {
             int i = o.find(key);
             if (i < 0) {
@@ -178,7 +178,7 @@ public final class JsObject {
     }
 
     /** Defines or redefines an own property: a data property if {@code value} isn't an Accessor. */
-    void define(String key, Object value, boolean enumerable, boolean writable, boolean configurable) {
+    void define(Object key, Object value, boolean enumerable, boolean writable, boolean configurable) {
         int attributes = (enumerable ? 0 : HIDDEN) | (writable || value instanceof Accessor ? 0 : READONLY)
                 | (configurable ? 0 : FIXED);
         int i = find(key);
@@ -190,12 +190,12 @@ public final class JsObject {
         }
     }
 
-    void defineAccessor(String key, JsFunction getter, JsFunction setter) {
+    void defineAccessor(Object key, JsFunction getter, JsFunction setter) {
         defineAccessor(key, getter, setter, true);
     }
 
     /** Adds a getter or setter, joining an accessor already there; a class's are not enumerable. */
-    void defineAccessor(String key, JsFunction getter, JsFunction setter, boolean enumerable) {
+    void defineAccessor(Object key, JsFunction getter, JsFunction setter, boolean enumerable) {
         int i = find(key);
         if (i >= 0 && values[i] instanceof Accessor) {
             Accessor a = (Accessor) values[i];
@@ -207,7 +207,7 @@ public final class JsObject {
     }
 
     /** Removes an own property; false if it can't be removed (non-configurable) or there was none. */
-    public boolean remove(String key) {
+    public boolean remove(Object key) {
         int i = find(key);
         if (i < 0 || (flags[i] & FIXED) != 0) {
             return false;
@@ -223,17 +223,17 @@ public final class JsObject {
         return true;
     }
 
-    public boolean isEnumerable(String key) {
+    public boolean isEnumerable(Object key) {
         int i = find(key);
         return i >= 0 && (flags[i] & HIDDEN) == 0;
     }
 
-    boolean isWritable(String key) {
+    boolean isWritable(Object key) {
         int i = find(key);
         return i >= 0 && (flags[i] & READONLY) == 0;
     }
 
-    boolean isConfigurable(String key) {
+    boolean isConfigurable(Object key) {
         int i = find(key);
         return i >= 0 && (flags[i] & FIXED) == 0;
     }
@@ -290,18 +290,18 @@ public final class JsObject {
         String[] out = new String[count];
         int n = 0;
         for (int i = 0; i < size; i++) {
-            if (counted(i, includeHidden) && isIndex(keys[i])) {
+            if (counted(i, includeHidden) && isIndex((String) keys[i])) {
                 int at = n++;
-                while (at > 0 && Long.parseLong(out[at - 1]) > Long.parseLong(keys[i])) {
+                while (at > 0 && Long.parseLong(out[at - 1]) > Long.parseLong((String) keys[i])) {
                     out[at] = out[at - 1];
                     at--;
                 }
-                out[at] = keys[i];
+                out[at] = (String) keys[i];
             }
         }
         for (int i = 0; i < size; i++) {
-            if (counted(i, includeHidden) && !isIndex(keys[i])) {
-                out[n++] = keys[i];
+            if (counted(i, includeHidden) && !isIndex((String) keys[i])) {
+                out[n++] = (String) keys[i];
             }
         }
         return out;
@@ -309,7 +309,29 @@ public final class JsObject {
 
     /** Whether key {@code i} is reported: enumerable ones, plus the others when asked, but never a private '#' name. */
     private boolean counted(int i, boolean includeHidden) {
-        return (includeHidden || (flags[i] & HIDDEN) == 0) && !keys[i].startsWith("#");
+        return keys[i] instanceof String && (includeHidden || (flags[i] & HIDDEN) == 0) && !isPrivate(keys[i]);
+    }
+
+    private static boolean isPrivate(Object key) {
+        return key instanceof String && ((String) key).startsWith("#");
+    }
+
+    /** Own symbol keys: the enumerable ones, or all of them when {@code includeHidden}. */
+    JsSymbol[] symbolKeys(boolean includeHidden) {
+        int count = 0;
+        for (int i = 0; i < size; i++) {
+            if (keys[i] instanceof JsSymbol && (includeHidden || (flags[i] & HIDDEN) == 0)) {
+                count++;
+            }
+        }
+        JsSymbol[] out = new JsSymbol[count];
+        int n = 0;
+        for (int i = 0; i < size; i++) {
+            if (keys[i] instanceof JsSymbol && (includeHidden || (flags[i] & HIDDEN) == 0)) {
+                out[n++] = (JsSymbol) keys[i];
+            }
+        }
+        return out;
     }
 
     /** A canonical array index: "0", or digits with no leading zero, below 2^32 - 1. */
