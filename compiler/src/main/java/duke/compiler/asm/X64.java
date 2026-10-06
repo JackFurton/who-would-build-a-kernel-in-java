@@ -418,6 +418,13 @@ public final class X64 {
         out.emit8(0xA4);
     }
 
+    /** Stores rax into rcx eight-byte words at [rdi]. */
+    public void repStosq() {
+        out.emit8(0xF3);
+        out.emit8(0x48);
+        out.emit8(0xAB);
+    }
+
     /** Stores al into rcx bytes at [rdi]. */
     public void repStosb() {
         out.emit8(0xF3);

@@ -253,7 +253,7 @@ final class Collector {
                 lastFreed += Heap.next - run;
                 Heap.next = run;
                 // The bump allocator hands out zeroed memory; the dead objects here weren't.
-                Magic.fillMemory(run, 0, to - run);
+                Magic.zeroMemoryWords(run, (to - run) >>> 3);
             } else {
                 addHole(run, to - run);
             }

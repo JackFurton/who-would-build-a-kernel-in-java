@@ -870,6 +870,12 @@ final class MethodCompiler {
             case "pokeInt" -> poke(4);
             case "pokeLong" -> poke(8);
             case "copyMemory" -> copyMemory();
+            case "zeroMemoryWords" -> {
+                popLong(RCX);
+                popLong(Reg.RDI);
+                a.movImm32(RAX, 0);
+                a.repStosq();
+            }
             case "fillMemory" -> {
                 popLong(RCX);
                 a.pop(RAX);
