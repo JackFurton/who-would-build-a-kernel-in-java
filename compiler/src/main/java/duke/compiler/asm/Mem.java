@@ -1,10 +1,17 @@
 package duke.compiler.asm;
 
-/** A memory operand: {@code [base + index*scale + disp]}, or {@code [rip + symbol + disp]} when base is null. */
-public record Mem(Reg base, Reg index, int scale, int disp, String symbol) {
+/**
+ * A memory operand: {@code [base + index*scale + disp]}, {@code [rip + symbol + disp]} when base is
+ * null, or {@code gs:[disp]} when {@code gs} is set.
+ */
+public record Mem(Reg base, Reg index, int scale, int disp, String symbol, boolean gs) {
+
+    public Mem(Reg base, Reg index, int scale, int disp, String symbol) {
+        this(base, index, scale, disp, symbol, false);
+    }
 
     public Mem {
-        if (base == null && symbol == null) {
+        if (base == null && symbol == null && !gs) {
             throw new IllegalArgumentException("memory operand needs a base register or a symbol");
         }
         if (index == Reg.RSP) {
@@ -35,7 +42,12 @@ public record Mem(Reg base, Reg index, int scale, int disp, String symbol) {
         return new Mem(null, null, 1, disp, symbol);
     }
 
+    /** An absolute offset into the GS segment: the per-CPU block. */
+    public static Mem gs(int disp) {
+        return new Mem(null, null, 1, disp, null, true);
+    }
+
     boolean isRipRelative() {
-        return base == null;
+        return base == null && !gs;
     }
 }

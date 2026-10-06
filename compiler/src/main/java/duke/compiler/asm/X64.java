@@ -490,6 +490,18 @@ public final class X64 {
      * size of any immediate the caller emits afterwards, needed to bias RIP-relative displacements.
      */
     private void memOp(boolean w, boolean forceRex, int reg, Mem m, int trailingImm, int... opcode) {
+        if (m.gs()) {
+            // Segment override, then ModRM rm=100 with a SIB of no base and no index: [disp32].
+            out.emit8(0x65);
+            rex(w, reg, 0, 0, forceRex);
+            for (int b : opcode) {
+                out.emit8(b);
+            }
+            out.emit8((reg & 7) << 3 | 0b100);
+            out.emit8(0x25);
+            out.emit32(m.disp());
+            return;
+        }
         if (m.isRipRelative()) {
             rex(w, reg, 0, 0, forceRex);
             for (int b : opcode) {
