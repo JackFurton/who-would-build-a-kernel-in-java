@@ -632,7 +632,8 @@ final class CodeGen {
             case Chain c -> throw error(c.line(), "optional chaining is not supported by the x86 back end");
             case Spread sp -> throw error(sp.line(), "spread is not supported by the x86 back end");
             case TaggedTemplate tt -> throw error(tt.line(), "tagged templates are not supported by the x86 back end");
-            case Internal in -> throw error(in.line(), "rest parameters are not supported by the x86 back end");
+            case Hole h -> throw error(h.line(), "array holes are not supported by the x86 back end");
+            case Internal in -> throw error(in.line(), "rest parameters and destructuring are not supported by the x86 back end");
             case Member m -> {
                 gen(m.object());
                 asm.push(RAX);

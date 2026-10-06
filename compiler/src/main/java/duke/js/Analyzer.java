@@ -407,6 +407,7 @@ final class Analyzer {
                 }
                 visit(p.value());
             });
+            case Hole h -> { }
             case Spread sp -> visit(sp.value());
             case TaggedTemplate tt -> {
                 visit(tt.tag());

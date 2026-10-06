@@ -725,11 +725,15 @@ final class JavaGen {
                     default -> "JS.call(" + expr(tt.tag()) + tail + ")";
                 };
             }
+            case Hole h -> {
+                return "JS.U";
+            }
             case Internal in -> {
                 if (in.name().equals("restArgs")) {
                     return "JS.restArgs(" + currentArgs + ", " + ((Num) in.args().get(0)).value() + ")";
                 }
-                throw new IllegalStateException("internal " + in.name());
+                // The other helpers are runtime methods of the same name: toArray, requireObject and objectRest.
+                return "JS." + in.name() + "(" + list(in.args()) + ")";
             }
             case FuncExpr f -> {
                 return function(f.function());
