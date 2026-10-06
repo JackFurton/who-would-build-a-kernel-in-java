@@ -57,6 +57,10 @@ public class ShellTest {
                 System.out.println("shell-test: " + Runtime.getRuntime().availableProcessors() + " cores; busiest processes:");
                 new ProcessBuilder("sh", "-c", "ps -eo pid,pcpu,etime,args --sort=-pcpu 2>/dev/null | head -12 || ps -Ao pid,pcpu,etime,command -r | head -12")
                         .inheritIO().start().waitFor();
+                if (qemu.isAlive()) {
+                    System.out.println("shell-test: where each CPU is (look the RIPs up in build/kernel.map):");
+                    System.out.println(query(monitor, "info registers -a").indent(4));
+                }
                 qemu.destroy();
                 qemu.waitFor(10, TimeUnit.SECONDS);
                 System.out.println("shell-test: the kernel never reached its prompt (QEMU " + state + "); QEMU said:\n"
@@ -154,6 +158,22 @@ public class ShellTest {
             channel.connect(UnixDomainSocketAddress.of(monitor));
             channel.write(ByteBuffer.wrap((line + "\n").getBytes(StandardCharsets.US_ASCII)));
             Thread.sleep(300);
+        }
+    }
+
+    /** Sends a monitor command and returns what QEMU answered. */
+    static String query(Path monitor, String line) throws Exception {
+        try (SocketChannel channel = SocketChannel.open(StandardProtocolFamily.UNIX)) {
+            channel.connect(UnixDomainSocketAddress.of(monitor));
+            channel.write(ByteBuffer.wrap((line + "\n").getBytes(StandardCharsets.US_ASCII)));
+            Thread.sleep(1000);
+            channel.configureBlocking(false);
+            StringBuilder answer = new StringBuilder();
+            ByteBuffer buffer = ByteBuffer.allocate(1 << 16);
+            for (int n; (n = channel.read(buffer)) > 0; buffer.clear()) {
+                answer.append(new String(buffer.array(), 0, n, StandardCharsets.US_ASCII));
+            }
+            return clean(answer.toString());
         }
     }
 
