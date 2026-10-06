@@ -75,7 +75,8 @@ ktest: $(DUKEC) $(BUILD)/limine/BOOTX64.EFI
 shell-test: all
 	java tools/ShellTest.java
 
-# jsc programs against node: needs node, and Docker unless this is x86-64 Linux.
+# jsc programs against node, through both back ends. Needs node, and the x86 back end needs Docker
+# unless this is x86-64 Linux; JS_BACKENDS=java skips it.
 js-test: $(DUKEC)
 	java tools/JsTests.java
 

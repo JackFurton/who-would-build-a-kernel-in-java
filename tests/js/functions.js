@@ -55,3 +55,8 @@ function outer() {
 var inner = outer();
 console.log(inner(), inner(), inner());
 console.log(typeof fib, typeof (() => 1));
+var tally = { hits: 0 };
+var hit = (x) => (x && tally.hits++, x || tally.hits--);
+console.log(hit(1), hit(0), tally);
+var pick = (a, b) => (a ?? b) || (a && b);
+console.log(pick(null, 0), pick(2, 3), pick(0, 5));
