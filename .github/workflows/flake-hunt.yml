@@ -1,0 +1,64 @@
+name: Flake hunt
+
+# Throwaway: boots the kernel over and over to catch the firmware #UD crash, and keeps the logs.
+on:
+  push:
+    branches: [ci-flake-hunt]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  hunt:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    strategy:
+      fail-fast: true
+      matrix:
+        shard: [1, 2, 3, 4, 5, 6, 7, 8]
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '25'
+
+      - uses: gradle/actions/setup-gradle@v6
+
+      - name: Install QEMU and OVMF
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends qemu-system-x86 ovmf
+
+      - name: Build the kernel
+        run: make all
+
+      - name: Boot environment
+        run: tools/boot-env.sh | tee build-env.txt >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Boot until it fails
+        run: |
+          mkdir -p hunt
+          for i in $(seq 1 25); do
+            echo "== round $i"
+            if ! tools/boot-test.sh build/esp build/serial.log DUKE-BOOT-OK 60 > hunt/boot-$i.txt 2>&1; then
+              echo "boot-test failed in round $i"; cat hunt/boot-$i.txt | tail -40; exit 1
+            fi
+            if ! java tools/ShellTest.java > hunt/shell-$i.txt 2>&1; then
+              echo "shell-test failed in round $i"; tail -60 hunt/shell-$i.txt; exit 1
+            fi
+          done
+
+      - name: Keep the evidence
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: crash-shard-${{ matrix.shard }}
+          path: |
+            hunt/
+            build/serial.log
+            build/shell-test/
+            build-env.txt
+          if-no-files-found: ignore
