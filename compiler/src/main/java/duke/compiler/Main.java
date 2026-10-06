@@ -5,10 +5,16 @@ import duke.compiler.image.Image;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 
-/** {@code dukec --classes DIR --entry pkg/Class.method --output kernel.elf [--map kernel.map]} */
+/**
+ * {@code dukec --classes DIR --entry pkg/Class.method --output kernel.elf [--map kernel.map] [--include pkg/Class|pkg/]...}
+ *
+ * <p>{@code --include} adds classes (or whole packages, with a trailing slash) that are compiled in and
+ * initialized at boot though nothing refers to them. {@link Compiler#DEFAULT_INCLUDES} are always on.
+ */
 public final class Main {
 
     private Main() {
@@ -19,6 +25,7 @@ public final class Main {
         String entry = null;
         Path output = null;
         Path map = null;
+        List<String> includes = new ArrayList<>(Compiler.DEFAULT_INCLUDES);
         for (int i = 0; i < args.length; i++) {
             String value = i + 1 < args.length ? args[i + 1] : null;
             switch (args[i]) {
@@ -26,6 +33,7 @@ public final class Main {
                 case "--entry" -> entry = require(value, args[i]);
                 case "--output" -> output = Path.of(require(value, args[i]));
                 case "--map" -> map = Path.of(require(value, args[i]));
+                case "--include" -> includes.add(require(value, args[i]));
                 default -> usage("unknown argument " + args[i]);
             }
             i++;
@@ -40,7 +48,9 @@ public final class Main {
 
         Image.Linked linked;
         try {
-            Image image = new Compiler(ClassPool.load(classes)).compile(entry.substring(0, dot), entry.substring(dot + 1));
+            Compiler compiler = new Compiler(ClassPool.load(classes));
+            includes.forEach(compiler::include);
+            Image image = compiler.compile(entry.substring(0, dot), entry.substring(dot + 1));
             linked = image.link(Compiler.KERNEL_BASE);
         } catch (CompileException e) {
             System.err.println("dukec: error: " + e.getMessage());
@@ -69,7 +79,7 @@ public final class Main {
 
     private static void usage(String problem) {
         System.err.println("dukec: " + problem);
-        System.err.println("usage: dukec --classes DIR --entry pkg/Class.method --output kernel.elf [--map kernel.map]");
+        System.err.println("usage: dukec --classes DIR --entry pkg/Class.method --output kernel.elf [--map kernel.map] [--include pkg/Class|pkg/]...");
         System.exit(2);
     }
 }

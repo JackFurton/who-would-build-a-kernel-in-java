@@ -284,6 +284,18 @@ has no effect outside its own fields, so when it runs is unobservable. A fuller 
 (running arbitrary initializers on the host, GraalVM-style) would need a heap snapshotter and a
 policy for which classes are safe. That waits until something needs it.
 
+### Extra roots
+
+The compiler starts from the entry point, so a class nothing refers to isn't in the image. For code
+that has to be there anyway (generated modules that register themselves, say), `dukec --include`
+adds roots. Each is a class (`--include pkg/Class`) or, with a trailing slash, every class under a
+package prefix (`--include pkg/`), and may be repeated. An included class is compiled into the image
+and, if it has a static initializer, `_start` runs it before the entry point, after the entry class's
+own. `duke/js/gen/` is included by default, so the generated JavaScript modules need no flag. A name
+that isn't in the class pool is a compile error; a package prefix that matches nothing is not.
+Initializers run that early can't rely on anything the entry point sets up, so they should only
+register work for later.
+
 ### Runtime checks
 
 Null dereferences, array bounds and division by zero are checked inline, and on failure call
