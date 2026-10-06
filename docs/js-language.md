@@ -13,22 +13,23 @@ with `// backends: java` and skips it.
 | Area | What works |
 | --- | --- |
 | Declarations | `var`, `let`, `const`, function declarations (hoisted), per-iteration `let` in `for` loops |
-| Functions | declarations, expressions, arrows, closures, `this`, `call`/`apply`/`bind`, name inference (`const f = () => 1` is named `f`) |
-| Objects | literals, shorthand properties and methods, computed access, prototypes, `new`, constructor functions, `instanceof`, `in`, `delete`, `for...in`, property enumeration order (indexes first) |
+| Functions | declarations, expressions, arrows, closures, `this`, `arguments`, default and rest parameters, `call`/`apply`/`bind`, name inference (`const f = () => 1` is named `f`) |
+| Spread | `...` in calls, `new`, array literals and object literals (arrays and strings are the iterables for now) |
+| Objects | literals, shorthand properties and methods, computed keys (`{[k]: v}`), computed access, prototypes, `new`, constructor functions, `instanceof`, `in`, `delete`, `for...in`, property enumeration order (indexes first) |
 | Operators | arithmetic and bitwise (32-bit), comparison, `===`/`==`, logical, `??`, `?:`, optional chaining (`?.`, `?.[]`, `?.()`), `typeof`, `void`, `delete`, compound assignment, `++`/`--` |
 | Literals | decimal, `0x`, `0b` and `0o` integers (with `_` separators), strings, template literals, array and object literals |
 | Statements | `if`, `for`, `for...of`, `for...in`, `while`, `do...while`, `switch` (fallthrough, `default` anywhere), labels with `break`/`continue`, `break`, `continue`, blocks, `throw`, `try`/`catch`/`finally` (with or without a catch binding) |
 | Errors | `Error`, `TypeError`, `RangeError`, `ReferenceError`, `SyntaxError`, `EvalError`, `URIError`; runtime errors (reading a property of `undefined`, calling a non-function, stack overflow) are catchable |
-| Strings | literals, template literals, the usual methods (`slice`, `split`, `indexOf`, `padStart`, ...) |
+| Strings | literals, template literals and tagged templates (`String.raw` too), the usual methods (`slice`, `split`, `indexOf`, `padStart`, ...) |
 | Arrays | literals, indexing, `length`, and the common methods (`push`, `map`, `filter`, `reduce`, `sort`, ...) |
 | Built-ins | `console.log`/`error` (node-style formatting), `Math` (integer subset), `Object` statics (`keys`, `values`, `entries`, `assign`, `create`, `getPrototypeOf`, `setPrototypeOf`, `hasOwn`), `Object.prototype` methods, `Array.isArray`/`of`, `String`, `Number`, `parseInt` |
 
 ## Not yet (unbuilt)
 
-In the order we expect to do them: classes (`extends`, `super`, `static`, getters and setters), default parameters, rest and
-spread, destructuring, `arguments`, tagged templates, `Symbol`, iterators and generators, `Map`/`Set`/
-`WeakMap`/`WeakSet`, modules (`import`/`export`), `Promise` and `async`/`await`, optional chaining,
-`Object.defineProperty` and property descriptors, `Object.freeze`, `JSON`, typed arrays.
+In the order we expect to do them: destructuring, classes (`extends`, `super`, `static`, getters and
+setters), `Symbol`, iterators and generators, `Map`/`Set`/`WeakMap`/`WeakSet`, modules
+(`import`/`export`), `Promise` and `async`/`await`, `Object.defineProperty` and property descriptors,
+`Object.freeze`, `JSON`, typed arrays.
 
 ## Waiting on the kernel
 
@@ -52,6 +53,8 @@ property operation). Calling `new Function` throws an error that says so.
 - Arrays have no holes: `delete a[i]` and growing past the end store `undefined` (node prints `<1 empty item>`).
 - `console.log` doesn't group arrays of more than six items into columns, as node does.
 - Methods in object literals can be used with `new`; node throws.
+- `arguments` is a plain array with no link back to the parameters, and `console.log(arguments)` prints it as one.
+- A tagged template's strings array is built on each call, so it is not the same object every time as in node.
 - An undeclared name is a compile error, where node throws a `ReferenceError` when the line runs.
 - Errors have no stack trace: `stack` is just `Name: message`, and `console.log(err)` prints that (inside an object, in
   brackets) where node prints the trace.

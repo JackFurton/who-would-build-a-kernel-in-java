@@ -388,6 +388,9 @@ final class Analyzer {
             }
             case Ident id -> {
                 Var v = lookup(id.name());
+                if (v == null && id.name().equals("arguments")) {
+                    v = argumentsVar();
+                }
                 if (v == null) {
                     if (!externals.contains(id.name())) {
                         throw new JsException(file, id.line(), id.name() + " is not defined");
@@ -398,7 +401,18 @@ final class Analyzer {
                 }
             }
             case ArrayLit a -> a.elements().forEach(this::visit);
-            case ObjectLit o -> o.properties().forEach(p -> visit(p.value()));
+            case ObjectLit o -> o.properties().forEach(p -> {
+                if (p.computed() != null) {
+                    visit(p.computed());
+                }
+                visit(p.value());
+            });
+            case Spread sp -> visit(sp.value());
+            case TaggedTemplate tt -> {
+                visit(tt.tag());
+                tt.exprs().forEach(this::visit);
+            }
+            case Internal in -> in.args().forEach(this::visit);
             case FuncExpr f -> visitFunction(f.function(), true);
             case Unary u -> visit(u.operand());
             case Update u -> visit(u.target());
@@ -455,6 +469,24 @@ final class Analyzer {
             }
         }
         return null;
+    }
+
+    /** The {@code arguments} of the nearest non-arrow function, declared on first use; null at top level. */
+    private Var argumentsVar() {
+        FuncInfo f = current.func;
+        while (f != null && !f.main && f.node.arrow()) {
+            f = f.parent;
+        }
+        if (f == null || f.main) {
+            return null;
+        }
+        Var v = f.scope.vars.get("arguments");
+        if (v == null) {
+            v = new Var("arguments", "arguments", f, false);
+            v.slot = f.newSlot();
+            f.scope.vars.put("arguments", v);
+        }
+        return v;
     }
 
     /** The {@code this} of the nearest non-arrow function, declared on first use; null at top level. */

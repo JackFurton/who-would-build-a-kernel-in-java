@@ -63,7 +63,7 @@ class JsCompilerTest {
                 Arguments.of("var s = \"\u00e9\";", "only ASCII strings"),
                 Arguments.of("var x = 1 +;", "unexpected ';'"),
                 Arguments.of("break;", "'break' outside a loop"),
-                Arguments.of("var a = [...b];", "spread is not supported yet"));
+                Arguments.of("function f(...a, b) {}", "a rest parameter must be last"));
     }
 
     @ParameterizedTest
@@ -88,6 +88,9 @@ class JsCompilerTest {
         assertTrue(error("switch (1) { }").contains("'switch' is not supported by the x86 back end"));
         assertTrue(error("a: for (;;) { break a; }").contains("labels are not supported by the x86 back end"));
         assertTrue(error("var o; o?.x;").contains("optional chaining is not supported by the x86 back end"));
+        assertTrue(error("function f(...a) {}").contains("rest parameters are not supported by the x86 back end"));
+        assertTrue(error("function f() {}\nf(...[]);").contains("spread is not supported by the x86 back end"));
+        assertTrue(error("function f() {}\nvar t = f`x`;").contains("tagged templates are not supported by the x86 back end"));
         assertTrue(error("throw 1;").contains("'throw' is not supported by the x86 back end"));
         assertTrue(error("try { } finally { }").contains("'try' is not supported by the x86 back end"));
     }
@@ -163,7 +166,8 @@ class JsCompilerTest {
                 for (let k2 in items) items[k2]++;
                 try { throw new Error("x"); } catch (e) { has = e; } finally { has = null; }
                 try { has = 1; } catch { has = 2; }
-                console.log(t, u, twice((x) => x * 2, 3), early(2), nested(3), (1, 2), has, q);
+                function params(a, b = a, ...rest) { return [a, b, ...rest, arguments.length, { [a]: b, ...q }]; }
+                console.log(t, u, twice((x) => x * 2, 3), early(2), nested(3), (1, 2), has, q, params(1, 2, 3), String.raw`x${1}`);
                 """;
         Path dir = Files.createTempDirectory("jsgen");
         Path module = dir.resolve("Sample.java");

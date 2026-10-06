@@ -40,7 +40,7 @@ final class Lexer {
             skipTrivia();
             newline = newline || line > before;
             if (pos >= src.length()) {
-                out.add(new Token(Token.Kind.EOF, "", 0, line, true, null, null));
+                out.add(new Token(Token.Kind.EOF, "", 0, line, true, null, null, null));
                 return out;
             }
             out.add(next(newline));
@@ -54,7 +54,7 @@ final class Lexer {
             return number(newline);
         }
         if (c == '"' || c == '\'') {
-            return new Token(Token.Kind.STR, string(c), 0, line, newline, null, null);
+            return new Token(Token.Kind.STR, string(c), 0, line, newline, null, null, null);
         }
         if (c == '`') {
             return template(newline);
@@ -67,12 +67,12 @@ final class Lexer {
             }
             String word = src.substring(start, pos);
             return new Token(KEYWORDS.contains(word) ? Token.Kind.KEYWORD : Token.Kind.IDENT, word, 0, line,
-                    newline, null, null);
+                    newline, null, null, null);
         }
         for (String p : PUNCTUATORS) {
             if (src.startsWith(p, pos)) {
                 pos += p.length();
-                return new Token(Token.Kind.PUNCT, p, 0, line, newline, null, null);
+                return new Token(Token.Kind.PUNCT, p, 0, line, newline, null, null, null);
             }
         }
         throw error("unexpected character '" + c + "'");
@@ -112,7 +112,7 @@ final class Lexer {
         if (value >= 1L << 53) {
             throw error("integer literal is beyond 2^53 and would not be exact in JavaScript either");
         }
-        return new Token(Token.Kind.NUM, src.substring(start, pos), value, line, newline, null, null);
+        return new Token(Token.Kind.NUM, src.substring(start, pos), value, line, newline, null, null, null);
     }
 
     private String string(char quote) {
@@ -135,7 +135,9 @@ final class Lexer {
         pos++;
         List<String> chunks = new ArrayList<>();
         List<String> exprs = new ArrayList<>();
+        List<String> raws = new ArrayList<>();
         StringBuilder sb = new StringBuilder();
+        int rawStart = pos;
         while (true) {
             if (pos >= src.length()) {
                 throw error("unterminated template literal");
@@ -143,12 +145,15 @@ final class Lexer {
             char c = src.charAt(pos++);
             if (c == '`') {
                 chunks.add(sb.toString());
-                return new Token(Token.Kind.TEMPLATE, "`", 0, startLine, newline, chunks, exprs);
+                raws.add(src.substring(rawStart, pos - 1).replace("\r\n", "\n"));
+                return new Token(Token.Kind.TEMPLATE, "`", 0, startLine, newline, chunks, exprs, raws);
             } else if (c == '$' && pos < src.length() && src.charAt(pos) == '{') {
+                raws.add(src.substring(rawStart, pos - 1).replace("\r\n", "\n"));
                 pos++;
                 chunks.add(sb.toString());
                 sb.setLength(0);
                 exprs.add(templateExpression());
+                rawStart = pos;
             } else if (c == '\\') {
                 sb.append(escape());
             } else {

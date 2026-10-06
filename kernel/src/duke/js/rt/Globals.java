@@ -98,6 +98,18 @@ public final class Globals {
         JsFunction string = function("String", (callee, self, args) -> JS.str(arg(args, 0)));
         string.props().set("fromCharCode", function("fromCharCode", (callee, self, args) ->
                 String.valueOf((char) JS.toNumber(arg(args, 0)))));
+        string.props().setHidden("raw", function("raw", (callee, self, args) -> {
+            Object raw = JS.get(arg(args, 0), "raw");
+            StringBuilder sb = new StringBuilder();
+            long n = JS.length(raw);
+            for (long i = 0; i < n; i++) {
+                sb.append(JS.str(JS.getIndex(raw, i)));
+                if (i + 1 < n && i + 1 < args.length) {
+                    sb.append(JS.str(args[(int) i + 1]));
+                }
+            }
+            return sb.toString();
+        }));
         g.set("String", string);
 
         JsFunction number = function("Number", (callee, self, args) -> Long.valueOf(JS.toNumber(arg(args, 0))));

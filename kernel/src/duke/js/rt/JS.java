@@ -63,9 +63,112 @@ public final class JS {
         JsObject o = new JsObject();
         o.proto = Globals.objectPrototype();
         for (int i = 0; i < keysAndValues.length; i += 2) {
-            o.set((String) keysAndValues[i], keysAndValues[i + 1]);
+            o.set(keyString(keysAndValues[i]), keysAndValues[i + 1]);
         }
         return o;
+    }
+
+    /** Marks {@code ...value} among call arguments, array elements and object members. */
+    private static final class Spreading {
+        final Object value;
+
+        Spreading(Object value) {
+            this.value = value;
+        }
+    }
+
+    public static Object spreadOf(Object value) {
+        return new Spreading(value);
+    }
+
+    /** The values of an iterable, appended to {@code out}. Arrays and strings only for now. */
+    static void addAll(JsArray out, Object iterable) {
+        if (iterable instanceof JsArray) {
+            JsArray a = (JsArray) iterable;
+            for (int i = 0; i < a.length(); i++) {
+                out.add(a.get(i));
+            }
+        } else if (iterable instanceof String) {
+            String s = (String) iterable;
+            for (int i = 0; i < s.length(); i++) {
+                out.add(s.substring(i, i + 1));
+            }
+        } else {
+            throw new JsError("TypeError: " + (iterable == null ? "undefined" : str(iterable)) + " is not iterable");
+        }
+    }
+
+    /** The arguments or elements for a list that contains spreads: {@code f(a, ...b)} becomes {@code spread(a, spreadOf(b))}. */
+    public static Object[] spread(Object... parts) {
+        JsArray out = new JsArray();
+        for (Object part : parts) {
+            if (part instanceof Spreading) {
+                addAll(out, ((Spreading) part).value);
+            } else {
+                out.add(part);
+            }
+        }
+        Object[] result = new Object[out.length()];
+        for (int i = 0; i < result.length; i++) {
+            result[i] = out.get(i);
+        }
+        return result;
+    }
+
+    /** {@code {a: 1, ...other, b: 2}}: members in order, each a key and a value or a lone spread of an object. */
+    public static Object objectSpread(Object... parts) {
+        JsObject o = new JsObject();
+        o.proto = Globals.objectPrototype();
+        for (int i = 0; i < parts.length; ) {
+            if (parts[i] instanceof Spreading) {
+                copyOwn(o, ((Spreading) parts[i]).value);
+                i++;
+            } else {
+                o.set(keyString(parts[i]), parts[i + 1]);
+                i += 2;
+            }
+        }
+        return o;
+    }
+
+    private static void copyOwn(JsObject target, Object source) {
+        if (source instanceof JsObject) {
+            JsObject from = (JsObject) source;
+            for (String key : from.keys()) {
+                target.set(key, from.getOwn(key));
+            }
+        } else if (source instanceof JsArray || source instanceof String) {
+            for (long i = 0; i < length(source); i++) {
+                target.set(Long.toString(i), getIndex(source, i));
+            }
+        }
+    }
+
+    /** The parameter {@code ...rest}: the arguments from index {@code from} on. */
+    public static Object restArgs(Object[] args, int from) {
+        JsArray rest = new JsArray();
+        for (int i = from; i < args.length; i++) {
+            rest.add(args[i]);
+        }
+        return rest;
+    }
+
+    /** The {@code arguments} object. It's an ordinary array here, so it has no link back to the parameters. */
+    public static Object arguments(Object[] args) {
+        return new JsArray(args);
+    }
+
+    /** The strings array a tag function receives, with its {@code raw} counterpart. */
+    public static Object templateStrings(String[] cooked, String[] raw) {
+        Object[] c = new Object[cooked.length];
+        Object[] r = new Object[raw.length];
+        for (int i = 0; i < c.length; i++) {
+            c[i] = cooked[i];
+            r[i] = raw[i];
+        }
+        JsArray strings = new JsArray(c);
+        strings.namedOrCreate().setHidden("raw", new JsArray(r));
+        return strings;
     }
 
     public static Object arg(Object[] args, int i) {
@@ -383,6 +486,9 @@ public final class JS {
             if ("length".equals(key)) {
                 return Long.valueOf(array.length());
             }
+            if (array.named() != null && array.named().has(keyString(key))) {
+                return array.named().get(keyString(key));
+            }
             return Builtins.method(o, keyString(key));
         }
         if (o instanceof String) {
@@ -421,7 +527,7 @@ public final class JS {
             } else if ("length".equals(key)) {
                 array.setLength((int) toNumber(value));
             } else {
-                throw new JsError("TypeError: arrays cannot have a property named '" + str(key) + "' yet");
+                array.namedOrCreate().set(keyString(key), value);
             }
         } else if (o instanceof JsFunction) {
             JsFunction f = (JsFunction) o;
