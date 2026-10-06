@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="820" height="496" viewBox="0 0 820 496" role="img" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif">
 <title>Calibration</title>
-<desc>Firebathero: L6, Staff Engineer, Performance, 284 merged, 207 in review. dkempner: L7, Senior Staff Engineer, JavaScript, 442 merged, 9 in review. Kethankumar99: L4, Software Engineer II, Device Drivers, 31 merged, 0 in review. senthilkumar-r: L3, Software Engineer, Device Drivers, 16 merged, 0 in review. GalaktusSK: L3, Software Engineer, Generalist, 0 merged, 15 in review. </desc>
+<desc>Firebathero: L6, Staff Engineer, Performance, 346 merged, 145 in review. dkempner: L7, Senior Staff Engineer, JavaScript, 442 merged, 9 in review. Kethankumar99: L4, Software Engineer II, Device Drivers, 31 merged, 0 in review. senthilkumar-r: L3, Software Engineer, Device Drivers, 16 merged, 0 in review. GalaktusSK: L3, Software Engineer, Generalist, 0 merged, 15 in review. </desc>
 <rect x="0.0" y="0.0" width="820.0" height="496.0" rx="0" fill="#fcfcfb"/>
 <text x="16.0" y="28.0" fill="#0b0b0b" font-size="18" font-weight="700" text-anchor="start">Calibration</text>
 <text x="16.0" y="48.0" fill="#52514e" font-size="12" font-weight="400" text-anchor="start">Leveled on merged code. Darker: in review. Faded: 30 days at today's pace.</text>
@@ -14,11 +14,11 @@
 <text x="33.0" y="118.0" fill="#ffffff" font-size="13" font-weight="700" text-anchor="middle">L6</text>
 <text x="60.0" y="111.0" fill="#0b0b0b" font-size="14" font-weight="700" text-anchor="start">Firebathero</text>
 <text x="60.0" y="127.0" fill="#52514e" font-size="11" font-weight="400" text-anchor="start">Staff Engineer, Performance</text>
-<text x="60.0" y="142.0" fill="#898781" font-size="10" font-weight="400" text-anchor="start">3 merged · 4 in review · L7 promo when their open PRs merge</text>
-<rect x="300.0" y="104.0" width="330.9" height="20.0" rx="5" fill="#7c5cd6" fill-opacity="0.22"/>
+<text x="60.0" y="142.0" fill="#898781" font-size="10" font-weight="400" text-anchor="start">4 merged · 3 in review · L7 promo when their open PRs merge</text>
+<rect x="300.0" y="104.0" width="382.4" height="20.0" rx="5" fill="#7c5cd6" fill-opacity="0.22"/>
 <rect x="300.0" y="104.0" width="95.1" height="20.0" rx="5" fill="#7c5cd6" fill-opacity="0.55"/>
-<rect x="300.0" y="104.0" width="55.0" height="20.0" rx="5" fill="#7c5cd6"/>
-<text x="636.9" y="119.0" fill="#0b0b0b" font-size="11" font-weight="700" text-anchor="start">284</text>
+<rect x="300.0" y="104.0" width="67.0" height="20.0" rx="5" fill="#7c5cd6"/>
+<text x="688.4" y="119.0" fill="#0b0b0b" font-size="11" font-weight="700" text-anchor="start">346</text>
 <rect x="16.0" y="164.0" width="34.0" height="26.0" rx="5" fill="#eb6834"/>
 <text x="33.0" y="182.0" fill="#ffffff" font-size="13" font-weight="700" text-anchor="middle">L7</text>
 <text x="60.0" y="175.0" fill="#0b0b0b" font-size="14" font-weight="700" text-anchor="start">dkempner</text>
