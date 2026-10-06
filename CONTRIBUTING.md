@@ -8,7 +8,9 @@ kernel one more thing". You don't need to know the whole system to help.
 
 - [`good first issue`](https://github.com/JackFurton/who-would-build-a-kernel-in-java/labels/good%20first%20issue)
   issues are small and self-contained, and say how to prove they're done.
-- Comment on an issue to claim it before you start, so two people don't build the same thing.
+- Comment `@duke-bot claim` on an issue to take it before you start, so two people don't build
+  the same thing. duke-bot assigns you within a minute; `@duke-bot release` gives it back if
+  you can't finish.
 - The [project board](https://github.com/users/JackFurton/projects/1) shows everything open and
   what's done.
 - Bigger work is grouped into [milestones](https://github.com/JackFurton/who-would-build-a-kernel-in-java/milestones).
@@ -65,3 +67,5 @@ must not allocate.
 - Run `make test` before pushing. CI runs the same targets on your PR automatically (GitHub may
   hold the very first run from a brand-new account for approval, as a spam guard).
 - Match the surrounding code: comments explain *why*, not *what*.
+- Maintainers: "Enable auto-merge" on an approved PR (or `gh pr merge --auto --squash`) merges it
+  as soon as CI is green, so nobody has to wait around to click.
