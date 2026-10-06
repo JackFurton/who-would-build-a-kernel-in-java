@@ -85,6 +85,11 @@ final class Node {
 
     record Return(Expr value, int line) implements Stmt {}
 
+    record Throw(Expr value, int line) implements Stmt {}
+
+    /** {@code param} is null for {@code catch {}}; {@code handler} or {@code finalizer} may be null, but not both. */
+    record Try(Block block, String param, Block handler, Block finalizer, int line) implements Stmt {}
+
     record Break(int line) implements Stmt {}
 
     record Continue(int line) implements Stmt {}

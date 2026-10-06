@@ -43,6 +43,10 @@ final class Inspect {
         }
         if (v instanceof JsObject) {
             JsObject o = (JsObject) v;
+            if (Globals.isError(o)) {
+                // node prints the stack; there are no stack traces here, so just "Name: message".
+                return depth == 0 ? Globals.errorText(o) : "[" + Globals.errorText(o) + "]";
+            }
             String name = constructorName(o);
             String prefix = o.proto == null ? "[Object: null prototype] " : name == null || name.equals("Object") ? "" : name + " ";
             if (depth > 2) {

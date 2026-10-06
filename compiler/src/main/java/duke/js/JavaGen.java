@@ -31,8 +31,9 @@ import java.util.Set;
 final class JavaGen {
 
     /** Globals the runtime defines; other undeclared names are compile errors. */
-    static final Set<String> GLOBALS = Set.of("console", "Math", "String", "Number", "Array", "Object", "parseInt",
-            "Kernel");
+    static final Set<String> GLOBALS = Set.of("console", "Math", "String", "Number", "Array", "Object", "Function",
+            "parseInt", "Kernel", "Error", "TypeError", "RangeError", "ReferenceError", "SyntaxError", "EvalError",
+            "URIError");
 
     static final String PACKAGE = "duke.js.gen";
 
@@ -305,6 +306,8 @@ final class JavaGen {
                 String value = r.value() == null ? "JS.U" : expr(r.value());
                 line(fn.main ? "if (JS.T) return;" : "if (JS.T) return " + value + ";");
             }
+            case Throw t -> line("if (JS.T) throw JS.thrown(" + expr(t.value()) + ");");
+            case Try t -> genTry(t);
             case Break b -> line("if (JS.T) break;");
             case Continue c -> {
                 String label = continueLabels.peek();
@@ -402,6 +405,28 @@ final class JavaGen {
         indent--;
         line("}");
         indent--;
+        line("}");
+    }
+
+    private void genTry(Try t) {
+        line("try {");
+        body(t.block());
+        if (t.handler() != null) {
+            String exception = "ex" + ++uid;
+            // Runtime errors and JavaScript throws are RuntimeExceptions; a stack overflow is an Error that
+            // JavaScript can catch too (as a RangeError).
+            line("} catch (RuntimeException | StackOverflowError " + exception + ") {");
+            indent++;
+            if (t.param() != null) {
+                declare(an.resolved.get(t), "JS.caught(" + exception + ")");
+            }
+            indent--;
+            body(t.handler());
+        }
+        if (t.finalizer() != null) {
+            line("} finally {");
+            body(t.finalizer());
+        }
         line("}");
     }
 

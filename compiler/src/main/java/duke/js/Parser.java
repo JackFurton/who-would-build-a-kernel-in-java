@@ -21,7 +21,7 @@ final class Parser {
     private static final Set<String> ASSIGN = Set.of("=", "+=", "-=", "*=", "/=", "%=", "&=", "|=", "^=", "<<=",
             ">>=", ">>>=", "**=", "&&=", "||=", "??=");
 
-    private static final Set<String> UNSUPPORTED = Set.of("throw", "try", "class", "switch");
+    private static final Set<String> UNSUPPORTED = Set.of("class", "switch");
 
     private final String file;
     private final List<Token> tokens;
@@ -107,6 +107,36 @@ final class Parser {
             }
             semicolon();
             return new Return(value, line);
+        }
+        if (t.is("throw")) {
+            pos++;
+            if (peek().newlineBefore()) {
+                throw error(peek(), "a line break is not allowed after 'throw'");
+            }
+            Expr value = expression();
+            semicolon();
+            return new Throw(value, line);
+        }
+        if (t.is("try")) {
+            pos++;
+            Block block = block();
+            String param = null;
+            Block handler = null;
+            Block finalizer = null;
+            if (accept("catch")) {
+                if (accept("(")) {
+                    param = expectIdent();
+                    expect(")");
+                }
+                handler = block();
+            }
+            if (accept("finally")) {
+                finalizer = block();
+            }
+            if (handler == null && finalizer == null) {
+                throw error(peek(), "missing catch or finally after try");
+            }
+            return new Try(block, param, handler, finalizer, line);
         }
         if (t.is("break")) {
             pos++;
