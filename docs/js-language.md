@@ -27,7 +27,7 @@ with `// backends: java` and skips it.
 | Errors | `Error`, `TypeError`, `RangeError`, `ReferenceError`, `SyntaxError`, `EvalError`, `URIError`; runtime errors (reading a property of `undefined`, calling a non-function, stack overflow) are catchable |
 | Strings | literals, template literals and tagged templates (`String.raw` too), the usual methods (`slice`, `split`, `indexOf`, `padStart`, ...) |
 | Arrays | literals, indexing, `length`, and the common methods (`push`, `map`, `filter`, `reduce`, `sort`, ...) |
-| Built-ins | `console.log`/`error` (node-style formatting), `Math` (integer subset), `Object` statics (`keys`, `values`, `entries`, `assign`, `create`, `getPrototypeOf`, `setPrototypeOf`, `hasOwn`), `Object.prototype` methods, `Array.isArray`/`of`, `String`, `Number`, `parseInt` |
+| Built-ins | `console.log`/`error` (node-style formatting), `Math` (integer subset), `Object` statics (`keys`, `values`, `entries`, `assign`, `create`, `getPrototypeOf`, `setPrototypeOf`, `hasOwn`), `Object.prototype` methods, `Array.isArray`/`of`/`from`, the usual `Array`, `String`, `Number` and `Boolean` prototype methods (`toString(radix)`, string `replace`/`replaceAll` with a string pattern), `parseInt`, `isNaN`/`isFinite`, `globalThis`, `encodeURI*`/`decodeURI*`, `btoa`/`atob`, `Math.imul`/`clz32` |
 
 ## Not yet (unbuilt)
 

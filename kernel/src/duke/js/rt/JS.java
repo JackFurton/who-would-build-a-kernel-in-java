@@ -728,7 +728,7 @@ public final class JS {
             return null;
         }
         if (o instanceof Long || o instanceof Boolean) {
-            return null;
+            return Builtins.primitiveMethod(o, key(key));
         }
         throw new JsError("TypeError: Cannot read properties of " + str(o) + " (reading '" + str(key) + "')");
     }
@@ -1014,6 +1014,12 @@ public final class JS {
 
     /** Calls {@code o[key](...args)} with {@code this} bound to {@code o}. */
     public static Object invoke(Object o, Object key, Object... args) {
+        if (key instanceof String && (o instanceof Long || o instanceof Boolean)) {
+            Object result = Builtins.invokePrimitive(o, (String) key, args);
+            if (result != Builtins.NO_METHOD) {
+                return result;
+            }
+        }
         if (key instanceof String && (o instanceof JsArray || o instanceof String || o instanceof JsFunction
                 || o instanceof JsMap)) {
             Object result = Builtins.invoke(o, (String) key, args);

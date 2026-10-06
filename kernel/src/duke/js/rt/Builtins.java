@@ -8,11 +8,13 @@ final class Builtins {
 
     private static final String[] ARRAY_METHODS = {"values", "keys", "entries", "push", "pop", "shift", "unshift", "slice", "concat", "join",
         "indexOf", "includes", "reverse", "forEach", "map", "filter", "reduce", "some", "every", "find",
-        "findIndex", "sort"};
+        "findIndex", "sort", "splice", "fill", "flat", "flatMap", "at", "lastIndexOf", "reduceRight", "findLast",
+        "findLastIndex", "copyWithin", "toSorted", "toReversed", "toSpliced", "with"};
 
     private static final String[] STRING_METHODS = {"charAt", "charCodeAt", "indexOf", "includes", "startsWith",
         "endsWith", "slice", "substring", "split", "toUpperCase", "toLowerCase", "trim", "repeat", "padStart",
-        "padEnd", "concat"};
+        "padEnd", "concat", "at", "lastIndexOf", "trimStart", "trimEnd", "trimLeft", "trimRight", "replace", "replaceAll",
+        "substr", "localeCompare", "normalize", "toLocaleUpperCase", "toLocaleLowerCase", "codePointAt"};
 
     private Builtins() {
     }
@@ -333,19 +335,26 @@ final class Builtins {
             case "join":
                 return join(a, arg(args, 0) == null ? "," : JS.str(args[0]));
             case "indexOf":
-                for (int i = 0; i < n; i++) {
+                for (int i = index(arg(args, 1), n, 0); i < n; i++) {
                     if (JS.seq(a.get(i), arg(args, 0))) {
                         return num(i);
                     }
                 }
                 return num(-1);
             case "includes":
-                for (int i = 0; i < n; i++) {
+                for (int i = index(arg(args, 1), n, 0); i < n; i++) {
                     if (JS.seq(a.get(i), arg(args, 0))) {
                         return Boolean.TRUE;
                     }
                 }
                 return Boolean.FALSE;
+            case "lastIndexOf":
+                for (int i = index(arg(args, 1), n, n - 1) >= n ? n - 1 : index(arg(args, 1), n, n - 1); i >= 0; i--) {
+                    if (JS.seq(a.get(i), arg(args, 0))) {
+                        return num(i);
+                    }
+                }
+                return num(-1);
             case "reverse":
                 for (int i = 0; i < n - 1 - i; i++) {
                     Object t = a.get(i);
@@ -417,31 +426,170 @@ final class Builtins {
                     }
                 }
                 return num(-1);
+            case "splice": {
+                int from = index(arg(args, 0), n, 0);
+                int count = args.length == 0 ? 0 : args.length == 1 ? n - from : clamp(JS.toNumber(args[1]), n - from);
+                return a.replace(from, count, rest(args, 2));
+            }
+            case "fill": {
+                int to = index(arg(args, 2), n, n);
+                for (int i = index(arg(args, 1), n, 0); i < to; i++) {
+                    a.set(i, arg(args, 0));
+                }
+                return a;
+            }
+            case "flat": {
+                JsArray r = new JsArray();
+                flatten(a, arg(args, 0) == null ? 1 : JS.toNumber(args[0]), r);
+                return r;
+            }
+            case "flatMap": {
+                JsArray r = new JsArray();
+                for (int i = 0; i < n; i++) {
+                    Object mapped = callback(arg(args, 0), a.get(i), num(i), a);
+                    if (mapped instanceof JsArray) {
+                        flatten((JsArray) mapped, 0, r);
+                    } else {
+                        r.add(mapped);
+                    }
+                }
+                return r;
+            }
+            case "at": {
+                long i = JS.toNumber(arg(args, 0));
+                return a.get((int) (i < 0 ? i + n : i));
+            }
+            case "reduceRight": {
+                int i = n - 1;
+                Object acc = arg(args, 1);
+                if (args.length < 2) {
+                    if (n == 0) {
+                        throw new JsError("TypeError: Reduce of empty array with no initial value");
+                    }
+                    acc = a.get(i--);
+                }
+                for (; i >= 0; i--) {
+                    acc = callback(args[0], acc, a.get(i), num(i), a);
+                }
+                return acc;
+            }
+            case "findLast":
+                for (int i = n - 1; i >= 0; i--) {
+                    if (JS.truthy(callback(arg(args, 0), a.get(i), num(i), a))) {
+                        return a.get(i);
+                    }
+                }
+                return null;
+            case "findLastIndex":
+                for (int i = n - 1; i >= 0; i--) {
+                    if (JS.truthy(callback(arg(args, 0), a.get(i), num(i), a))) {
+                        return num(i);
+                    }
+                }
+                return num(-1);
+            case "copyWithin": {
+                int target = index(arg(args, 0), n, 0);
+                int from = index(arg(args, 1), n, 0);
+                int to = index(arg(args, 2), n, n);
+                Object[] copy = new Object[Math.max(0, to - from)];
+                for (int i = 0; i < copy.length; i++) {
+                    copy[i] = a.get(from + i);
+                }
+                for (int i = 0; i < copy.length && target + i < n; i++) {
+                    a.set(target + i, copy[i]);
+                }
+                return a;
+            }
+            case "toSorted":
+                return sort(copyOf(a), arg(args, 0));
+            case "toReversed": {
+                JsArray r = new JsArray();
+                for (int i = n - 1; i >= 0; i--) {
+                    r.add(a.get(i));
+                }
+                return r;
+            }
+            case "toSpliced": {
+                JsArray r = copyOf(a);
+                int from = index(arg(args, 0), n, 0);
+                int count = args.length == 0 ? 0 : args.length == 1 ? n - from : clamp(JS.toNumber(args[1]), n - from);
+                r.replace(from, count, rest(args, 2));
+                return r;
+            }
+            case "with": {
+                long i = JS.toNumber(arg(args, 0));
+                if (i < 0) {
+                    i += n;
+                }
+                if (i < 0 || i >= n) {
+                    throw new JsError("RangeError: Invalid index : " + JS.str(arg(args, 0)));
+                }
+                JsArray r = copyOf(a);
+                r.set((int) i, arg(args, 1));
+                return r;
+            }
             default: // sort
                 return sort(a, arg(args, 0));
         }
     }
 
-    /** Stable insertion sort. Without a comparator elements compare as strings, like JavaScript. */
+    private static JsArray copyOf(JsArray a) {
+        JsArray r = new JsArray();
+        for (int i = 0; i < a.length(); i++) {
+            r.add(a.get(i));
+        }
+        return r;
+    }
+
+    private static void flatten(JsArray a, long depth, JsArray out) {
+        for (int i = 0; i < a.length(); i++) {
+            Object v = a.get(i);
+            if (v instanceof JsArray && depth > 0) {
+                flatten((JsArray) v, depth - 1, out);
+            } else {
+                out.add(v);
+            }
+        }
+    }
+
+    /** Stable merge sort. Without a comparator elements compare as strings, like JavaScript. */
     private static Object sort(JsArray a, Object comparator) {
         int n = a.length();
-        for (int i = 1; i < n; i++) {
-            Object x = a.get(i);
-            int j = i - 1;
-            while (j >= 0) {
-                Object y = a.get(j);
-                boolean after = comparator == null
-                        ? JS.str(y).compareTo(JS.str(x)) > 0
-                        : JS.toNumber(callback(comparator, y, x)) > 0;
-                if (!after) {
-                    break;
-                }
-                a.set(j + 1, y);
-                j--;
-            }
-            a.set(j + 1, x);
+        Object[] items = new Object[n];
+        for (int i = 0; i < n; i++) {
+            items[i] = a.get(i);
+        }
+        Object[] scratch = new Object[n];
+        mergeSort(items, scratch, 0, n, comparator);
+        for (int i = 0; i < n; i++) {
+            a.set(i, items[i]);
         }
         return a;
+    }
+
+    private static boolean after(Object x, Object y, Object comparator) {
+        return comparator == null ? JS.str(x).compareTo(JS.str(y)) > 0 : JS.toNumber(callback(comparator, x, y)) > 0;
+    }
+
+    private static void mergeSort(Object[] items, Object[] scratch, int from, int to, Object comparator) {
+        if (to - from < 2) {
+            return;
+        }
+        int middle = (from + to) / 2;
+        mergeSort(items, scratch, from, middle, comparator);
+        mergeSort(items, scratch, middle, to, comparator);
+        int left = from;
+        int right = middle;
+        for (int i = from; i < to; i++) {
+            if (left < middle && (right >= to || !after(items[left], items[right], comparator))) {
+                scratch[i] = items[left++];
+            } else {
+                scratch[i] = items[right++];
+            }
+        }
+        for (int i = from; i < to; i++) {
+            items[i] = scratch[i];
+        }
     }
 
     // ---- strings ----
@@ -499,11 +647,70 @@ final class Builtins {
             case "indexOf":
                 return num(indexOf(s, JS.str(arg(args, 0)), arg(args, 1) == null ? 0 : (int) JS.toNumber(args[1])));
             case "includes":
-                return JS.bool(indexOf(s, JS.str(arg(args, 0)), 0) >= 0);
-            case "startsWith":
-                return JS.bool(s.startsWith(JS.str(arg(args, 0))));
-            case "endsWith":
-                return JS.bool(s.endsWith(JS.str(arg(args, 0))));
+                return JS.bool(indexOf(s, JS.str(arg(args, 0)), arg(args, 1) == null ? 0 : (int) JS.toNumber(args[1])) >= 0);
+            case "startsWith": {
+                String prefix = JS.str(arg(args, 0));
+                int at = arg(args, 1) == null ? 0 : clamp(JS.toNumber(args[1]), n);
+                return JS.bool(s.substring(at).startsWith(prefix));
+            }
+            case "endsWith": {
+                String suffix = JS.str(arg(args, 0));
+                int end = arg(args, 1) == null ? n : clamp(JS.toNumber(args[1]), n);
+                return JS.bool(s.substring(0, end).endsWith(suffix));
+            }
+            case "at": {
+                long i = JS.toNumber(arg(args, 0));
+                i = i < 0 ? i + n : i;
+                return i < 0 || i >= n ? null : s.substring((int) i, (int) i + 1);
+            }
+            case "lastIndexOf": {
+                String needle = JS.str(arg(args, 0));
+                for (int i = Math.min(n - needle.length(), arg(args, 1) == null ? n : clamp(JS.toNumber(args[1]), n)); i >= 0; i--) {
+                    if (indexOf(s.substring(i), needle, 0) == 0) {
+                        return num(i);
+                    }
+                }
+                return num(-1);
+            }
+            case "trimStart":
+            case "trimLeft": {
+                int i = 0;
+                while (i < n && s.charAt(i) <= ' ') {
+                    i++;
+                }
+                return s.substring(i);
+            }
+            case "trimEnd":
+            case "trimRight": {
+                int end = n;
+                while (end > 0 && s.charAt(end - 1) <= ' ') {
+                    end--;
+                }
+                return s.substring(0, end);
+            }
+            case "replace":
+                return replace(s, JS.str(arg(args, 0)), arg(args, 1), false);
+            case "replaceAll":
+                return replace(s, JS.str(arg(args, 0)), arg(args, 1), true);
+            case "substr": {
+                int from = index(arg(args, 0), n, 0);
+                int count = arg(args, 1) == null ? n - from : clamp(JS.toNumber(args[1]), n - from);
+                return s.substring(from, from + count);
+            }
+            case "localeCompare": {
+                int c = s.compareTo(JS.str(arg(args, 0)));
+                return num(c < 0 ? -1 : c > 0 ? 1 : 0);
+            }
+            case "normalize":
+                return s;
+            case "toLocaleUpperCase":
+                return mapLetters(s, 'a', 'z', -32);
+            case "toLocaleLowerCase":
+                return mapLetters(s, 'A', 'Z', 32);
+            case "codePointAt": {
+                long i = arg(args, 0) == null ? 0 : JS.toNumber(args[0]);
+                return i < 0 || i >= n ? null : num(s.charAt((int) i));
+            }
             case "slice": {
                 int from = index(arg(args, 0), n, 0);
                 int to = index(arg(args, 1), n, n);
@@ -514,8 +721,13 @@ final class Builtins {
                 int b = arg(args, 1) == null ? n : clamp(JS.toNumber(args[1]), n);
                 return a <= b ? s.substring(a, b) : s.substring(b, a);
             }
-            case "split":
-                return split(s, arg(args, 0));
+            case "split": {
+                JsArray parts = (JsArray) split(s, arg(args, 0));
+                if (arg(args, 1) != null && JS.toNumber(args[1]) < parts.length()) {
+                    parts.setLength((int) JS.toNumber(args[1]));
+                }
+                return parts;
+            }
             case "toUpperCase":
                 return mapLetters(s, 'a', 'z', -32);
             case "toLowerCase":
@@ -523,6 +735,9 @@ final class Builtins {
             case "trim":
                 return s.trim();
             case "repeat": {
+                if (JS.toNumber(arg(args, 0)) < 0) {
+                    throw new JsError("RangeError: Invalid count value: " + JS.str(arg(args, 0)));
+                }
                 StringBuilder sb = new StringBuilder();
                 for (long i = 0; i < JS.toNumber(arg(args, 0)); i++) {
                     sb.append(s);
@@ -533,9 +748,137 @@ final class Builtins {
                 return pad(s, arg(args, 0), arg(args, 1), true);
             case "padEnd":
                 return pad(s, arg(args, 0), arg(args, 1), false);
-            default: // concat
-                return s.concat(JS.str(arg(args, 0)));
+            default: { // concat
+                StringBuilder all = new StringBuilder(s);
+                for (Object part : args) {
+                    all.append(JS.str(part));
+                }
+                return all.toString();
+            }
         }
+    }
+
+    /** {@code s.replace(search, replacement)} for a plain string pattern; the replacement may be a function. */
+    private static String replace(String s, String search, Object replacement, boolean all) {
+        StringBuilder out = new StringBuilder();
+        int from = 0;
+        int at = indexOf(s, search, 0);
+        while (at >= 0 && at <= s.length()) {
+            out.append(s.substring(from, at));
+            out.append(replacementText(search, at, s, replacement));
+            if (search.isEmpty()) {
+                // An empty pattern matches between every character, so step over one to move on.
+                if (at < s.length()) {
+                    out.append(s.charAt(at));
+                }
+                from = at + 1;
+            } else {
+                from = at + search.length();
+            }
+            if (!all) {
+                break;
+            }
+            at = indexOf(s, search, from);
+            if (search.isEmpty() && from > s.length()) {
+                at = -1;
+            }
+        }
+        if (from <= s.length()) {
+            out.append(s.substring(from));
+        }
+        return out.toString();
+    }
+
+    private static String replacementText(String match, int at, String s, Object replacement) {
+        if (replacement instanceof JsFunction) {
+            return JS.str(callback(replacement, match, num(at), s));
+        }
+        String text = JS.str(replacement);
+        StringBuilder out = new StringBuilder();
+        for (int i = 0; i < text.length(); i++) {
+            char c = text.charAt(i);
+            if (c == '$' && i + 1 < text.length() && text.charAt(i + 1) == '$') {
+                out.append('$');
+                i++;
+            } else if (c == '$' && i + 1 < text.length() && text.charAt(i + 1) == '&') {
+                out.append(match);
+                i++;
+            } else {
+                out.append(c);
+            }
+        }
+        return out.toString();
+    }
+
+    // ---- numbers and booleans ----
+
+    /** {@code (5).toString(2)} and friends: the methods a number or boolean value has. */
+    static Object primitiveMethod(Object o, Object key) {
+        if (!(key instanceof String)) {
+            return null;
+        }
+        String name = (String) key;
+        boolean known = o instanceof Long ? name.equals("toString") || name.equals("toFixed") || name.equals("valueOf")
+                || name.equals("toLocaleString") : name.equals("toString") || name.equals("valueOf");
+        return known ? new JsFunction(name, (callee, self, args) -> invokePrimitive(self, name, args)) : null;
+    }
+
+    static Object invokePrimitive(Object o, String name, Object[] args) {
+        if (o instanceof Long) {
+            long n = ((Long) o).longValue();
+            switch (name) {
+                case "toString":
+                    return radixString(n, arg(args, 0) == null ? 10 : (int) JS.toNumber(args[0]));
+                case "toFixed": {
+                    long digits = arg(args, 0) == null ? 0 : JS.toNumber(args[0]);
+                    StringBuilder sb = new StringBuilder(Long.toString(n));
+                    if (digits > 0) {
+                        sb.append('.');
+                        for (long i = 0; i < digits; i++) {
+                            sb.append('0');
+                        }
+                    }
+                    return sb.toString();
+                }
+                case "toLocaleString": {
+                    String digits = Long.toString(n < 0 ? -n : n);
+                    StringBuilder sb = new StringBuilder();
+                    for (int i = 0; i < digits.length(); i++) {
+                        if (i > 0 && (digits.length() - i) % 3 == 0) {
+                            sb.append(',');
+                        }
+                        sb.append(digits.charAt(i));
+                    }
+                    return n < 0 ? "-" + sb : sb.toString();
+                }
+                case "valueOf":
+                    return o;
+                default:
+                    return NO_METHOD;
+            }
+        }
+        return name.equals("toString") ? JS.str(o) : name.equals("valueOf") ? o : NO_METHOD;
+    }
+
+    private static String radixString(long n, int radix) {
+        if (radix < 2 || radix > 36) {
+            throw new JsError("RangeError: toString() radix must be between 2 and 36");
+        }
+        if (n == 0) {
+            return "0";
+        }
+        boolean negative = n < 0;
+        StringBuilder sb = new StringBuilder();
+        long rest = n;
+        while (rest != 0) {
+            long digit = rest % radix;
+            sb.append("0123456789abcdefghijklmnopqrstuvwxyz".charAt((int) (digit < 0 ? -digit : digit)));
+            rest /= radix;
+        }
+        if (negative) {
+            sb.append('-');
+        }
+        return sb.reverse().toString();
     }
 
     private static int clamp(long i, int n) {

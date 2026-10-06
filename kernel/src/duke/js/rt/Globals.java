@@ -98,6 +98,10 @@ public final class Globals {
             long x = JS.toNumber(arg(args, 0));
             return Long.valueOf(x < 0 ? -1 : x > 0 ? 1 : 0);
         }));
+        math.set("imul", function("imul", (callee, self, args) ->
+                Long.valueOf((int) JS.toNumber(arg(args, 0)) * (int) JS.toNumber(arg(args, 1)))));
+        math.set("clz32", function("clz32", (callee, self, args) ->
+                Long.valueOf(Integer.numberOfLeadingZeros((int) JS.toNumber(arg(args, 0))))));
         math.set("pow", function("pow", (callee, self, args) -> JS.pow(arg(args, 0), arg(args, 1))));
         math.set("max", function("max", (callee, self, args) -> extreme(args, true)));
         math.set("min", function("min", (callee, self, args) -> extreme(args, false)));
@@ -124,8 +128,29 @@ public final class Globals {
         JsFunction number = function("Number", (callee, self, args) -> Long.valueOf(JS.toNumber(arg(args, 0))));
         number.props().set("isInteger", function("isInteger", (callee, self, args) -> JS.bool(arg(args, 0) instanceof Long)));
         number.props().set("MAX_SAFE_INTEGER", Long.valueOf(9007199254740991L));
+        number.props().set("MIN_SAFE_INTEGER", Long.valueOf(-9007199254740991L));
+        number.props().set("isSafeInteger", function("isSafeInteger", (callee, self, args) ->
+                JS.bool(arg(args, 0) instanceof Long && Math.abs(((Long) arg(args, 0)).longValue()) <= 9007199254740991L)));
+        number.props().set("isFinite", function("isFinite", (callee, self, args) -> JS.bool(arg(args, 0) instanceof Long)));
+        number.props().set("isNaN", function("isNaN", (callee, self, args) -> Boolean.FALSE));
         g.set("Number", number);
 
+        g.set("Boolean", function("Boolean", (callee, self, args) -> JS.bool(JS.truthy(arg(args, 0)))));
+        g.set("isNaN", function("isNaN", (callee, self, args) -> JS.bool(!isNumeric(arg(args, 0)))));
+        g.set("isFinite", function("isFinite", (callee, self, args) -> JS.bool(isNumeric(arg(args, 0)))));
+        g.set("globalThis", g);
+        g.set("encodeURIComponent", function("encodeURIComponent", (callee, self, args) ->
+                Encoding.encode(JS.str(arg(args, 0)), "")));
+        g.set("encodeURI", function("encodeURI", (callee, self, args) ->
+                Encoding.encode(JS.str(arg(args, 0)), ";,/?:@&=+$#")));
+        g.set("decodeURIComponent", function("decodeURIComponent", (callee, self, args) ->
+                Encoding.decode(JS.str(arg(args, 0)), "")));
+        g.set("decodeURI", function("decodeURI", (callee, self, args) ->
+                Encoding.decode(JS.str(arg(args, 0)), ";,/?:@&=+$#")));
+        g.set("escape", function("escape", (callee, self, args) -> Encoding.encode(JS.str(arg(args, 0)), "@*_+-./")));
+        g.set("unescape", function("unescape", (callee, self, args) -> Encoding.decode(JS.str(arg(args, 0)), "")));
+        g.set("btoa", function("btoa", (callee, self, args) -> Encoding.btoa(JS.str(arg(args, 0)))));
+        g.set("atob", function("atob", (callee, self, args) -> Encoding.atob(JS.str(arg(args, 0)))));
         g.set("parseInt", function("parseInt", (callee, self, args) ->
                 Long.valueOf(JS.parseInteger(JS.str(arg(args, 0)), false))));
 
@@ -150,6 +175,35 @@ public final class Globals {
         arrayPrototype.setHidden("constructor", array);
         array.setPrototype(arrayPrototype);
         array.props().setHidden("isArray", function("isArray", (callee, self, args) -> JS.bool(arg(args, 0) instanceof JsArray)));
+        array.props().setHidden("from", function("from", (callee, self, args) -> {
+            Object source = arg(args, 0);
+            Object mapper = arg(args, 1);
+            if (JS.nullish(source)) {
+                throw new JsError("TypeError: " + JS.str(source) + " is not iterable");
+            }
+            JsArray out = new JsArray();
+            boolean iterable = source instanceof JsArray || source instanceof String || source instanceof JsMap
+                    || source instanceof JsObject && ((JsObject) source).get(ITERATOR) instanceof JsFunction;
+            if (iterable) {
+                JsIter it = JS.iter(source);
+                try {
+                    while (it.next()) {
+                        Object v = it.value();
+                        out.add(mapper == null ? v : JS.callMethod(mapper, null, v, Long.valueOf(out.length())));
+                    }
+                } finally {
+                    it.close();
+                }
+            } else if (source instanceof JsObject) {
+                // An array-like: an object with a length.
+                long n = JS.toNumber(JS.get(source, "length"));
+                for (long i = 0; i < n; i++) {
+                    Object v = JS.getIndex(source, i);
+                    out.add(mapper == null ? v : JS.callMethod(mapper, null, v, Long.valueOf(i)));
+                }
+            }
+            return out;
+        }));
         array.props().setHidden("of", function("of", (callee, self, args) -> new JsArray(args)));
         g.set("Array", array);
 
@@ -702,6 +756,19 @@ public final class Globals {
             copy.set(key, source.getOwn(key));
         }
         return copy;
+    }
+
+    /** Whether {@code v} converts to a number: what isNaN and isFinite ask, with no NaN to be found. */
+    private static boolean isNumeric(Object v) {
+        if (v instanceof String) {
+            try {
+                JS.toNumber(v);
+                return true;
+            } catch (JsError e) {
+                return false;
+            }
+        }
+        return v instanceof Long || v instanceof Boolean || v == JS.NULL;
     }
 
     private static Object extreme(Object[] args, boolean max) {
