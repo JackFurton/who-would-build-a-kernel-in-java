@@ -9,6 +9,9 @@ on:
 permissions:
   contents: read
 
+env:
+  OVMF: /usr/share/OVMF/OVMF_CODE_4M.fd
+
 jobs:
   hunt:
     runs-on: ubuntu-24.04
