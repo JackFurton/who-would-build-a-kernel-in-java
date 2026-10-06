@@ -183,6 +183,7 @@ class JsCompilerTest {
                 var klass = class { [key]() { } };
                 var acc = { get g() { return 1; }, set g(v) { }, get ["c" + 1]() { return 2; } };
                 for (const item of items) { if (item) break; }
+                var coll = new Map([[1, 2]]), uniq = new Set([...items]), weak = new WeakMap(), ws = new WeakSet();
                 var sym = Symbol("x"), withSym = { [sym]: 1 };
                 var [pa, { pb = 2, ...pc }] = [1, {}];
                 [pa, o.x] = [pb, pc];

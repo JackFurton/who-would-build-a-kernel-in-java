@@ -26,6 +26,98 @@ final class Builtins {
         return false;
     }
 
+    // ---- Map, Set, WeakMap and WeakSet ----
+
+    static String mapTag(JsMap m) {
+        return m.weak ? (m.isSet ? "[object WeakSet]" : "[object WeakMap]") : m.isSet ? "[object Set]" : "[object Map]";
+    }
+
+    /** {@code collection.key}: {@code size}, a method, the iterator symbol, or a property the program added. */
+    static Object mapProperty(JsMap m, Object key) {
+        if (key instanceof JsSymbol) {
+            if (key == Globals.ITERATOR && !m.weak) {
+                return new JsFunction("[Symbol.iterator]", (callee, self, args) ->
+                        Globals.iteratorObject(((JsMap) self).iterate(((JsMap) self).isSet ? 1 : 2)));
+            }
+            return m.named() == null ? null : m.named().get(key);
+        }
+        String name = (String) key;
+        if (name.equals("size") && !m.weak) {
+            return Long.valueOf(m.size());
+        }
+        if (m.named() != null && m.named().has(name)) {
+            return m.named().get(name);
+        }
+        if (isMapMethod(m, name)) {
+            return new JsFunction(name, (callee, self, args) -> mapMethod((JsMap) self, name, args));
+        }
+        return null;
+    }
+
+    private static boolean isMapMethod(JsMap m, String name) {
+        if (m.weak) {
+            return m.isSet ? name.equals("add") || name.equals("has") || name.equals("delete")
+                    : name.equals("get") || name.equals("set") || name.equals("has") || name.equals("delete");
+        }
+        if (name.equals("has") || name.equals("delete") || name.equals("clear") || name.equals("forEach")
+                || name.equals("keys") || name.equals("values") || name.equals("entries")) {
+            return true;
+        }
+        return m.isSet ? name.equals("add") : name.equals("get") || name.equals("set");
+    }
+
+    private static void checkWeakKey(JsMap m, Object key) {
+        if (m.weak && !(JS.isObject(key) || key instanceof JsSymbol)) {
+            throw new JsError("TypeError: Invalid value used " + (m.isSet ? "in weak set" : "as weak map key"));
+        }
+    }
+
+    private static Object mapMethod(JsMap m, String name, Object[] args) {
+        if (!isMapMethod(m, name)) {
+            return NO_METHOD;
+        }
+        Object key = arg(args, 0);
+        switch (name) {
+            case "get":
+                return m.get(key);
+            case "set":
+                checkWeakKey(m, key);
+                m.put(key, arg(args, 1));
+                return m;
+            case "add":
+                checkWeakKey(m, key);
+                m.put(key, key);
+                return m;
+            case "has":
+                return JS.bool(m.has(key));
+            case "delete":
+                return JS.bool(m.delete(key));
+            case "clear":
+                m.clear();
+                return null;
+            case "forEach": {
+                m.beginIteration();
+                try {
+                    for (int i = 0; i < m.limit(); i++) {
+                        if (m.liveAt(i)) {
+                            Object k = m.keyAt(i);
+                            callback(arg(args, 0), m.isSet ? k : m.valueAt(i), k, m);
+                        }
+                    }
+                } finally {
+                    m.endIteration();
+                }
+                return null;
+            }
+            case "keys":
+                return Globals.iteratorObject(m.iterate(0));
+            case "values":
+                return Globals.iteratorObject(m.iterate(1));
+            default: // entries
+                return Globals.iteratorObject(m.iterate(2));
+        }
+    }
+
     /** {@code o[symbol]} for arrays and strings: their {@code Symbol.iterator}. */
     static Object symbolMethod(Object o, JsSymbol key) {
         if (key == Globals.ITERATOR) {
@@ -70,6 +162,9 @@ final class Builtins {
     static Object invoke(Object o, String name, Object[] args) {
         if (o instanceof JsFunction) {
             return functionMethod((JsFunction) o, name, args);
+        }
+        if (o instanceof JsMap) {
+            return mapMethod((JsMap) o, name, args);
         }
         if (o instanceof JsArray) {
             return contains(ARRAY_METHODS, name) ? arrayMethod((JsArray) o, name, args) : NO_METHOD;

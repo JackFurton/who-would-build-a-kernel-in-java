@@ -89,6 +89,9 @@ public final class JS {
         if (iterable instanceof String) {
             return new JsIter.StringIter((String) iterable);
         }
+        if (iterable instanceof JsMap && !((JsMap) iterable).weak) {
+            return ((JsMap) iterable).iterate(((JsMap) iterable).isSet ? 1 : 2);
+        }
         Object method = nullish(iterable) ? null : get(iterable, Globals.ITERATOR);
         if (!(method instanceof JsFunction)) {
             throw new JsError("TypeError: " + (iterable == null ? "undefined" : iterable instanceof JsSymbol
@@ -331,6 +334,9 @@ public final class JS {
         if (v instanceof JsFunction) {
             return "function () { [native code] }";
         }
+        if (v instanceof JsMap) {
+            return Builtins.mapTag((JsMap) v);
+        }
         Object toString = ((JsObject) v).get("toString");
         if (toString instanceof JsFunction) {
             Object text = ((JsFunction) toString).call(v, new Object[0]);
@@ -429,7 +435,12 @@ public final class JS {
     // ---- operators ----
 
     private static boolean isObjectLike(Object v) {
-        return v instanceof JsArray || v instanceof JsObject || v instanceof JsFunction;
+        return isObject(v);
+    }
+
+    /** True for anything JavaScript calls an object: plain objects, arrays, functions, maps and sets. */
+    static boolean isObject(Object v) {
+        return v instanceof JsObject || v instanceof JsArray || v instanceof JsFunction || v instanceof JsMap;
     }
 
     public static Object add(Object a, Object b) {
@@ -611,6 +622,9 @@ public final class JS {
         if (o instanceof JsFunction) {
             return Builtins.functionProperty((JsFunction) o, key(key));
         }
+        if (o instanceof JsMap) {
+            return Builtins.mapProperty((JsMap) o, key(key));
+        }
         if (o instanceof JsSymbol) {
             JsSymbol symbol = (JsSymbol) o;
             if ("description".equals(key)) {
@@ -645,6 +659,8 @@ public final class JS {
             } else {
                 array.namedOrCreate().set(key(key), value);
             }
+        } else if (o instanceof JsMap) {
+            ((JsMap) o).namedOrCreate().assign(key(key), value);
         } else if (o instanceof JsFunction) {
             JsFunction f = (JsFunction) o;
             if ("prototype".equals(key) && value instanceof JsObject) {
@@ -822,6 +838,11 @@ public final class JS {
         if (a instanceof JsFunction) {
             return f == Globals.lookup("Function") || f == Globals.lookup("Object");
         }
+        if (a instanceof JsMap) {
+            JsMap m = (JsMap) a;
+            return f == Globals.lookup(m.weak ? (m.isSet ? "WeakSet" : "WeakMap") : (m.isSet ? "Set" : "Map"))
+                    || f == Globals.lookup("Object");
+        }
         return false;
     }
 
@@ -838,6 +859,9 @@ public final class JS {
         if (o instanceof JsFunction) {
             return Builtins.functionProperty((JsFunction) o, key(key)) != null
                     || "name".equals(key) || "prototype".equals(key);
+        }
+        if (o instanceof JsMap) {
+            return Builtins.mapProperty((JsMap) o, key(key)) != null;
         }
         throw new JsError("TypeError: Cannot use 'in' operator to search for '" + str(key) + "' in " + str(o));
     }
@@ -898,7 +922,8 @@ public final class JS {
 
     /** Calls {@code o[key](...args)} with {@code this} bound to {@code o}. */
     public static Object invoke(Object o, Object key, Object... args) {
-        if (key instanceof String && (o instanceof JsArray || o instanceof String || o instanceof JsFunction)) {
+        if (key instanceof String && (o instanceof JsArray || o instanceof String || o instanceof JsFunction
+                || o instanceof JsMap)) {
             Object result = Builtins.invoke(o, (String) key, args);
             if (result != Builtins.NO_METHOD) {
                 return result;

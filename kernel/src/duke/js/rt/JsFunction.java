@@ -99,7 +99,7 @@ public final class JsFunction {
             runFieldInit(self);
         }
         Object result = (constructBody != null ? constructBody : body).call(this, self, args);
-        return result instanceof JsObject || result instanceof JsArray || result instanceof JsFunction ? result : self;
+        return JS.isObject(result) ? result : self;
     }
 
     public String name() {

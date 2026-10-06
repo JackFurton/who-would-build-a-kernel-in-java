@@ -29,6 +29,9 @@ final class Inspect {
         if (v instanceof JsSymbol) {
             return v.toString();
         }
+        if (v instanceof JsMap) {
+            return collection((JsMap) v, depth);
+        }
         if (v instanceof JsArray) {
             JsArray a = (JsArray) v;
             if (depth > 2) {
@@ -71,6 +74,30 @@ final class Inspect {
             return container(keys, f.props(), head + " {", "}", depth, head);
         }
         return JS.str(v);
+    }
+
+    /** {@code Map(2) { 'a' => 1, 'b' => 2 }} and {@code Set(1) { 1 }}. */
+    private static String collection(JsMap m, int depth) {
+        String kind = (m.weak ? "Weak" : "") + (m.isSet ? "Set" : "Map");
+        if (m.weak) {
+            return kind + " { <items unknown> }";
+        }
+        if (depth > 2) {
+            return "[" + kind + "]";
+        }
+        String head = kind + "(" + m.size() + ") ";
+        if (m.size() == 0) {
+            return head + "{}";
+        }
+        lastDepth = depth;
+        ArrayList<String> parts = new ArrayList<>();
+        for (int i = 0; i < m.limit(); i++) {
+            if (m.liveAt(i)) {
+                String key = format(m.keyAt(i), depth + 1);
+                parts.add(m.isSet ? key : key + " => " + format(m.valueAt(i), depth + 1));
+            }
+        }
+        return combine(parts, head + "{", "}", depth);
     }
 
     /** The name of the nearest constructor on the prototype chain, or null if there is none. */

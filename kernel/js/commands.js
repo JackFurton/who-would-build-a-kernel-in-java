@@ -53,3 +53,17 @@ Kernel.command("catches", function () {
   try { results.push("try"); } finally { results.push("finally"); }
   console.log("catches: " + results.join(" | "));
 });
+
+// Maps and sets inside the kernel: hashing by value for strings, by identity for objects, and insertion order.
+Kernel.command("collections", function () {
+  var seen = new Set();
+  var counts = new Map();
+  for (var word of "the quick brown fox jumps over the lazy dog the end".split(" ")) {
+    seen.add(word);
+    counts.set(word, (counts.get(word) || 0) + 1);
+  }
+  var key = {};
+  var objects = new Map([[key, "object key"]]);
+  console.log("collections: " + seen.size + " distinct, the=" + counts.get("the") + ", " + objects.get(key) + ", "
+    + [...counts.keys()].slice(0, 3).join("/"));
+});

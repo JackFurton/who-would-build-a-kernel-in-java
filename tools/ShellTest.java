@@ -87,7 +87,9 @@ public class ShellTest {
                             .replace("19900000", String.valueOf(sumIds())) + ", collections ran");
             failures += check("javascript exceptions", () -> type(serial, "catches\n"),
                     "catches: RangeError: thrown | TypeError | Maximum call stack size exceeded | try | finally");
-            failures += check("help lists registered commands", () -> type(serial, "help\n"), "also: hello, fib, meminfo, churn, catches");
+            failures += check("javascript collections", () -> type(serial, "collections\n"),
+                    "collections: 9 distinct, the=3, object key, the/quick/brown");
+            failures += check("help lists registered commands", () -> type(serial, "help\n"), "also: hello, fib, meminfo, churn, catches, collections");
             failures += framebuffer(serial, monitor);
             failures += check("panic", () -> type(serial, "panic\n"), "PANIC: requested from the shell");
         } finally {
