@@ -15,11 +15,11 @@ env:
 jobs:
   hunt:
     runs-on: ubuntu-24.04
-    timeout-minutes: 25
+    timeout-minutes: 40
     strategy:
       fail-fast: true
       matrix:
-        shard: [1, 2, 3, 4, 5, 6, 7, 8]
+        shard: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
     steps:
       - uses: actions/checkout@v7
 
@@ -39,12 +39,12 @@ jobs:
         run: make all
 
       - name: Boot environment
-        run: tools/boot-env.sh | tee build-env.txt >> "$GITHUB_STEP_SUMMARY"
+        run: tools/boot-env.sh | tee build-env.txt | tee -a "$GITHUB_STEP_SUMMARY"
 
       - name: Boot until it fails
         run: |
           mkdir -p hunt
-          for i in $(seq 1 25); do
+          for i in $(seq 1 40); do
             echo "== round $i"
             if ! tools/boot-test.sh build/esp build/serial.log DUKE-BOOT-OK 60 > hunt/boot-$i.txt 2>&1; then
               echo "boot-test failed in round $i"; cat hunt/boot-$i.txt | tail -40; exit 1
