@@ -78,6 +78,9 @@ public final class Character implements Comparable<Character> {
     }
 
     public static int digit(char c, int radix) {
+        if (radix < 2 || radix > 36) {
+            return -1;
+        }
         int d = -1;
         if (c >= '0' && c <= '9') {
             d = c - '0';
@@ -87,6 +90,30 @@ public final class Character implements Comparable<Character> {
             d = c - 'A' + 10;
         }
         return d < radix ? d : -1;
+    }
+
+    public static char forDigit(int digit, int radix) {
+        if (radix < 2 || radix > 36 || digit < 0 || digit >= radix) {
+            return '\0';
+        }
+        return (char) (digit < 10 ? '0' + digit : 'a' + digit - 10);
+    }
+
+    public static int getNumericValue(char c) {
+        int value = digit(c, 36);
+        if (value >= 0) {
+            return value;
+        }
+        if (c == 0xB2 || c == 0xB3 || c == 0xB9) {
+            return c == 0xB2 ? 2 : c == 0xB3 ? 3 : 1;
+        }
+        if (c >= 0xBC && c <= 0xBE) {
+            return -2;
+        }
+        return -1;
+    }
+    public static boolean isAlphabetic(int codePoint) {
+        return codePoint >= 0 && codePoint <= 0xFF && isLetter((char) codePoint);
     }
 
     public static String toString(char c) {
