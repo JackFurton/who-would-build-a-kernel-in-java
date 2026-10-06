@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # CI, on pushes to main: appends this commit's metrics to the metrics branch and re-renders the
-# progress chart the README embeds. Expects the kernel and compiler test results already built.
+# progress chart and calibration charts the READMEs embed. Expects the kernel and compiler test
+# results already built.
 set -euo pipefail
 
 row=$(java tools/Metrics.java)
@@ -16,7 +17,9 @@ for attempt in 1 2 3; do
         echo "$row" >> "$dir/metrics.csv"
     fi
     java tools/ProgressChart.java "$dir/metrics.csv" "$dir"
-    git -C "$dir" add metrics.csv progress-light.svg progress-dark.svg
+    java benchmarking-meatspace/Calibration.java "$dir"
+    git -C "$dir" add metrics.csv progress-light.svg progress-dark.svg \
+        calibration-light.svg calibration-dark.svg external-race-light.svg external-race-dark.svg
     git -C "$dir" -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
         commit -q -m "Metrics for $commit" || exit 0
     if git -C "$dir" push -q origin HEAD:metrics; then
