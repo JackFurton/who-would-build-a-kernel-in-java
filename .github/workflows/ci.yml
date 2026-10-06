@@ -82,8 +82,13 @@ jobs:
     permissions:
       # Pushes the new row and chart to the metrics branch.
       contents: write
+      # The calibration counts open PRs as in review.
+      pull-requests: read
     steps:
       - uses: actions/checkout@v7
+        with:
+          # The tier list reads the whole history.
+          fetch-depth: 0
 
       - uses: actions/setup-java@v6
         with:
@@ -97,3 +102,5 @@ jobs:
 
       - name: Record metrics
         run: tools/record-metrics.sh
+        env:
+          GH_TOKEN: ${{ github.token }}
