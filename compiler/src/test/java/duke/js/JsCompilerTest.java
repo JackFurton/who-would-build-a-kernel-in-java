@@ -82,15 +82,16 @@ class JsCompilerTest {
     // ---- the Java back end, which is how JavaScript gets into the kernel ----
 
     @Test
-    void translatesModulesToJavaWithAnEntryPoint() {
+    void translatesModulesToJavaAndARunner() {
         Map<String, String> modules = new LinkedHashMap<>();
         modules.put("kernel/js/commands.js", "console.log(1);");
         modules.put("kernel/js/fs-tools.js", "var x = 2;");
-        Map<String, String> classes = Main.translateAll(modules);
-        assertEquals(List.of("Commands", "FsTools", "Modules", "Boot"), List.copyOf(classes.keySet()));
-        assertTrue(classes.get("Modules").contains("Commands.run();"));
-        assertTrue(classes.get("Modules").indexOf("Commands.run();") < classes.get("Modules").indexOf("FsTools.run();"));
-        assertTrue(classes.get("Boot").contains("Kernel.beforeShell"));
+        Map<String, String> files = Main.translateAll(modules);
+        assertEquals(List.of("duke/js/gen/Commands.java", "duke/js/gen/FsTools.java", "duke/js/Modules.java"),
+                List.copyOf(files.keySet()));
+        String runner = files.get("duke/js/Modules.java");
+        assertTrue(runner.contains("duke.js.gen.Commands.run();"));
+        assertTrue(runner.indexOf("gen.Commands.run();") < runner.indexOf("gen.FsTools.run();"));
     }
 
     @Test

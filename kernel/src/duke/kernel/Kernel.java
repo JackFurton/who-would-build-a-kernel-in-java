@@ -1,6 +1,7 @@
 package duke.kernel;
 
 import duke.boot.Limine;
+import duke.js.Modules;
 import duke.kernel.acpi.Acpi;
 import duke.kernel.acpi.Hpet;
 import duke.kernel.acpi.Madt;
@@ -54,9 +55,6 @@ public final class Kernel {
 
     private static long reclaimed;
 
-    /** Runs once the kernel is up and before the shell starts. The generated JavaScript entry point sets it. */
-    public static Runnable beforeShell;
-
     /** The entry point: the compiler's _start stub calls this. */
     public static void main() {
         init();
@@ -94,9 +92,7 @@ public final class Kernel {
                 + Timer.HZ + " Hz tick; slept 100 ms, uptime advanced " + (Timer.uptimeMillis() - before) + " ms");
         Console.println("DUKE-BOOT-OK");
         JsHost.install();
-        if (beforeShell != null) {
-            beforeShell.run();
-        }
+        Modules.init();
         Shell.run();
     }
 

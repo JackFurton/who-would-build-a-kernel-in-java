@@ -387,7 +387,7 @@ Lexer ─▶ Parser ─▶ Analyzer (scopes, captures, frame slots) ─▶ CodeG
 those classes are compiled with the kernel's own sources, so `dukec` sees them as ordinary Java:
 
 ```
-kernel/js/*.js ──jsc --java──▶ build/jsgen/duke/js/gen/*.java ─┐
+kernel/js/*.js ──jsc --java──▶ build/jsgen/duke/js/**/*.java ──┐
 kernel/src/**/*.java ───────────────────────────────────────────┴─javac──▶ .class ──dukec──▶ kernel.elf
 ```
 
@@ -402,10 +402,10 @@ JS and Java share one heap, collector, calling convention and exception system, 
   and every generated name carries a number, because Java forbids a lambda to shadow an enclosing name.
 - **The runtime** (`kernel/src/duke/js/rt`) is plain Java with no kernel dependencies, so it also runs on
   HotSpot. That is what lets `make js-test` check the translator against node without booting anything.
-- **The entry point** is a generated `duke.js.gen.Boot.main`, which sets `Kernel.beforeShell` and calls
-  `Kernel.main()`. The Makefile passes it to `dukec` as `--entry`, so nothing under `kernel/src` refers
-  to generated code, and the conformance and ktest builds don't need the JS step. Each module's
-  top-level code runs once, just before the shell starts.
+- **How the kernel reaches it:** `Kernel.main` calls `duke.js.Modules.init()` just before the shell
+  starts. The checked-in `Modules` is empty, which is what the test harnesses compile. The kernel build
+  swaps it for the one jsc generates, which calls each module's top-level code once, so nothing under
+  `kernel/src` has to name generated code and the entry point is still `Kernel.main`.
 - **What JS can touch** is whatever `duke.kernel.JsHost` puts in the `Kernel` global: printing, uptime,
   free memory, and `Kernel.command(name, fn)`, which adds a shell command. It's deliberately small and
   explicit. `kernel/js/commands.js` has the first commands (`hello`, `fib`, `meminfo`).
