@@ -1,5 +1,6 @@
 package duke.rt;
 
+import duke.kernel.Monitors;
 import duke.kernel.Panic;
 import duke.kernel.Scheduler;
 
@@ -19,6 +20,14 @@ public final class Runtime {
 
     static void stackOverflow() {
         throw new StackOverflowError();
+    }
+
+    static void monitorEnter(Object object) {
+        Monitors.enter(object);
+    }
+
+    static void monitorExit(Object object) {
+        Monitors.exit(object);
     }
 
     /** A prologue or loop back-edge found a preemption request (Magic.requestPreemption). */

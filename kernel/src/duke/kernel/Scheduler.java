@@ -22,8 +22,13 @@ public final class Scheduler {
     public static final int SLEEPING = 3;
     public static final int JOINING = 4;
     public static final int DEAD = 5;
+    /** Waiting to enter a monitor. */
+    public static final int BLOCKED = 6;
+    /** In Object.wait, untimed if wakeTick is 0. */
+    public static final int WAITING = 7;
 
-    private static final String[] STATE_NAMES = {"new", "runnable", "running", "sleeping", "joining", "dead"};
+    private static final String[] STATE_NAMES = {
+        "new", "runnable", "running", "sleeping", "joining", "dead", "blocked", "waiting"};
     private static final long INTERRUPT_FLAG = 1 << 9;
 
     /** One thread's scheduling state; java.lang.Thread holds one. */
@@ -39,6 +44,10 @@ public final class Scheduler {
         boolean ran;
         long wakeTick;
         Task joining;
+        /** The monitor this thread is blocked or waiting on, and the count it holds it with. */
+        Monitors.Monitor monitor;
+        int monitorCount;
+        /** Run queue, or a monitor's blocked or waiting list: a thread is on at most one. */
         Task next;
 
         public Task(Thread thread) {
@@ -84,6 +93,11 @@ public final class Scheduler {
 
     public static Thread currentThread() {
         return current.thread;
+    }
+
+    /** Null before init. */
+    static Task current() {
+        return current;
     }
 
     public static void start(Task task) {
@@ -260,7 +274,7 @@ public final class Scheduler {
     }
 
     /** Switches to {@code next} and returns once something switches back. Interrupts must be off. */
-    private static void switchTo(Task next) {
+    static void switchTo(Task next) {
         Task previous = current;
         if (next == previous) {
             previous.state = RUNNING;
@@ -294,7 +308,7 @@ public final class Scheduler {
         }
     }
 
-    private static Task next() {
+    static Task next() {
         wakeSleepers();
         Task task = dequeue();
         return task != null ? task : idle;
@@ -306,11 +320,13 @@ public final class Scheduler {
             Task task = tasks[i];
             if (task.state == SLEEPING && task.wakeTick <= now) {
                 enqueue(task);
+            } else if (task.state == WAITING && task.wakeTick != 0 && task.wakeTick <= now) {
+                Monitors.timedOut(task);
             }
         }
     }
 
-    private static void enqueue(Task task) {
+    static void enqueue(Task task) {
         task.state = RUNNABLE;
         task.next = null;
         if (runTail == null) {
@@ -354,7 +370,7 @@ public final class Scheduler {
         }
     }
 
-    private static void restore(long flags) {
+    static void restore(long flags) {
         if ((flags & INTERRUPT_FLAG) != 0) {
             Magic.enableInterrupts();
         }

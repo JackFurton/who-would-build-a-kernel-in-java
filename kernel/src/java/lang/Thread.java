@@ -1,5 +1,6 @@
 package java.lang;
 
+import duke.kernel.Monitors;
 import duke.kernel.Scheduler;
 
 /** A kernel thread; duke.kernel.Scheduler does the work. No priorities, daemons or interrupts yet. */
@@ -41,6 +42,10 @@ public class Thread implements Runnable {
             throw new IllegalArgumentException("timeout value is negative");
         }
         Scheduler.sleep(millis);
+    }
+
+    public static boolean holdsLock(Object object) {
+        return Monitors.holds(object);
     }
 
     public static void yield() {

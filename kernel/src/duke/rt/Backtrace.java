@@ -13,8 +13,10 @@ public final class Backtrace {
     static final int ENTRY_GC_MAP = 56;
     static final int ENTRY_EXCEPTIONS = 40;
     static final int ENTRY_FLAGS = 48;
+    static final int ENTRY_MONITOR_FROM = 52;
     static final int HIDDEN = 1;
     static final int INTERRUPT_ENTRY = 2;
+    static final int SYNCHRONIZED = 4;
     private static final int MAX_FRAMES = 64;
 
     private Backtrace() {
