@@ -919,12 +919,7 @@ final class MethodCompiler {
                 a.movImm32(RAX, 0);
                 a.repStosq();
             }
-            case "fillMemory" -> {
-                popLong(RCX);
-                a.pop(RAX);
-                popLong(Reg.RDI);
-                a.repStosb();
-            }
+            case "fillMemory" -> fillMemory();
             case "addressOf" -> {
                 a.pop(RAX);
                 pushLong(RAX);
@@ -1137,6 +1132,26 @@ final class MethodCompiler {
         a.bind(forward);
         a.repMovsb();
         a.bind(done);
+    }
+
+    /** Repeat the low byte through rax, fill whole words, then the exact remaining bytes. */
+    private void fillMemory() {
+        popLong(RCX);
+        a.pop(RAX);
+        popLong(Reg.RDI);
+        X64.Label tail = new X64.Label();
+        a.aluImm(Alu.CMP, true, RCX, 8);
+        a.jcc(Cond.B, tail);
+        a.mov(RDX, RCX);
+        a.movzx8(RAX, RAX);
+        a.movImm64(Reg.R8, 0x0101_0101_0101_0101L);
+        a.imul(true, RAX, Reg.R8);
+        a.shiftImm(Shift.SHR, true, RCX, 3);
+        a.repStosq();
+        a.mov(RCX, RDX);
+        a.aluImm(Alu.AND, true, RCX, 7);
+        a.bind(tail);
+        a.repStosb();
     }
 
     /** Pushes edx:eax as one long. */

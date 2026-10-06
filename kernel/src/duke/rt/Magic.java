@@ -43,7 +43,11 @@ public final class Magic {
     /** Zero exactly {@code words * 8} bytes of aligned ordinary RAM; {@code words} must be nonnegative. */
     public static native void zeroMemoryWords(long destination, long words);
 
-    /** memset: {@code bytes} copies of the low byte of {@code value} at {@code destination}. */
+    /**
+     * memset: exactly {@code bytes} copies of the low byte of {@code value}, even at an unaligned
+     * destination. The count must be nonnegative; zero does not dereference the address.
+     * This may use eight-byte accesses and is not for device registers.
+     */
     public static native void fillMemory(long destination, int value, long bytes);
 
     public static native long addressOf(Object object);
