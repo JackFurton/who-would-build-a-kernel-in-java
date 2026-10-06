@@ -1075,6 +1075,10 @@ final class MethodCompiler {
                 a.mov(RSP, RSI);
                 a.pop(RBP);
             }
+            case "apEntry" -> {
+                a.lea(RAX, Mem.rip(program.requireApEntry()));
+                pushLong(RAX);
+            }
             case "threadEntry" -> {
                 a.lea(RAX, Mem.rip(program.requireThreadEntry()));
                 pushLong(RAX);

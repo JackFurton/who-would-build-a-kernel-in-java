@@ -19,7 +19,7 @@ final class AcpiTest {
     }
 
     static void testMadtMatchesQemuSmp() {
-        assertEquals(2, Madt.cpus().size(), "tools/qemu.sh runs -smp 2");
+        assertEquals(4, Madt.cpus().size(), "tools/qemu.sh runs -smp 4");
         assertEquals(1, Madt.ioApics().size(), "one I/O APIC");
         assertEquals(2, Madt.gsiForIrq(0), "the PIT's IRQ 0 is wired to GSI 2 on q35");
         assertEquals(1, Madt.gsiForIrq(1), "the keyboard's IRQ 1 isn't overridden");

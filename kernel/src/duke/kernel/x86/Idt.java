@@ -32,4 +32,9 @@ public final class Idt {
         Magic.pokeLong(descriptor + 2, Magic.addressOf(TABLE) + 16);
         Magic.loadIdt(descriptor);
     }
+
+    /** Loads the table {@link #load} built onto another CPU: every CPU shares it. */
+    public static void loadOnThisCpu() {
+        Magic.loadIdt(Magic.addressOf(DESCRIPTOR) + 16);
+    }
 }

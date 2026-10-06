@@ -15,7 +15,9 @@ public final class Gdt {
     public static final int DOUBLE_FAULT_IST = 1;
 
     // Present, ring 0, code (execute/read) with the long-mode bit; and present, ring 0, read/write data.
-    private static final long[] TABLE = {0, 0x00209A0000000000L, 0x0000920000000000L, 0, 0};
+    private static final long CODE_DESCRIPTOR = 0x00209A0000000000L;
+    private static final long DATA_DESCRIPTOR = 0x0000920000000000L;
+    private static final long[] TABLE = {0, CODE_DESCRIPTOR, DATA_DESCRIPTOR, 0, 0};
     private static final long[] DESCRIPTOR = new long[2];
     // 104-byte 64-bit TSS. Image data, so it never moves.
     private static final long[] TSS_DATA = new long[13];
@@ -23,32 +25,57 @@ public final class Gdt {
     private static final int TSS_LIMIT = 103;
     private static final int TSS_IST1 = 36;
     private static final int TSS_IO_MAP_BASE = 102;
+    private static final int MAX_CPUS = 64;
+    /** Other CPUs' GDTs and TSSs, kept reachable: each CPU reads its own on every interrupt. */
+    private static final long[][] OTHER_CPUS = new long[4 * MAX_CPUS][];
 
     private static boolean loaded;
 
     private Gdt() {
     }
 
+    /** The boot CPU's GDT and TSS, which live in the image. */
     public static void ensureLoaded() {
         if (!loaded) {
-            load();
+            install(build(TABLE, DESCRIPTOR, TSS_DATA, DOUBLE_FAULT_STACK));
+            loaded = true;
         }
     }
 
-    private static void load() {
-        long tss = Magic.addressOf(TSS_DATA) + 16;
-        Magic.pokeLong(tss + TSS_IST1, Magic.addressOf(DOUBLE_FAULT_STACK) + 16 + 8L * DOUBLE_FAULT_STACK.length);
-        Magic.pokeShort(tss + TSS_IO_MAP_BASE, (short) (TSS_LIMIT + 1));
-        // An available 64-bit TSS (type 0x89); the base is split across both descriptor words.
-        TABLE[3] = TSS_LIMIT | (tss & 0xFF_FFFF) << 16 | 0x89L << 40 | (tss >>> 24 & 0xFF) << 56;
-        TABLE[4] = tss >>> 32;
+    /**
+     * A GDT, TSS and double-fault stack for another CPU, built by the boot CPU so the other one
+     * needn't allocate. Returns the descriptor to {@link #install} there.
+     */
+    public static long prepare(int cpu) {
+        long[] table = {0, CODE_DESCRIPTOR, DATA_DESCRIPTOR, 0, 0};
+        long[] descriptor = new long[2];
+        long[] tss = new long[13];
+        long[] stack = new long[2048];
+        OTHER_CPUS[4 * cpu] = table;
+        OTHER_CPUS[4 * cpu + 1] = descriptor;
+        OTHER_CPUS[4 * cpu + 2] = tss;
+        OTHER_CPUS[4 * cpu + 3] = stack;
+        return build(table, descriptor, tss, stack);
+    }
 
-        long descriptor = Magic.addressOf(DESCRIPTOR) + 16;
-        Magic.pokeShort(descriptor, (short) (8 * TABLE.length - 1));
-        Magic.pokeLong(descriptor + 2, Magic.addressOf(TABLE) + 16);
+    /** Loads a GDT from {@link #prepare} on the calling CPU, with its segments and TSS. */
+    public static void install(long descriptor) {
         Magic.loadGdt(descriptor);
         Magic.loadSegments(KERNEL_CODE, KERNEL_DATA);
         Magic.loadTaskRegister(TSS);
-        loaded = true;
+    }
+
+    private static long build(long[] table, long[] descriptorWords, long[] tssData, long[] doubleFaultStack) {
+        long tss = Magic.addressOf(tssData) + 16;
+        Magic.pokeLong(tss + TSS_IST1, Magic.addressOf(doubleFaultStack) + 16 + 8L * doubleFaultStack.length);
+        Magic.pokeShort(tss + TSS_IO_MAP_BASE, (short) (TSS_LIMIT + 1));
+        // An available 64-bit TSS (type 0x89); the base is split across both descriptor words.
+        table[3] = TSS_LIMIT | (tss & 0xFF_FFFF) << 16 | 0x89L << 40 | (tss >>> 24 & 0xFF) << 56;
+        table[4] = tss >>> 32;
+
+        long descriptor = Magic.addressOf(descriptorWords) + 16;
+        Magic.pokeShort(descriptor, (short) (8 * table.length - 1));
+        Magic.pokeLong(descriptor + 2, Magic.addressOf(table) + 16);
+        return descriptor;
     }
 }

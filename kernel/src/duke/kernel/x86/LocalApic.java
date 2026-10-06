@@ -34,6 +34,11 @@ public final class LocalApic {
         write(SPURIOUS, SOFTWARE_ENABLE | SPURIOUS_VECTOR);
     }
 
+    /** Turns on the calling CPU's local APIC; {@link #init} mapped the registers every CPU shares. */
+    public static void enableOnThisCpu() {
+        write(SPURIOUS, SOFTWARE_ENABLE | SPURIOUS_VECTOR);
+    }
+
     public static int id() {
         return read(ID) >>> 24;
     }

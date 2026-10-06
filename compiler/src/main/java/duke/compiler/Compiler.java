@@ -53,7 +53,8 @@ public final class Compiler {
     /**
      * Each CPU's own block, which GS points at (IA32_GS_BASE). Layout: the block's own address, the
      * stack limit every prologue checks, the real limit while a preemption request replaces it, the
-     * running thread's stack base (the limits are offsets from it), and the CPU's index.
+     * running thread's stack base (the limits are offsets from it), the CPU's index, then for a
+     * starting application processor its stack top, CR3 and GDT descriptor address.
      */
     static final int CPU_BLOCK_SIZE = 64;
     static final Mem CPU_SELF = Mem.gs(0);
@@ -108,6 +109,7 @@ public final class Compiler {
     private int multiArraySites;
     private boolean interruptStubs;
     private boolean stackOverflowStub;
+    private boolean apEntry;
     private final Map<String, LineInfo> lineInfo = new LinkedHashMap<>();
 
     private record LineInfo(String sourceFile, List<int[]> lines) {}
@@ -213,6 +215,9 @@ public final class Compiler {
         }
         if (stackOverflowStub) {
             emitStackOverflowStub();
+        }
+        if (apEntry) {
+            emitApEntry();
         }
         emitBootStub(entryClass, mainSymbol);
         emitMethodTable();
@@ -630,6 +635,51 @@ public final class Compiler {
     }
 
     /** Where a new thread's first switch returns to (Magic.threadEntry). */
+    static final String AP_ENTRY = "ap.entry";
+    /** Where a starting CPU finds its stack top, CR3 and GDT descriptor, set up by the boot CPU. */
+    static final int CPU_STACK_TOP = 40;
+    static final int CPU_CR3 = 48;
+    private static final int MP_INFO_EXTRA_ARGUMENT = 24;
+
+    /** Where Limine sends each application processor (Magic.apEntry). */
+    String requireApEntry() {
+        if (!apEntry) {
+            apEntry = true;
+            requireMethod("duke/kernel/Smp", "apMain", "()V");
+        }
+        return AP_ENTRY;
+    }
+
+    /**
+     * Limine jumps here on each application processor with its limine_mp_info in rdi, on Limine's
+     * page tables and stack, in bootloader-reclaimable memory. The info's extra argument is this
+     * CPU's block, which is image data and so mapped either way. Off Limine's memory first (our
+     * CR3, our stack), then GS at the block, then Java.
+     */
+    private void emitApEntry() {
+        Section text = image.text;
+        text.align(16);
+        int start = text.size();
+        X64 a = new X64(text);
+        a.load(8, false, Reg.RBX, Mem.at(Reg.RDI, MP_INFO_EXTRA_ARGUMENT));
+        a.load(8, false, Reg.RAX, Mem.at(Reg.RBX, CPU_CR3));
+        a.writeCr(3, Reg.RAX);
+        a.load(8, false, Reg.RSP, Mem.at(Reg.RBX, CPU_STACK_TOP));
+        a.alu(X64.Alu.XOR, false, Reg.RBP, Reg.RBP);
+        a.mov(Reg.RAX, Reg.RBX);
+        a.mov(Reg.RDX, Reg.RBX);
+        a.shiftImm(X64.Shift.SHR, true, Reg.RDX, 32);
+        a.movImm32(Reg.RCX, IA32_GS_BASE);
+        a.wrmsr();
+        a.call(methodSymbol("duke/kernel/Smp", "apMain", "()V"));
+        X64.Label hang = new X64.Label();
+        a.bind(hang);
+        a.cli();
+        a.hlt();
+        a.jmp(hang);
+        image.define(AP_ENTRY, text, start, text.size() - start, Image.SymbolType.FUNC);
+    }
+
     String requireThreadEntry() {
         return requireMethod("duke/kernel/Scheduler", "threadMain", "()V");
     }
