@@ -149,8 +149,22 @@ another's limit.
 Code that must not be interrupted by another thread says so cheaply: the scheduler only switches
 when interrupts are on, so its own bookkeeping runs with them off, and the allocator and
 collector are skipped by `Runtime.preempt` while they run, since neither is reentrant. Not yet:
-monitors (`synchronized`, #23), so class initialization isn't thread-safe and two threads printing
-at once can interleave mid-line; and a second CPU (#24).
+thread-safe class initialization (#23), and a second CPU (#24).
+
+### Monitors
+
+`synchronized` blocks and methods, `wait`, `notify` and `notifyAll` run on `duke.kernel.Monitors`.
+There's no lock word in object headers. A monitor exists only while some thread holds, waits on
+or is blocked on it, as an entry in a small table keyed by the object's address, which the
+non-moving collector keeps stable. Uncontended enter and exit cost a call and a short scan with
+interrupts off. Releasing hands the monitor straight to the first blocked thread.
+
+`monitorenter` and `monitorexit` compile to calls into `duke.rt.Runtime`, and javac's own
+handlers release block monitors on exceptions. A synchronized method gets the same calls in its
+prologue and before each return, and keeps its lock object in a hidden slot at `[rbp - 8]`. Its
+method table entry is flagged and records the code offset from which the monitor is held, so
+`Exceptions.raise` releases it when an exception leaves the method, but not when one comes from
+the prologue before the monitor was taken.
 
 ## Compiler pipeline
 
@@ -326,7 +340,7 @@ Static, instance, virtual and interface methods (including defaults), exceptions
 including both switch forms, static and instance fields, array loads and stores, string literals
 and `String.length`/`charAt`.
 
-Not yet, and each a clear compile error: floating point and monitors.
+Not yet, and a clear compile error: floating point.
 
 String concatenation works because the kernel compiles with `javac -XDstringConcat=inline`, which
 turns `+` into `StringBuilder` calls instead of an `invokedynamic`. Every place that compiles

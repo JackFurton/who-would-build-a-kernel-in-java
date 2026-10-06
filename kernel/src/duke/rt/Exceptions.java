@@ -1,5 +1,6 @@
 package duke.rt;
 
+import duke.kernel.Monitors;
 import duke.kernel.Panic;
 
 /**
@@ -37,6 +38,12 @@ final class Exceptions {
                         }
                     }
                 }
+            }
+            int flags = Magic.peekInt(entry + Backtrace.ENTRY_FLAGS);
+            if ((flags & Backtrace.SYNCHRONIZED) != 0
+                    && pc - Magic.peekLong(entry) >= Magic.peekInt(entry + Backtrace.ENTRY_MONITOR_FROM)) {
+                // Leaving a synchronized method, which keeps its lock object at [rbp - 8].
+                Monitors.exitUnwinding(Magic.toObject(Magic.peekLong(rbp - 8)));
             }
             pc = Magic.peekLong(rbp + 8) - 1;
             rbp = Magic.peekLong(rbp);

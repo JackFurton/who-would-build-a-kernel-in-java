@@ -36,6 +36,7 @@ import java.lang.classfile.instruction.LabelTarget;
 import java.lang.classfile.instruction.LineNumber;
 import java.lang.classfile.instruction.LoadInstruction;
 import java.lang.classfile.instruction.LookupSwitchInstruction;
+import java.lang.classfile.instruction.MonitorInstruction;
 import java.lang.classfile.instruction.NewMultiArrayInstruction;
 import java.lang.classfile.instruction.NewObjectInstruction;
 import java.lang.classfile.instruction.NewPrimitiveArrayInstruction;
@@ -87,6 +88,12 @@ final class MethodCompiler {
     private int line = -1;
     private final List<ExceptionCatch> catches = new ArrayList<>();
     private int extraLocals;
+    /** Slots below rbp: the Java locals that aren't arguments, plus the monitor slot. */
+    private int frameSlots;
+    private boolean synchronizedMethod;
+    /** Code offset from which a synchronized method holds its monitor. */
+    private int monitorHeldFrom;
+    private static final Mem MONITOR_SLOT = Mem.at(RBP, -8);
     private List<CodeElement> elements;
     private FrameTypes.State[] states;
     /** Slot kinds before the instruction being compiled; the prologue sees the entry state. */
@@ -111,12 +118,11 @@ final class MethodCompiler {
         if (method.is(AccessFlag.ABSTRACT)) {
             throw error("abstract method reached without virtual dispatch support");
         }
-        if (method.is(AccessFlag.SYNCHRONIZED)) {
-            throw error("synchronized methods are not supported yet");
-        }
         CodeAttribute code = (CodeAttribute) method.method().code().orElseThrow();
         argSlots = argSlots(method.method().methodTypeSymbol()) + (method.is(AccessFlag.STATIC) ? 0 : 1);
         extraLocals = code.maxLocals() - argSlots;
+        synchronizedMethod = method.is(AccessFlag.SYNCHRONIZED);
+        frameSlots = Math.max(extraLocals, 0) + (synchronizedMethod ? 1 : 0);
         elements = code.elementList();
         states = FrameTypes.analyze(code, elements, method.method().methodTypeSymbol(), method.is(AccessFlag.STATIC));
         for (FrameTypes.State s : states) {
@@ -132,10 +138,13 @@ final class MethodCompiler {
         methodStart = start;
         a.push(RBP);
         a.mov(RBP, RSP);
-        if (extraLocals > 0) {
-            a.aluImm(Alu.SUB, true, RSP, 8 * extraLocals);
+        if (frameSlots > 0) {
+            a.aluImm(Alu.SUB, true, RSP, 8 * frameSlots);
         }
         stackCheck();
+        if (synchronizedMethod) {
+            enterMethodMonitor();
+        }
 
         for (int index = 0; index < elements.size(); index++) {
             switch (elements.get(index)) {
@@ -160,7 +169,10 @@ final class MethodCompiler {
         String sourceFile = method.owner().findAttribute(Attributes.sourceFile())
                 .map(f -> f.sourceFile().stringValue()).orElse(null);
         program.recordLines(symbol, sourceFile, lines);
-        recordExceptionTable(symbol, start, extraLocals);
+        recordExceptionTable(symbol, start);
+        if (synchronizedMethod) {
+            program.recordMonitorHeld(symbol, monitorHeldFrom);
+        }
         program.recordSafepoints(symbol, safepoints);
     }
 
@@ -180,7 +192,24 @@ final class MethodCompiler {
         if (slot < argSlots) {
             return Mem.at(RBP, 16 + 8 * (argSlots - 1 - slot));
         }
-        return Mem.at(RBP, -8 * (slot - argSlots + 1));
+        return Mem.at(RBP, -8 * (slot - argSlots + 1 + (synchronizedMethod ? 1 : 0)));
+    }
+
+    /**
+     * A synchronized method keeps its lock object in a hidden slot at [rbp - 8], below which the
+     * Java locals start, so the unwinder can find and release it (Exceptions.raise).
+     */
+    private void enterMethodMonitor() {
+        if (method.is(AccessFlag.STATIC)) {
+            a.lea(RAX, Mem.rip(program.requireTib(method.ownerName())));
+        } else {
+            a.load(8, false, RAX, local(0));
+        }
+        a.store(8, MONITOR_SLOT, RAX);
+        a.push(RAX);
+        emitCall(program.requireMethod(RUNTIME, "monitorEnter", "(Ljava/lang/Object;)V"));
+        a.aluImm(Alu.ADD, true, RSP, 8);
+        monitorHeldFrom = a.position() - methodStart;
     }
 
     private static int argSlots(MethodTypeDesc type) {
@@ -223,6 +252,11 @@ final class MethodCompiler {
             case InvokeInstruction inv -> invoke(inv);
             case InvokeDynamicInstruction indy -> invokeDynamic(indy);
             case ReturnInstruction r -> {
+                if (synchronizedMethod) {
+                    a.push(MONITOR_SLOT);
+                    emitCall(program.requireMethod(RUNTIME, "monitorExit", "(Ljava/lang/Object;)V"));
+                    a.aluImm(Alu.ADD, true, RSP, 8);
+                }
                 switch (r.typeKind().slotSize()) {
                     case 1 -> a.pop(RAX);
                     case 2 -> popLong(RAX);
@@ -247,6 +281,15 @@ final class MethodCompiler {
             case NewReferenceArrayInstruction n -> newArray("[" + descriptorOf(n.componentType().asInternalName()));
             case NewMultiArrayInstruction n -> newMultiArray(n.arrayType().asInternalName(), n.dimensions());
             case TypeCheckInstruction t -> typeCheck(t.opcode(), program.requireTib(t.type().asInternalName()));
+            case MonitorInstruction m -> {
+                a.pop(RAX);
+                consumed = 1;
+                nullCheck(RAX);
+                a.push(RAX);
+                String name = m.opcode() == Opcode.MONITORENTER ? "monitorEnter" : "monitorExit";
+                emitCall(program.requireMethod(RUNTIME, name, "(Ljava/lang/Object;)V"));
+                a.aluImm(Alu.ADD, true, RSP, 8);
+            }
             case NopInstruction n -> { }
             default -> throw error("unsupported bytecode " + i.opcode().name().toLowerCase());
         }
@@ -835,7 +878,7 @@ final class MethodCompiler {
         int onStack = state.stack().length - consumed;
         for (int i = 0; i < onStack; i++) {
             if (state.stack()[i] == FrameTypes.REF) {
-                refs.add(-8 * Math.max(extraLocals, 0) - 8 * (i + 1));
+                refs.add(-8 * frameSlots - 8 * (i + 1));
             }
         }
         safepoints.add(new Compiler.Safepoint(a.position() - methodStart, refs));
@@ -1211,7 +1254,7 @@ final class MethodCompiler {
      * Rows of (start, end, handler, catch type TIB) over this method's code, in the order the class
      * file lists them, which is the order the JVM tries them. Offsets are from the method start.
      */
-    private void recordExceptionTable(String symbol, int start, int extraLocals) {
+    private void recordExceptionTable(String symbol, int start) {
         List<Compiler.Handler> handlers = new ArrayList<>();
         for (ExceptionCatch c : catches) {
             String catchType = c.catchType().map(t -> program.requireTib(t.asInternalName())).orElse(null);
@@ -1219,7 +1262,7 @@ final class MethodCompiler {
                     label(c.handler()).position() - start, catchType));
         }
         if (!handlers.isEmpty()) {
-            program.recordExceptionTable(symbol, 8 * Math.max(extraLocals, 0), handlers);
+            program.recordExceptionTable(symbol, 8 * frameSlots, handlers);
         }
     }
 

@@ -107,6 +107,8 @@ public final class Compiler {
     private record ExceptionTable(int frameBytes, List<Handler> handlers) {}
 
     private final Map<String, ExceptionTable> exceptionTables = new LinkedHashMap<>();
+    /** Synchronized methods: the code offset from which each holds its monitor. */
+    private final Map<String, Integer> monitorHeld = new LinkedHashMap<>();
 
     /** A call site's return offset in its method, and the rbp-relative slots holding references there. */
     record Safepoint(int offset, List<Integer> refSlots) {}
@@ -407,6 +409,10 @@ public final class Compiler {
         exceptionTables.put(methodSymbol, new ExceptionTable(frameBytes, handlers));
     }
 
+    void recordMonitorHeld(String methodSymbol, int offset) {
+        monitorHeld.put(methodSymbol, offset);
+    }
+
     void recordLines(String methodSymbol, String sourceFile, List<int[]> lines) {
         lineInfo.put(methodSymbol, new LineInfo(sourceFile, lines));
     }
@@ -415,9 +421,9 @@ public final class Compiler {
      * For backtraces and exception dispatch (duke.rt.Backtrace, duke.rt.Exceptions). Header: entry
      * count (u64). Each 64-byte entry, sorted by address: start, size (u32), line count (u32), name
      * String, source file String or 0, line table or 0, exception table or 0, flags (u32, see
-     * methodFlags) and padding, GC map or 0. A GC map is a safepoint count (u32), then per call
-     * site its return offset (u32), a slot count (u32) and that many rbp-relative offsets (i32) of
-     * slots holding references, in code order. A line table is
+     * methodFlags), the offset a synchronized method holds its monitor from (u32), GC map or 0.
+     * A GC map is a safepoint count (u32), then per call site its return offset (u32), a slot count
+     * (u32) and that many rbp-relative offsets (i32) of slots holding references, in code order. A line table is
      * (code offset u32, line u32) pairs in code order. An exception table is a row count (u32) and
      * the frame's local-variable bytes below rbp (u32), then 24-byte rows: start, end, handler
      * (u32 code offsets, plus u32 padding) and the catch type's TIB, 0 meaning any.
@@ -488,8 +494,9 @@ public final class Compiler {
             emitPointer(rodata, info == null || info.sourceFile() == null ? null : requireString(info.sourceFile()));
             emitPointer(rodata, hasLines ? "lines:" + f.name() : null);
             emitPointer(rodata, exceptionTables.containsKey(f.name()) ? "exceptions:" + f.name() : null);
-            rodata.emit32(methodFlags(f.name()));
-            rodata.emit32(0);
+            Integer heldFrom = monitorHeld.get(f.name());
+            rodata.emit32(methodFlags(f.name()) | (heldFrom != null ? METHOD_SYNCHRONIZED : 0));
+            rodata.emit32(heldFrom != null ? heldFrom : 0);
             emitPointer(rodata, safepoints.containsKey(f.name()) ? "gcmap:" + f.name() : null);
         }
         image.define(METHOD_TABLE, rodata, table, rodata.size() - table, Image.SymbolType.OBJECT);
@@ -499,6 +506,11 @@ public final class Compiler {
     static final int METHOD_HIDDEN = 1;
     /** Unwinding stops here: exceptions don't propagate out of interrupt handlers. */
     static final int METHOD_INTERRUPT_ENTRY = 2;
+    /**
+     * A synchronized method: the unwinder releases the monitor in its [rbp - 8] when an exception
+     * leaves it from at or past the code offset in the entry's next word.
+     */
+    static final int METHOD_SYNCHRONIZED = 4;
 
     private int methodFlags(String symbol) {
         if (symbol.equals("interrupt.common")) {
