@@ -1,3 +1,4 @@
+// backends: java
 // Library methods on numbers, strings, arrays and the global object.
 console.log((255).toString(16), (255).toString(2), (-10).toString(8), (5).toString());
 console.log(true.toString(), Boolean(0), Boolean("x"), Boolean([]));
