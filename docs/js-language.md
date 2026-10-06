@@ -27,12 +27,14 @@ with `// backends: java` and skips it.
 | Errors | `Error`, `TypeError`, `RangeError`, `ReferenceError`, `SyntaxError`, `EvalError`, `URIError`; runtime errors (reading a property of `undefined`, calling a non-function, stack overflow) are catchable |
 | Strings | literals, template literals and tagged templates (`String.raw` too), the usual methods (`slice`, `split`, `indexOf`, `padStart`, ...) |
 | Arrays | literals, indexing, `length`, and the common methods (`push`, `map`, `filter`, `reduce`, `sort`, ...) |
-| Built-ins | `console.log`/`error` (node-style formatting), `Math` (integer subset), `Object` statics (`keys`, `values`, `entries`, `assign`, `create`, `getPrototypeOf`, `setPrototypeOf`, `hasOwn`), `Object.prototype` methods, `Array.isArray`/`of`/`from`, the usual `Array`, `String`, `Number` and `Boolean` prototype methods (`toString(radix)`, string `replace`/`replaceAll` with a string pattern), `parseInt`, `isNaN`/`isFinite`, `globalThis`, `encodeURI*`/`decodeURI*`, `btoa`/`atob`, `Math.imul`/`clz32` |
+| Built-ins | `console.log`/`error` (node-style formatting), `Math` (integer subset), `Object` statics (`keys`, `values`, `entries`, `assign`, `create`, `getPrototypeOf`, `setPrototypeOf`, `hasOwn`), `Object.prototype` methods, `Array.isArray`/`of`/`from`, the usual `Array`, `String`, `Number` and `Boolean` prototype methods (`toString(radix)`, string `replace`/`replaceAll` with a string pattern), `parseInt`, `isNaN`/`isFinite`, `globalThis`, `encodeURI*`/`decodeURI*`, `btoa`/`atob`, `Math.imul`/`clz32`, `JSON.parse`/`stringify` (replacers, reviver, indent, `toJSON`; integers only, so a fraction is a SyntaxError) |
 
 ## Not yet (unbuilt)
 
-In the order we expect to do them: modules
-(`import`/`export`), `Promise` and `async`/`await`, `JSON`, typed arrays.
+In the order we expect to do them: regular expressions (an engine in the runtime, Latin-1 only), `Date` (once the
+kernel gives JS a clock), `Promise`, timers and `async`/`await` (the event loop and the generator
+transform), modules (`import`/`export`), typed arrays, `ArrayBuffer` and `DataView`, `Proxy` and `Reflect` (see below),
+and small gaps (function `length`, `new.target`, `parseFloat`).
 
 ## Waiting on the kernel
 
@@ -40,7 +42,6 @@ In the order we expect to do them: modules
 | --- | --- |
 | Fractions, `NaN`, `Infinity`, `Math.sqrt` and friends | floating point in `dukec` and SSE enabled in the kernel; numbers are 64-bit integers until then |
 | Non-Latin-1 text, `\u` escapes above 0xFF, `codePointAt` | UTF-16 strings (the kernel's are Latin-1) |
-| Regular expressions | a regex engine |
 | `Date` | a clock API for JS, then the date arithmetic |
 | `setTimeout`, timers | an event loop on top of the kernel timer |
 

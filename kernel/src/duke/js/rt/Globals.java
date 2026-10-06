@@ -84,6 +84,12 @@ public final class Globals {
         console.set("error", console.get("log"));
         g.set("console", console);
 
+        JsObject json = new JsObject();
+        json.set("parse", function("parse", (callee, self, args) -> Json.parse(JS.str(arg(args, 0)), arg(args, 1))));
+        json.set("stringify", function("stringify", (callee, self, args) ->
+                Json.stringify(arg(args, 0), arg(args, 1), arg(args, 2))));
+        g.set("JSON", json);
+
         JsObject math = new JsObject();
         Object identity = function("floor", (callee, self, args) -> arg(args, 0));
         math.set("floor", identity);
