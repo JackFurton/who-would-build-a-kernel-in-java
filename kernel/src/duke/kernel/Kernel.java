@@ -27,31 +27,51 @@ public final class Kernel {
     /** Brings up the core subsystems. Shared with the ktest runner, so tests see a real kernel. */
     public static void init() {
         Serial.init();
+        Console.println("[init] Serial.init();");
         if (!Limine.baseRevisionSupported()) {
             Panic.panic("Limine doesn't support base revision 6");
         }
         Limine.snapshot();
+        Console.println("[init] Limine.snapshot();");
         Gdt.ensureLoaded();
+        Console.println("[init] Gdt.ensureLoaded();");
         Idt.load();
+        Console.println("[init] Idt.load();");
         PhysicalMemory.init();
+        Console.println("[init] PhysicalMemory.init();");
         KernelAddressSpace.activate();
+        Console.println("[init] KernelAddressSpace.activate();");
         KernelHeap.init();
+        Console.println("[init] KernelHeap.init();");
         FramebufferConsole.init();
+        Console.println("[init] FramebufferConsole.init();");
         Acpi.init();
+        Console.println("[init] Acpi.init();");
         Madt.init();
+        Console.println("[init] Madt.init();");
         Hpet.init();
+        Console.println("[init] Hpet.init();");
         Pic.disable();
+        Console.println("[init] Pic.disable();");
         LocalApic.init();
+        Console.println("[init] LocalApic.init();");
         Timer.init();
+        Console.println("[init] Timer.init();");
         Scheduler.init();
+        Console.println("[init] Scheduler.init();");
         Smp.start();
+        Console.println("[init] Smp.start();");
         // Not before: the boot CPU's old GDT and page tables, and the other CPUs while Limine had
         // them parked, all lived in this memory.
         reclaimed = PhysicalMemory.reclaimBootloaderMemory();
+        Console.println("[init] reclaimed = PhysicalMemory.reclaimBootloaderMemory();");
         IoApic.init();
+        Console.println("[init] IoApic.init();");
         Ps2Keyboard.init();
         Serial.enableInput();
+        Console.println("[init] Serial.enableInput();");
         Magic.enableInterrupts();
+        Console.println("[init] Magic.enableInterrupts();");
     }
 
     private static long reclaimed;
