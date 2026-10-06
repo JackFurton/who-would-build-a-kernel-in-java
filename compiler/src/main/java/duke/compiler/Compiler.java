@@ -638,7 +638,10 @@ public final class Compiler {
      * Called from a prologue that found rsp below the limit, or from a loop back-edge that found a
      * preemption request. A request ({@link #PREEMPT} in the limit) puts the real limit back and
      * tail-jumps to Runtime.preempt, which returns to the caller once the thread runs again.
-     * Otherwise it's an overflow. The first time, it lowers the limit to the emergency mark and
+     * Otherwise it's an overflow, unless the limit has changed since the caller looked: an interrupt
+     * between the caller's check and this one runs Java code whose own prologue takes the pending
+     * request, and then the real limit is back and rsp is above it, so the stub just returns. The
+     * first time, it lowers the limit to the emergency mark and
      * tail-jumps to Runtime.stackOverflow, which throws from inside the reserve. Overflowing again
      * before the unwinder resets the limit means even the reserve is gone: checks are disabled and
      * Runtime.stackExhausted panics.
@@ -650,12 +653,15 @@ public final class Compiler {
         X64 a = new X64(text);
         X64.Label overflow = new X64.Label();
         X64.Label exhausted = new X64.Label();
+        X64.Label spurious = new X64.Label();
         a.aluImm(X64.Alu.CMP, true, STACK_LIMIT, PREEMPT);
         a.jcc(Cond.NE, overflow);
         a.load(8, false, Reg.RAX, STACK_LIMIT_SAVED);
         a.store(8, STACK_LIMIT, Reg.RAX);
         a.jmp(methodSymbol("duke/rt/Runtime", "preempt", "()V"));
         a.bind(overflow);
+        a.alu(X64.Alu.CMP, true, STACK_LIMIT, Reg.RSP);
+        a.jcc(Cond.BE, spurious);
         a.load(8, false, Reg.RAX, STACK_BASE);
         a.lea(Reg.RAX, Mem.at(Reg.RAX, STACK_EMERGENCY));
         a.alu(X64.Alu.CMP, true, STACK_LIMIT, Reg.RAX);
@@ -666,6 +672,8 @@ public final class Compiler {
         a.alu(X64.Alu.XOR, false, Reg.RAX, Reg.RAX);
         a.store(8, STACK_LIMIT, Reg.RAX);
         a.jmp(methodSymbol("duke/rt/Runtime", "stackExhausted", "()V"));
+        a.bind(spurious);
+        a.ret();
         image.define(STACK_OVERFLOW, text, start, text.size() - start, Image.SymbolType.FUNC);
     }
 
