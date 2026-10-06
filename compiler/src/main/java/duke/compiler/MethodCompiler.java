@@ -1125,6 +1125,7 @@ final class MethodCompiler {
         popLong(RSI);
         popLong(Reg.RDI);
         X64.Label forward = new X64.Label();
+        X64.Label bytes = new X64.Label();
         X64.Label done = new X64.Label();
         a.alu(Alu.CMP, true, Reg.RDI, RSI);
         a.jcc(Cond.E, done);
@@ -1151,11 +1152,14 @@ final class MethodCompiler {
         a.cld();
         a.jmp(done);
         a.bind(forward);
+        a.aluImm(Alu.CMP, true, RCX, 8);
+        a.jcc(Cond.B, bytes);
         a.mov(RDX, RCX);
         a.shiftImm(Shift.SHR, true, RCX, 3);
         a.repMovsq();
         a.mov(RCX, RDX);
         a.aluImm(Alu.AND, true, RCX, 7);
+        a.bind(bytes);
         a.repMovsb();
         a.bind(done);
     }
