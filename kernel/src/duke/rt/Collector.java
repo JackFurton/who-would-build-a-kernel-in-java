@@ -48,10 +48,9 @@ final class Collector {
     }
 
     private static void clearMarks() {
-        for (int i = 0; i < Heap.ARENA_MARKS.length; i++) {
-            Heap.ARENA_MARKS[i] = 0;
-        }
-        Magic.fillMemory(Heap.regionMarks, 0, (Heap.end - Heap.regionStart) / 64);
+        Magic.zeroMemoryWords(Magic.addressOf(Heap.ARENA_MARKS) + Tib.ARRAY_DATA, Heap.ARENA_MARKS.length);
+        // One mark bit per eight heap bytes, with the region committed in whole pages.
+        Magic.zeroMemoryWords(Heap.regionMarks, (Heap.end - Heap.regionStart) / 512);
     }
 
     private static void markStaticRoots() {

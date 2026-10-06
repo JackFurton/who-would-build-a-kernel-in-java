@@ -239,7 +239,7 @@ public final class Heap {
                 } else {
                     Magic.pokeLong(previous + 16, replacement);
                 }
-                Magic.fillMemory(hole, 0, size);
+                Magic.zeroMemoryWords(hole, size >>> 3);
                 return hole;
             }
             previous = hole;
