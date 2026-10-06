@@ -41,7 +41,9 @@ for now: the bump allocator isn't reentrant.
 
 `PhysicalMemory` hands out 4 KiB frames from the "usable" regions of Limine's memory map,
 tracked in a `FrameBitmap` (one bit per page, next-fit search). Frame 0 is never handed out.
-Frames are named by physical address and touched through the higher-half direct map.
+Frames are named by physical address and touched through the higher-half direct map. Zeroed frames
+are cleared as 512 eight-byte words. `tryAllocateZeroed` returns -1 on exhaustion, so heap backing and
+thread stacks can share that path without allocating an exception while handling memory pressure.
 
 Bulk copies use `Magic.copyMemory`: whole words with `rep movsq`, then the exact byte remainder.
 Unaligned addresses work, and neither end is rounded beyond the requested span. Only a destination

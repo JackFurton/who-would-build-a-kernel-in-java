@@ -1,7 +1,5 @@
 package duke.kernel.mm;
 
-import duke.rt.Magic;
-
 /**
  * Thread stacks, in their own PML4 slot. Each slot is a 64 KiB stack with an unmapped guard page
  * below it, so running off the end faults instead of overwriting the neighbour. Frames are mapped
@@ -37,13 +35,12 @@ public final class KernelStacks {
         PageTable table = KernelAddressSpace.table();
         long nx = KernelAddressSpace.noExecuteSupported() ? PageTable.NO_EXECUTE : 0;
         for (long page = bottom; page < bottom + STACK_BYTES; page += PhysicalMemory.PAGE_SIZE) {
-            long frame = PhysicalMemory.tryAllocate();
+            long frame = PhysicalMemory.tryAllocateZeroed();
             if (frame < 0) {
                 unmap(bottom, page);
                 FREE[freeCount++] = slot;
                 return -1;
             }
-            Magic.fillMemory(PhysicalMemory.toVirtual(frame), 0, PhysicalMemory.PAGE_SIZE);
             table.map(page, frame, PageTable.WRITABLE | nx);
         }
         return bottom;

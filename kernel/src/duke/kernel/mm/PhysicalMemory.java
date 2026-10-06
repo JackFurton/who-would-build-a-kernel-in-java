@@ -74,8 +74,19 @@ public final class PhysicalMemory {
     }
 
     public static long allocateZeroed() {
-        long frame = allocate();
-        Magic.fillMemory(toVirtual(frame), 0, PAGE_SIZE);
+        long frame = tryAllocateZeroed();
+        if (frame < 0) {
+            throw new OutOfMemoryError("out of physical memory");
+        }
+        return frame;
+    }
+
+    /** Like allocateZeroed(), but -1 instead of throwing when no frame is available. */
+    public static long tryAllocateZeroed() {
+        long frame = tryAllocate();
+        if (frame >= 0) {
+            Magic.zeroMemoryWords(toVirtual(frame), PAGE_SIZE / 8);
+        }
         return frame;
     }
 
