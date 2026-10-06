@@ -37,7 +37,7 @@ final class Parser {
         while (peek().kind() != Token.Kind.EOF) {
             body.add(statement());
         }
-        return body;
+        return withHoists(body);
     }
 
     // ---- statements ----
@@ -124,11 +124,25 @@ final class Parser {
             Block handler = null;
             Block finalizer = null;
             if (accept("catch")) {
+                Pat catchPattern = null;
                 if (accept("(")) {
-                    param = expectIdent();
+                    if (atPattern()) {
+                        catchPattern = bindingTarget();
+                        param = hidden("c");
+                    } else {
+                        param = expectIdent();
+                    }
                     expect(")");
                 }
                 handler = block();
+                if (catchPattern != null) {
+                    List<Binding> bindings = new ArrayList<>();
+                    flatten(catchPattern, new Ident(param, line), line, bindings);
+                    List<Stmt> inner = new ArrayList<>();
+                    inner.add(new VarDecl("let", declarators(bindings), line));
+                    inner.addAll(handler.body());
+                    handler = new Block(inner, handler.line());
+                }
             }
             if (accept("finally")) {
                 finalizer = block();
@@ -209,6 +223,15 @@ final class Parser {
         Token kind = tokens.get(pos++);
         List<Declarator> declarators = new ArrayList<>();
         do {
+            if (atPattern()) {
+                int line = peek().line();
+                Pat pattern = bindingTarget();
+                expect("=");
+                List<Binding> bindings = new ArrayList<>();
+                flatten(pattern, assignment(), line, bindings);
+                declarators.addAll(declarators(bindings));
+                continue;
+            }
             String name = expectIdent();
             Expr init = null;
             if (peek().is("=")) {
@@ -228,6 +251,23 @@ final class Parser {
         Stmt init = null;
         if (peek().is("let") || peek().is("const") || peek().is("var")) {
             String kind = peek().text();
+            if (tokens.get(pos + 1).is("[") || tokens.get(pos + 1).is("{")) {
+                Token after = tokens.get(matching(pos + 1) + 1);
+                boolean patternOf = after.kind() == Token.Kind.IDENT && after.text().equals("of");
+                if (patternOf || after.is("in")) {
+                    pos++;
+                    Pat pattern = bindingTarget();
+                    pos++;
+                    Expr iterable = after.is("in") ? expression() : assignment();
+                    expect(")");
+                    String hidden = hidden("f");
+                    List<Binding> bindings = new ArrayList<>();
+                    flatten(pattern, new Ident(hidden, line), line, bindings);
+                    Stmt body = new Block(new ArrayList<>(List.of(new VarDecl(kind, declarators(bindings), line),
+                            statement())), line);
+                    return new ForOf(kind, hidden, iterable, body, line, after.is("in"));
+                }
+            }
             boolean forOf = tokens.get(pos + 2).kind() == Token.Kind.IDENT && tokens.get(pos + 2).text().equals("of");
             boolean forIn = tokens.get(pos + 2).is("in");
             if (tokens.get(pos + 1).kind() == Token.Kind.IDENT && (forOf || forIn)) {
@@ -280,6 +320,10 @@ final class Parser {
         }
         Expr left = conditional();
         Token t = peek();
+        if (t.is("=") && (left instanceof ArrayLit || left instanceof ObjectLit)) {
+            pos++;
+            return destructuringAssignment(left, t.line());
+        }
         if (t.kind() == Token.Kind.PUNCT && ASSIGN.contains(t.text())) {
             if (!(left instanceof Ident || left instanceof Member || left instanceof Index)) {
                 throw error(t, "invalid assignment target");
@@ -332,6 +376,22 @@ final class Parser {
                 break;
             }
             Token t = peek();
+            if (atPattern()) {
+                Pat pattern = bindingTarget();
+                String hidden = "$p" + hiddenParameters++;
+                Expr source = new Ident(hidden, t.line());
+                if (accept("=")) {
+                    source = withDefault(source, assignment(), t.line());
+                }
+                List<Binding> bindings = new ArrayList<>();
+                flatten(pattern, source, t.line(), bindings);
+                prologue.add(new VarDecl("var", declarators(bindings), t.line()));
+                names.add(hidden);
+                if (!peek().is(")")) {
+                    expect(",");
+                }
+                continue;
+            }
             String name = expectIdent();
             if (accept("=")) {
                 String hidden = "$p" + hiddenParameters++;
@@ -361,13 +421,17 @@ final class Parser {
             params.add(expectIdent());
         }
         expect("=>");
+        List<Stmt> outerHoists = hoists;
+        hoists = new ArrayList<>();
         if (peek().is("{")) {
             body.addAll(block().body());
         } else {
             Expr e = assignment();
             body.add(new Return(e, e.line()));
         }
-        return new FuncExpr(new Function(null, params, body, true, line), line);
+        List<Stmt> all = withHoists(body);
+        hoists = outerHoists;
+        return new FuncExpr(new Function(null, params, all, true, line), line);
     }
 
     private Expr conditional() {
@@ -595,6 +659,11 @@ final class Parser {
                 if (t.is("[")) {
                     List<Expr> elements = new ArrayList<>();
                     while (!peek().is("]")) {
+                        if (peek().is(",")) {
+                            pos++;
+                            elements.add(new Hole(line));
+                            continue;
+                        }
                         elements.add(argument());
                         if (!peek().is("]")) {
                             expect(",");
@@ -643,6 +712,11 @@ final class Parser {
                 value = new FuncExpr(function(name, false, key.line()), key.line());
             } else if (computed == null && key.kind() == Token.Kind.IDENT) {
                 value = new Ident(name, key.line());
+                if (peek().is("=")) {
+                    // {a = 1} is only meaningful as a destructuring pattern; toPattern reads it back.
+                    pos++;
+                    value = new Assign("=", value, assignment(), key.line());
+                }
             } else {
                 throw error(peek(), "expected ':' but found " + peek());
             }
@@ -676,9 +750,266 @@ final class Parser {
         expect("(");
         List<String> params = new ArrayList<>();
         List<Stmt> body = new ArrayList<>();
+        List<Stmt> outerHoists = hoists;
+        hoists = new ArrayList<>();
         parameters(params, body);
         body.addAll(block().body());
-        return new Function(name, params, body, arrow, line);
+        List<Stmt> all = withHoists(body);
+        hoists = outerHoists;
+        return new Function(name, params, all, arrow, line);
+    }
+
+    // ---- destructuring ----
+    //
+    // A pattern is parsed (or recovered from an array or object literal that turns out to be an assignment
+    // target) and then flattened into plain bindings over hidden temporaries, so the rest of the compiler
+    // never sees one.
+
+    private sealed interface Pat permits PName, PTarget, PArray, PObject {}
+
+    private record PName(String name) implements Pat {}
+
+    /** A member or index expression on the left of a destructuring assignment. */
+    private record PTarget(Expr target) implements Pat {}
+
+    /** {@code target} is null for a hole. */
+    private record PElem(Pat target, Expr dflt) {}
+
+    private record PArray(List<PElem> elems, Pat rest) implements Pat {}
+
+    private record PProp(String key, Expr computed, Pat target, Expr dflt) {}
+
+    private record PObject(List<PProp> props, Pat rest) implements Pat {}
+
+    private record Binding(Expr target, Expr value) {}
+
+    private int hiddenNames;
+    /** Declarations that belong at the top of the function being parsed: temporaries for destructuring assignments. */
+    private List<Stmt> hoists = new ArrayList<>();
+
+    private String hidden(String prefix) {
+        return "$" + prefix + hiddenNames++;
+    }
+
+    private List<Stmt> withHoists(List<Stmt> body) {
+        List<Stmt> all = new ArrayList<>(hoists);
+        all.addAll(body);
+        return all;
+    }
+
+    private boolean atPattern() {
+        return peek().is("[") || peek().is("{");
+    }
+
+    /** A binding target: a name or a nested pattern. */
+    private Pat bindingTarget() {
+        if (peek().is("[")) {
+            pos++;
+            List<PElem> elems = new ArrayList<>();
+            Pat rest = null;
+            while (!peek().is("]")) {
+                if (peek().is(",")) {
+                    pos++;
+                    elems.add(new PElem(null, null));
+                    continue;
+                }
+                if (accept("...")) {
+                    rest = bindingTarget();
+                    if (!peek().is("]")) {
+                        throw error(peek(), "a rest element must be last");
+                    }
+                    break;
+                }
+                Pat target = bindingTarget();
+                Expr dflt = accept("=") ? assignment() : null;
+                elems.add(new PElem(target, dflt));
+                if (!peek().is("]")) {
+                    expect(",");
+                }
+            }
+            expect("]");
+            return new PArray(elems, rest);
+        }
+        if (peek().is("{")) {
+            pos++;
+            List<PProp> props = new ArrayList<>();
+            Pat rest = null;
+            while (!peek().is("}")) {
+                if (accept("...")) {
+                    rest = bindingTarget();
+                    if (!peek().is("}")) {
+                        throw error(peek(), "a rest element must be last");
+                    }
+                    break;
+                }
+                Token key = tokens.get(pos++);
+                String name = null;
+                Expr computed = null;
+                if (key.is("[")) {
+                    computed = assignment();
+                    expect("]");
+                } else if (key.kind() == Token.Kind.IDENT || key.kind() == Token.Kind.KEYWORD || key.kind() == Token.Kind.STR) {
+                    name = key.text();
+                } else if (key.kind() == Token.Kind.NUM) {
+                    name = Long.toString(key.number());
+                } else {
+                    throw error(key, "unexpected " + key + " in a pattern");
+                }
+                Pat target;
+                if (accept(":")) {
+                    target = bindingTarget();
+                } else if (computed == null && key.kind() == Token.Kind.IDENT) {
+                    target = new PName(name);
+                } else {
+                    throw error(peek(), "expected ':' but found " + peek());
+                }
+                Expr dflt = accept("=") ? assignment() : null;
+                props.add(new PProp(name, computed, target, dflt));
+                if (!peek().is("}")) {
+                    expect(",");
+                }
+            }
+            expect("}");
+            return new PObject(props, rest);
+        }
+        return new PName(expectIdent());
+    }
+
+    /** Recovers a pattern from an expression that was parsed as an array or object literal before the {@code =}. */
+    private Pat toPattern(Expr e) {
+        switch (e) {
+            case Ident id -> {
+                return new PName(id.name());
+            }
+            case Member m -> {
+                return new PTarget(m);
+            }
+            case Index i -> {
+                return new PTarget(i);
+            }
+            case ArrayLit a -> {
+                List<PElem> elems = new ArrayList<>();
+                Pat rest = null;
+                for (Expr element : a.elements()) {
+                    if (element instanceof Hole) {
+                        elems.add(new PElem(null, null));
+                    } else if (element instanceof Spread sp) {
+                        rest = toPattern(sp.value());
+                    } else if (element instanceof Assign as && as.op().equals("=")) {
+                        elems.add(new PElem(toPattern(as.target()), as.value()));
+                    } else {
+                        elems.add(new PElem(toPattern(element), null));
+                    }
+                }
+                return new PArray(elems, rest);
+            }
+            case ObjectLit o -> {
+                List<PProp> props = new ArrayList<>();
+                Pat rest = null;
+                for (Property p : o.properties()) {
+                    if (p.key() == null && p.computed() == null) {
+                        rest = toPattern(((Spread) p.value()).value());
+                    } else if (p.value() instanceof Assign as && as.op().equals("=")) {
+                        props.add(new PProp(p.key(), p.computed(), toPattern(as.target()), as.value()));
+                    } else {
+                        props.add(new PProp(p.key(), p.computed(), toPattern(p.value()), null));
+                    }
+                }
+                return new PObject(props, rest);
+            }
+            default -> throw new JsException(file, e.line(), "invalid destructuring target");
+        }
+    }
+
+    private static Expr withDefault(Expr value, Expr dflt, int line) {
+        if (dflt == null) {
+            return value;
+        }
+        return new Conditional(new Binary("===", value, new Lit(Literal.UNDEFINED, line), line), dflt, value, line);
+    }
+
+    /** Flattens a pattern matched against {@code source} into bindings, in evaluation order. */
+    private void flatten(Pat pattern, Expr source, int line, List<Binding> out) {
+        switch (pattern) {
+            case PName n -> out.add(new Binding(new Ident(n.name(), line), source));
+            case PTarget t -> out.add(new Binding(t.target(), source));
+            case PArray a -> {
+                String temp = hidden("d");
+                out.add(new Binding(new Ident(temp, line), new Internal("toArray", List.of(source), line)));
+                for (int i = 0; i < a.elems().size(); i++) {
+                    PElem e = a.elems().get(i);
+                    if (e.target() != null) {
+                        Expr item = new Index(new Ident(temp, line), new Num(i, line), line);
+                        flatten(e.target(), withDefault(item, e.dflt(), line), line, out);
+                    }
+                }
+                if (a.rest() != null) {
+                    Expr slice = new Call(new Member(new Ident(temp, line), "slice", line),
+                            List.of(new Num(a.elems().size(), line)), line);
+                    flatten(a.rest(), slice, line, out);
+                }
+            }
+            case PObject o -> {
+                String temp = hidden("d");
+                out.add(new Binding(new Ident(temp, line), new Internal("requireObject", List.of(source), line)));
+                List<Expr> used = new ArrayList<>();
+                used.add(new Ident(temp, line));
+                for (PProp p : o.props()) {
+                    Expr key = p.computed() != null ? p.computed() : new Str(p.key(), line);
+                    Expr item = p.computed() != null ? new Index(new Ident(temp, line), key, line)
+                            : new Member(new Ident(temp, line), p.key(), line);
+                    used.add(key);
+                    flatten(p.target(), withDefault(item, p.dflt(), line), line, out);
+                }
+                if (o.rest() != null) {
+                    flatten(o.rest(), new Internal("objectRest", used, line), line, out);
+                }
+            }
+        }
+    }
+
+    /** Declarators for the bindings of a declaration's pattern. */
+    private List<Declarator> declarators(List<Binding> bindings) {
+        List<Declarator> out = new ArrayList<>();
+        for (Binding b : bindings) {
+            out.add(new Declarator(((Ident) b.target()).name(), b.value()));
+        }
+        return out;
+    }
+
+    /** Index of the bracket closing the one at {@code open}. */
+    private int matching(int open) {
+        int depth = 0;
+        for (int i = open; i < tokens.size(); i++) {
+            Token t = tokens.get(i);
+            if (t.is("[") || t.is("{") || t.is("(")) {
+                depth++;
+            } else if (t.is("]") || t.is("}") || t.is(")")) {
+                if (--depth == 0) {
+                    return i;
+                }
+            }
+        }
+        throw error(tokens.get(open), "unbalanced bracket");
+    }
+
+    /** {@code [a, b] = value} or {@code ({a, b} = value)}: assigns through hidden temporaries and yields the value. */
+    private Expr destructuringAssignment(Expr left, int line) {
+        Pat pattern = toPattern(left);
+        Expr value = assignment();
+        String temp = hidden("d");
+        List<Binding> bindings = new ArrayList<>();
+        bindings.add(new Binding(new Ident(temp, line), value));
+        flatten(pattern, new Ident(temp, line), line, bindings);
+        List<Expr> steps = new ArrayList<>();
+        for (Binding b : bindings) {
+            if (b.target() instanceof Ident id && id.name().startsWith("$d")) {
+                hoists.add(new VarDecl("var", List.of(new Declarator(id.name(), null)), line));
+            }
+            steps.add(new Assign("=", b.target(), b.value(), line));
+        }
+        steps.add(new Ident(temp, line));
+        return new Sequence(steps, line);
     }
 
     // ---- token helpers ----

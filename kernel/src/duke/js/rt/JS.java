@@ -144,6 +144,50 @@ public final class JS {
         }
     }
 
+    /** The value to destructure with {@code [a, b] = value}: an array, or the elements of an iterable as one. */
+    public static Object toArray(Object value) {
+        if (value instanceof JsArray) {
+            return value;
+        }
+        JsArray out = new JsArray();
+        addAll(out, value);
+        return out;
+    }
+
+    /** The value to destructure with {@code {a, b} = value}: anything but null and undefined. */
+    public static Object requireObject(Object value) {
+        if (nullish(value)) {
+            throw new JsError("TypeError: Cannot destructure '" + str(value) + "' as it is " + str(value) + ".");
+        }
+        return value;
+    }
+
+    /** {@code const {a, ...rest} = o}: the own enumerable properties of {@code o} other than {@code excluded}. */
+    public static Object objectRest(Object o, Object... excluded) {
+        JsObject rest = new JsObject();
+        rest.proto = Globals.objectPrototype();
+        JsArray keys = (JsArray) forInKeys(o instanceof JsObject ? ownCopy((JsObject) o) : o);
+        for (int i = 0; i < keys.length(); i++) {
+            String key = (String) keys.get(i);
+            boolean skip = false;
+            for (Object name : excluded) {
+                skip = skip || key.equals(keyString(name));
+            }
+            if (!skip) {
+                rest.set(key, get(o, key));
+            }
+        }
+        return rest;
+    }
+
+    private static JsObject ownCopy(JsObject source) {
+        JsObject copy = new JsObject();
+        for (String key : source.keys()) {
+            copy.set(key, source.getOwn(key));
+        }
+        return copy;
+    }
+
     /** The parameter {@code ...rest}: the arguments from index {@code from} on. */
     public static Object restArgs(Object[] args, int from) {
         JsArray rest = new JsArray();

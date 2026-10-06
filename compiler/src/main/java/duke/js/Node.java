@@ -60,6 +60,9 @@ final class Node {
 
     record Sequence(List<Expr> exprs, int line) implements Expr {}
 
+    /** An elision in an array literal or pattern: the gap in {@code [a, , b]}. */
+    record Hole(int line) implements Expr {}
+
     /** {@code ...value} in a call's arguments, an array literal or an object literal. */
     record Spread(Expr value, int line) implements Expr {}
 

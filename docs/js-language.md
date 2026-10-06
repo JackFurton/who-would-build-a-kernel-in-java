@@ -14,6 +14,7 @@ with `// backends: java` and skips it.
 | --- | --- |
 | Declarations | `var`, `let`, `const`, function declarations (hoisted), per-iteration `let` in `for` loops |
 | Functions | declarations, expressions, arrows, closures, `this`, `arguments`, default and rest parameters, `call`/`apply`/`bind`, name inference (`const f = () => 1` is named `f`) |
+| Destructuring | array and object patterns (nested, with defaults, rest and computed keys) in declarations, assignments, parameters, `for...of`/`for...in` heads and `catch`; array holes |
 | Spread | `...` in calls, `new`, array literals and object literals (arrays and strings are the iterables for now) |
 | Objects | literals, shorthand properties and methods, computed keys (`{[k]: v}`), computed access, prototypes, `new`, constructor functions, `instanceof`, `in`, `delete`, `for...in`, property enumeration order (indexes first) |
 | Operators | arithmetic and bitwise (32-bit), comparison, `===`/`==`, logical, `??`, `?:`, optional chaining (`?.`, `?.[]`, `?.()`), `typeof`, `void`, `delete`, compound assignment, `++`/`--` |
@@ -26,7 +27,7 @@ with `// backends: java` and skips it.
 
 ## Not yet (unbuilt)
 
-In the order we expect to do them: destructuring, classes (`extends`, `super`, `static`, getters and
+In the order we expect to do them: classes (`extends`, `super`, `static`, getters and
 setters), `Symbol`, iterators and generators, `Map`/`Set`/`WeakMap`/`WeakSet`, modules
 (`import`/`export`), `Promise` and `async`/`await`, `Object.defineProperty` and property descriptors,
 `Object.freeze`, `JSON`, typed arrays.
@@ -53,6 +54,8 @@ property operation). Calling `new Function` throws an error that says so.
 - Arrays have no holes: `delete a[i]` and growing past the end store `undefined` (node prints `<1 empty item>`).
 - `console.log` doesn't group arrays of more than six items into columns, as node does.
 - Methods in object literals can be used with `new`; node throws.
+- Array patterns read by index, so they work on arrays and strings only until iterators exist.
+- Array literals with holes (`[1, , 2]`) store `undefined` there; node keeps a hole.
 - `arguments` is a plain array with no link back to the parameters, and `console.log(arguments)` prints it as one.
 - A tagged template's strings array is built on each call, so it is not the same object every time as in node.
 - An undeclared name is a compile error, where node throws a `ReferenceError` when the line runs.
