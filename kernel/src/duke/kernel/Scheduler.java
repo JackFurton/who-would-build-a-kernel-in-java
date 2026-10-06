@@ -30,10 +30,13 @@ public final class Scheduler {
     private static final String[] STATE_NAMES = {
         "new", "runnable", "running", "sleeping", "joining", "dead", "blocked", "waiting"};
     private static final long INTERRUPT_FLAG = 1 << 9;
+    private static final long MAIN_ID = 1;
 
     /** One thread's scheduling state; java.lang.Thread holds one. */
     public static final class Task {
         final Thread thread;
+        /** 1 for main; nothing reuses an id. */
+        final long id = ++lastId;
         int state = NEW;
         /** Lowest address of the stack; the boot stack for main, which is never freed. */
         long stackBottom;
@@ -55,6 +58,7 @@ public final class Scheduler {
         }
     }
 
+    private static long lastId;
     private static Task current;
     private static Task idle;
     private static Task runHead;
@@ -98,6 +102,20 @@ public final class Scheduler {
     /** Null before init. */
     static Task current() {
         return current;
+    }
+
+    /** The running thread's id; main's before init, since only main runs then. */
+    public static long currentId() {
+        return current == null ? MAIN_ID : current.id;
+    }
+
+    public static boolean isAlive(long id) {
+        for (int i = 0; i < taskCount; i++) {
+            if (tasks[i].id == id) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public static void start(Task task) {

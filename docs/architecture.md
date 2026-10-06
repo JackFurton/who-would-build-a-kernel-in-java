@@ -148,8 +148,8 @@ another's limit.
 
 Code that must not be interrupted by another thread says so cheaply: the scheduler only switches
 when interrupts are on, so its own bookkeeping runs with them off, and the allocator and
-collector are skipped by `Runtime.preempt` while they run, since neither is reentrant. Not yet:
-thread-safe class initialization (#23), and a second CPU (#24).
+collector are skipped by `Runtime.preempt` while they run, since neither is reentrant. Not yet: a
+second CPU (#24).
 
 ### Monitors
 
@@ -267,9 +267,13 @@ implementation are emitted as ordinary bytecode in the generated method.
 
 Classes initialize lazily, with JVM semantics (JVMS 5.5): on the first `new`, static field access
 or static call, superclass first. Each class whose initialization runs code gets a one-byte flag
-and a stub. Trigger sites compile to `cmp byte [flag], 0; jne skip; call stub`. No check is
-emitted for classes with nothing to run, or inside the class itself or a subclass. The flag is set
-before `<clinit>` runs, so cycles and self-references see default values exactly as on HotSpot.
+and a stub. Trigger sites compile to `cmp byte [flag], 1; je skip; call stub`. No check is
+emitted for classes with nothing to run, or inside the class itself or a subclass. The stub moves
+the flag to "initializing" before `<clinit>` runs and records the thread doing it, with no
+safepoint between testing the flag and setting it. Another thread that arrives meanwhile waits in
+`Runtime.awaitInitialization`; the initializing thread itself carries on, so cycles and
+self-references see default values exactly as on HotSpot. That wait path calls into `Runtime`
+and `Scheduler`, so the compiler refuses to give either of them a runtime initializer.
 
 Some initializers never run at boot. `BuildTimeInit` interprets a `<clinit>` at compile time when
 it's straight-line code that only builds constants: pushes, array creation, array loads and

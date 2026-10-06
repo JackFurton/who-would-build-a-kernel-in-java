@@ -711,8 +711,8 @@ final class MethodCompiler {
         }
         String initializer = program.requireInitializer(type);
         X64.Label done = new X64.Label();
-        a.cmpByte(Mem.rip("initialized:" + type), 0);
-        a.jcc(Cond.NE, done);
+        a.cmpByte(Mem.rip("initialized:" + type), Compiler.INITIALIZED);
+        a.jcc(Cond.E, done);
         emitCall(initializer);
         a.bind(done);
     }
