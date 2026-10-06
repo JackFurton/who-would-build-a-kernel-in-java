@@ -88,6 +88,10 @@ a dead tail back to the bump pointer. Free space is always walkable: holes carry
 word that can't be a TIB address. Allocation bumps first, then takes holes, then collects once
 committed memory passes twice the last live size (32 MiB minimum), and only then commits more.
 
+The collector clears both mark bitmaps by whole words before each marking pass. The region bitmap
+contains one word per 512 heap bytes; committed regions are page-aligned. Reused heap holes are also
+word-aligned and are zeroed with `Magic.zeroMemoryWords` before the allocator returns them.
+
 `make conformance-gc` runs the whole conformance suite with a collection at every allocation
 (about 50,000 collections). A slot missing from a stack map shows up there as a wrong result or a
 GC panic. Interrupt handlers still must not allocate. Other threads' stacks are roots too, and
