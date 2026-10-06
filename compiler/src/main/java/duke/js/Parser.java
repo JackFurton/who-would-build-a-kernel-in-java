@@ -21,8 +21,6 @@ final class Parser {
     private static final Set<String> ASSIGN = Set.of("=", "+=", "-=", "*=", "/=", "%=", "&=", "|=", "^=", "<<=",
             ">>=", ">>>=", "**=", "&&=", "||=", "??=");
 
-    private static final Set<String> UNSUPPORTED = Set.of("class");
-
     private final String file;
     private final List<Token> tokens;
     private int pos;
@@ -45,8 +43,10 @@ final class Parser {
     private Stmt statement() {
         Token t = peek();
         int line = t.line();
-        if (t.kind() == Token.Kind.KEYWORD && UNSUPPORTED.contains(t.text())) {
-            throw error(t, "'" + t.text() + "' is not supported yet");
+        if (t.is("class")) {
+            pos++;
+            String name = expectIdent();
+            return new ClassDecl(name, classTail(name, line), line);
         }
         if (t.is("{")) {
             return block();
@@ -204,6 +204,93 @@ final class Parser {
         }
         pos++;
         return new Switch(discriminant, cases, line);
+    }
+
+    /** A class after its name: {@code extends ...} and the body. Fields and static members are desugared here. */
+    private ClassExpr classTail(String name, int line) {
+        Expr superclass = null;
+        boolean hasSuper = accept("extends");
+        if (hasSuper) {
+            superclass = callOrMember();
+        }
+        expect("{");
+        Function constructor = null;
+        List<ClassMember> members = new ArrayList<>();
+        List<Stmt> fields = new ArrayList<>();
+        List<Stmt> statics = new ArrayList<>();
+        while (!peek().is("}")) {
+            if (accept(";")) {
+                continue;
+            }
+            Token next = tokens.get(pos + 1);
+            boolean isStatic = false;
+            if (peek().kind() == Token.Kind.IDENT && peek().text().equals("static") && !next.is("(") && !next.is("=")
+                    && !next.is(";") && !next.is("}")) {
+                pos++;
+                isStatic = true;
+                if (peek().is("{")) {
+                    statics.add(block());
+                    continue;
+                }
+            }
+            Token key = tokens.get(pos++);
+            char kind = 'm';
+            if (key.kind() == Token.Kind.IDENT && (key.text().equals("get") || key.text().equals("set"))
+                    && startsPropertyName(peek())) {
+                kind = key.text().charAt(0);
+                key = tokens.get(pos++);
+            }
+            String keyName = null;
+            Expr computed = null;
+            if (key.is("[")) {
+                computed = assignment();
+                expect("]");
+            } else if (key.kind() == Token.Kind.IDENT || key.kind() == Token.Kind.KEYWORD || key.kind() == Token.Kind.STR) {
+                keyName = key.text();
+            } else if (key.kind() == Token.Kind.NUM) {
+                keyName = Long.toString(key.number());
+            } else {
+                throw error(key, "unexpected " + key + " in a class body");
+            }
+            if (peek().is("(")) {
+                String fnName = computed != null ? null : kind == 'm' ? keyName : (kind == 'g' ? "get " : "set ") + keyName;
+                Function fn = function(fnName, false, key.line());
+                if (!isStatic && kind == 'm' && computed == null && "constructor".equals(keyName)) {
+                    if (constructor != null) {
+                        throw error(key, "a class may only have one constructor");
+                    }
+                    constructor = fn;
+                } else {
+                    members.add(new ClassMember(kind, isStatic, keyName, computed, new FuncExpr(fn, key.line())));
+                }
+            } else if (kind != 'm') {
+                throw error(peek(), "expected '(' but found " + peek());
+            } else {
+                int fieldLine = key.line();
+                Expr value = accept("=") ? assignment() : new Lit(Literal.UNDEFINED, fieldLine);
+                semicolon();
+                if (value instanceof FuncExpr fe && fe.function().name() == null && keyName != null) {
+                    // A field holding an anonymous function names it after the field.
+                    Function named = fe.function();
+                    value = new FuncExpr(new Function(keyName, named.params(), named.body(), named.arrow(), named.line()),
+                            fe.line());
+                }
+                Expr target = computed != null ? new Index(new This(fieldLine), computed, fieldLine)
+                        : new Member(new This(fieldLine), keyName, fieldLine);
+                (isStatic ? statics : fields).add(new ExprStmt(new Assign("=", target, value, fieldLine), fieldLine));
+            }
+        }
+        pos++;
+        if (constructor == null && hasSuper) {
+            // class B extends A {}  behaves as  constructor(...args) { super(...args); }
+            Expr rest = new Internal("restArgs", List.of(new Num(0, line)), line);
+            List<Stmt> body = List.of(new VarDecl("var", List.of(new Declarator("$args", rest)), line),
+                    new ExprStmt(new SuperCall(List.of(new Spread(new Ident("$args", line), line)), line), line));
+            constructor = new Function(name, List.of(), body, false, line);
+        }
+        Function fieldInit = fields.isEmpty() ? null : new Function("<fields>", List.of(), fields, false, line);
+        Function staticInit = statics.isEmpty() ? null : new Function("<static>", List.of(), statics, false, line);
+        return new ClassExpr(name, superclass, hasSuper, constructor, members, fieldInit, staticInit, line);
     }
 
     private Block block() {
@@ -644,10 +731,25 @@ final class Parser {
                         String name = peek().kind() == Token.Kind.IDENT ? expectIdent() : null;
                         return new FuncExpr(function(name, false, line), line);
                     }
-                    default:
-                        if (UNSUPPORTED.contains(t.text())) {
-                            throw error(t, "'" + t.text() + "' is not supported yet");
+                    case "class": {
+                        String name = peek().kind() == Token.Kind.IDENT ? expectIdent() : null;
+                        return classTail(name, line);
+                    }
+                    case "super": {
+                        if (accept("(")) {
+                            return new SuperCall(arguments(), line);
                         }
+                        if (accept(".")) {
+                            return new SuperMember(propertyName(), null, line);
+                        }
+                        if (accept("[")) {
+                            Expr index = expression();
+                            expect("]");
+                            return new SuperMember(null, index, line);
+                        }
+                        throw error(t, "'super' must be followed by an argument list or a member access");
+                    }
+                    default:
                         throw error(t, "unexpected " + t);
                 }
             case PUNCT:

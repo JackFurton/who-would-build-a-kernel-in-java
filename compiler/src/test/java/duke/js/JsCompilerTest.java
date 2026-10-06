@@ -55,7 +55,7 @@ class JsCompilerTest {
     static Stream<Arguments> unsupported() {
         return Stream.of(
                 Arguments.of("var x = 1.5;", "floating-point numbers are not supported"),
-                Arguments.of("class A {}", "'class' is not supported yet"),
+                Arguments.of("class A { constructor() {} constructor() {} }", "a class may only have one constructor"),
                 Arguments.of("try { }", "missing catch or finally after try"),
                 Arguments.of("switch (1) { default: default: }", "more than one default clause in switch"),
                 Arguments.of("var n = 0b;", "missing digits after the number prefix"),
@@ -72,6 +72,12 @@ class JsCompilerTest {
     @MethodSource("unsupported")
     void explainsUnsupportedSyntax(String source, String message) {
         assertTrue(error(source).contains(message), () -> error(source));
+    }
+
+    @Test
+    void javaBackEndRejectsSuperOutsideAMethod() {
+        assertTrue(assertThrows(JsException.class, () -> Main.translate("t.js", "super.x;", "T"))
+                .getMessage().contains("'super' is only valid inside a method"));
     }
 
     @Test
@@ -92,6 +98,7 @@ class JsCompilerTest {
         assertTrue(error("var o; o?.x;").contains("optional chaining is not supported by the x86 back end"));
         assertTrue(error("function f(...a) {}").contains("rest parameters and destructuring are not supported by the x86 back end"));
         assertTrue(error("var o = { get x() { return 1; } };").contains("accessors in object literals are not supported by the x86 back end"));
+        assertTrue(error("class A {}").contains("classes are not supported by the x86 back end"));
         assertTrue(error("var [a] = [1];").contains("destructuring are not supported by the x86 back end"));
         assertTrue(error("function f() {}\nf(...[]);").contains("spread is not supported by the x86 back end"));
         assertTrue(error("function f() {}\nvar t = f`x`;").contains("tagged templates are not supported by the x86 back end"));
@@ -170,6 +177,10 @@ class JsCompilerTest {
                 for (let k2 in items) items[k2]++;
                 try { throw new Error("x"); } catch (e) { has = e; } finally { has = null; }
                 try { has = 1; } catch { has = 2; }
+                class Base { #p = 1; f = () => this.#p; static s = 2; static { Base.t = 3; } get g() { return 1; } set g(v) { }
+                  m() { return 1; } static sm() { return 2; } }
+                class Derived extends Base { constructor() { super(); this.d = super.m(); } m() { return super.m() + 1; } }
+                var klass = class { [key]() { } };
                 var acc = { get g() { return 1; }, set g(v) { }, get ["c" + 1]() { return 2; } };
                 var [pa, { pb = 2, ...pc }] = [1, {}];
                 [pa, o.x] = [pb, pc];

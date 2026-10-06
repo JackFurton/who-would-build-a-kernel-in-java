@@ -10,7 +10,7 @@ final class Lexer {
     private static final Set<String> KEYWORDS = Set.of(
             "var", "let", "const", "function", "return", "if", "else", "while", "do", "for", "break",
             "continue", "true", "false", "null", "undefined", "typeof", "this", "new", "throw", "try", "catch",
-            "finally", "class", "delete", "in", "instanceof", "void", "switch", "case", "default");
+            "finally", "class", "extends", "super", "delete", "in", "instanceof", "void", "switch", "case", "default");
 
     // Longest first, so "===" wins over "==" and "=".
     private static final String[] PUNCTUATORS = {
@@ -68,6 +68,16 @@ final class Lexer {
             String word = src.substring(start, pos);
             return new Token(KEYWORDS.contains(word) ? Token.Kind.KEYWORD : Token.Kind.IDENT, word, 0, line,
                     newline, null, null, null);
+        }
+        if (c == '#' && pos + 1 < src.length()
+                && (Character.isLetter(src.charAt(pos + 1)) || src.charAt(pos + 1) == '_' || src.charAt(pos + 1) == '$')) {
+            // A private name such as #count: kept as an identifier whose text starts with '#'.
+            int start = pos++;
+            while (pos < src.length() && (Character.isLetterOrDigit(src.charAt(pos)) || src.charAt(pos) == '_'
+                    || src.charAt(pos) == '$')) {
+                pos++;
+            }
+            return new Token(Token.Kind.IDENT, src.substring(start, pos), 0, line, newline, null, null, null);
         }
         for (String p : PUNCTUATORS) {
             if (src.startsWith(p, pos)) {

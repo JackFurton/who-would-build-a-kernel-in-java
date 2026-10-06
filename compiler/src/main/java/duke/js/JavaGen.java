@@ -214,10 +214,32 @@ final class JavaGen {
         if (e instanceof FuncExpr fe && fe.function().name() == null) {
             return function(fe.function(), hint);
         }
+        if (e instanceof ClassExpr ce && ce.name() == null) {
+            return classExpression(ce, hint);
+        }
         return expr(e);
     }
 
     private String function(Function f, String name) {
+        return (f.arrow() ? "JS.arrow(" : "JS.fn(") + quote(name == null ? "" : name) + ", " + lambda(f) + ")";
+    }
+
+    /** The function context innermost first, so {@code super} can find its enclosing method. */
+    private final Deque<Frame> frames = new ArrayDeque<>();
+
+    private record Frame(String callee, String self, boolean arrow) {}
+
+    private Frame methodFrame(int line) {
+        for (Frame frame : frames) {
+            if (!frame.arrow()) {
+                return frame;
+            }
+        }
+        throw error(line, "'super' is only valid inside a method or constructor");
+    }
+
+    /** The Java lambda for a function body: {@code (callee, self, args) -> { ... }}. */
+    private String lambda(Function f) {
         FuncInfo info = an.functions.get(f);
         int id = ++uid;
         String callee = "callee" + id;
@@ -236,6 +258,7 @@ final class JavaGen {
         temps = new ArrayList<>();
         fn = info;
         continueLabels.clear();
+        frames.push(new Frame(callee, self, f.arrow()));
         indent++;
 
         for (Var v : info.scope.vars.values()) {
@@ -269,8 +292,30 @@ final class JavaGen {
         targets.clear();
         targets.addAll(savedTargets);
         currentArgs = savedArgs;
-        return (f.arrow() ? "JS.arrow(" : "JS.fn(") + quote(name == null ? "" : name) + ", (" + callee + ", " + self + ", " + args
-                + ") -> {\n" + body + "    ".repeat(indent) + "})";
+        frames.pop();
+        return "(" + callee + ", " + self + ", " + args + ") -> {\n" + body + "    ".repeat(indent) + "}";
+    }
+
+    /** A class becomes a chain of runtime calls that build the class function and add its members in order. */
+    private String classExpression(ClassExpr c, String hint) {
+        String name = c.name() != null ? c.name() : hint;
+        String constructor = c.constructor() == null ? "null" : lambda(c.constructor());
+        String fields = c.fields() == null ? "null" : lambda(c.fields());
+        String chain = "JS.classDef(" + quote(name == null ? "" : name) + ", " + (c.hasSuper() ? expr(c.superclass()) : "JS.U") + ", "
+                + c.hasSuper() + ", " + constructor + ", " + fields + ")";
+        for (ClassMember m : c.members()) {
+            String key = m.computed() != null ? expr(m.computed()) : quote(m.key());
+            if (m.kind() == 'm') {
+                chain = "JS.classMethod(" + chain + ", " + key + ", " + expr(m.value()) + ", " + m.isStatic() + ")";
+            } else {
+                chain = "JS.classAccessor(" + chain + ", " + key + ", " + expr(m.value()) + ", " + m.isStatic() + ", "
+                        + (m.kind() == 'g') + ")";
+            }
+        }
+        if (c.statics() != null) {
+            chain = "JS.classStatics(" + chain + ", " + lambda(c.statics()) + ")";
+        }
+        return chain;
     }
 
     // ---- statements ----
@@ -348,6 +393,7 @@ final class JavaGen {
                     line(label == null || label.isEmpty() ? "if (JS.T) continue;" : "if (JS.T) break " + label + ";");
                 }
             }
+            case ClassDecl c -> line(store(an.resolved.get(c), classExpression(c.cls(), c.name())) + ";");
             case FunctionDecl d -> { }
             case Empty e -> { }
         }
@@ -732,6 +778,19 @@ final class JavaGen {
             case Hole h -> {
                 return "JS.U";
             }
+            case ClassExpr c -> {
+                return classExpression(c, null);
+            }
+            case SuperCall sc -> {
+                Frame frame = methodFrame(sc.line());
+                String args = list(sc.args());
+                return "JS.superCall(" + frame.callee() + ", " + frame.self() + (args.isEmpty() ? "" : ", " + args) + ")";
+            }
+            case SuperMember sm -> {
+                Frame frame = methodFrame(sm.line());
+                return "JS.superGet(" + frame.callee() + ", " + frame.self() + ", "
+                        + (sm.name() != null ? quote(sm.name()) : expr(sm.index())) + ")";
+            }
             case Internal in -> {
                 if (in.name().equals("restArgs")) {
                     return "JS.restArgs(" + currentArgs + ", " + ((Num) in.args().get(0)).value() + ")";
@@ -788,6 +847,7 @@ final class JavaGen {
                 String args = list(c.args());
                 String tail = args.isEmpty() ? "" : ", " + args;
                 return switch (c.callee()) {
+                    case SuperMember sm -> "JS.callMethod(" + expr(sm) + ", " + methodFrame(sm.line()).self() + tail + ")";
                     case Member m -> "JS.invoke(" + expr(m.object()) + ", " + quote(m.name()) + tail + ")";
                     case Index i -> "JS.invoke(" + expr(i.object()) + ", " + expr(i.index()) + tail + ")";
                     default -> "JS.call(" + expr(c.callee()) + tail + ")";
