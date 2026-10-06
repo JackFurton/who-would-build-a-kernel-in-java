@@ -83,6 +83,9 @@ final class Node {
     /** An elision in an array literal or pattern: the gap in {@code [a, , b]}. */
     record Hole(int line) implements Expr {}
 
+    /** {@code yield value} (or {@code yield* value} when {@code delegate}); {@code value} is null for a bare {@code yield}. */
+    record Yield(Expr value, boolean delegate, int line) implements Expr {}
+
     /** {@code ...value} in a call's arguments, an array literal or an object literal. */
     record Spread(Expr value, int line) implements Expr {}
 

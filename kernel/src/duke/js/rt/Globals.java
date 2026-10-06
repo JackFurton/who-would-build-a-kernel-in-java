@@ -12,6 +12,7 @@ public final class Globals {
     private static JsObject table;
     private static JsObject objectPrototype;
     private static JsObject iteratorPrototype;
+    private static JsObject generatorPrototype;
 
     static final JsSymbol ITERATOR = new JsSymbol("Symbol.iterator");
     static final JsSymbol ASYNC_ITERATOR = new JsSymbol("Symbol.asyncIterator");
@@ -490,6 +491,9 @@ public final class Globals {
         iteratorPrototype = new JsObject();
         iteratorPrototype.proto = objectPrototype;
         iteratorPrototype.setHidden(ITERATOR, function("[Symbol.iterator]", (callee, self, args) -> self));
+        generatorPrototype = new JsObject();
+        generatorPrototype.proto = iteratorPrototype;
+        generatorPrototype.setHidden(TO_STRING_TAG, "Generator");
         symbolRegistry = new JsObject();
         JsFunction symbol = function("Symbol", (callee, self, args) -> {
             Object description = arg(args, 0);
@@ -519,6 +523,16 @@ public final class Globals {
             return description != null && symbolRegistry.getOwn(description) == sym ? description : null;
         }));
         g.set("Symbol", symbol);
+    }
+
+    /** The object {@code generatorFunction()} returns: next, throw and return drive the state machine. */
+    static JsObject generatorObject(JsGenerator generator) {
+        JsObject o = new JsObject();
+        o.proto = generatorPrototype;
+        o.setHidden("next", function("next", (callee, self, args) -> generator.step(0, arg(args, 0))));
+        o.setHidden("throw", function("throw", (callee, self, args) -> generator.step(1, arg(args, 0))));
+        o.setHidden("return", function("return", (callee, self, args) -> generator.step(2, arg(args, 0))));
+        return o;
     }
 
     /** A JavaScript iterator object over a Java iterator: {@code next()} yields {@code {value, done}}. */

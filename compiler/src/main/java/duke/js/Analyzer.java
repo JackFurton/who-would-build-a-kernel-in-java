@@ -410,6 +410,7 @@ final class Analyzer {
                 visit(p.value());
             });
             case Hole h -> { }
+            case Yield y -> throw new JsException(file, y.line(), "yield is only valid inside a generator");
             case ClassExpr c -> {
                 if (c.superclass() != null) {
                     visit(c.superclass());

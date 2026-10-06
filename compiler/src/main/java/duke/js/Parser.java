@@ -62,7 +62,8 @@ final class Parser {
         }
         if (t.is("function")) {
             pos++;
-            return new FunctionDecl(function(expectIdent(), false, line), line);
+            boolean generator = accept("*");
+            return new FunctionDecl(function(expectIdent(), false, line, generator), line);
         }
         if (t.is("if")) {
             pos++;
@@ -233,9 +234,10 @@ final class Parser {
                     continue;
                 }
             }
+            boolean generator = accept("*");
             Token key = tokens.get(pos++);
             char kind = 'm';
-            if (key.kind() == Token.Kind.IDENT && (key.text().equals("get") || key.text().equals("set"))
+            if (!generator && key.kind() == Token.Kind.IDENT && (key.text().equals("get") || key.text().equals("set"))
                     && startsPropertyName(peek())) {
                 kind = key.text().charAt(0);
                 key = tokens.get(pos++);
@@ -254,7 +256,7 @@ final class Parser {
             }
             if (peek().is("(")) {
                 String fnName = computed != null ? null : kind == 'm' ? keyName : (kind == 'g' ? "get " : "set ") + keyName;
-                Function fn = function(fnName, false, key.line());
+                Function fn = function(fnName, false, key.line(), generator);
                 if (!isStatic && kind == 'm' && computed == null && "constructor".equals(keyName)) {
                     if (constructor != null) {
                         throw error(key, "a class may only have one constructor");
@@ -402,6 +404,9 @@ final class Parser {
     }
 
     private Expr assignment() {
+        if (inGenerator && peek().kind() == Token.Kind.IDENT && peek().text().equals("yield")) {
+            return yieldExpression();
+        }
         if (isArrowAhead()) {
             return arrow();
         }
@@ -443,7 +448,17 @@ final class Parser {
         return false;
     }
 
-    private int hiddenParameters;
+    /** {@code yield}, {@code yield value} or {@code yield* iterable}. */
+    private Expr yieldExpression() {
+        int line = tokens.get(pos++).line();
+        boolean delegate = accept("*");
+        Token next = peek();
+        boolean bare = !delegate && (next.newlineBefore() || next.kind() == Token.Kind.EOF || next.is(")") || next.is("]")
+                || next.is("}") || next.is(",") || next.is(";") || next.is(":"));
+        return new Yield(bare ? null : assignment(), delegate, line);
+    }
+
+    private static int hiddenParameters;
 
     /**
      * Parses a parameter list after its opening parenthesis. A parameter with a default or a rest parameter is
@@ -509,6 +524,8 @@ final class Parser {
         }
         expect("=>");
         List<Stmt> outerHoists = hoists;
+        boolean outerGenerator = inGenerator;
+        inGenerator = false;
         hoists = new ArrayList<>();
         if (peek().is("{")) {
             body.addAll(block().body());
@@ -518,6 +535,7 @@ final class Parser {
         }
         List<Stmt> all = withHoists(body);
         hoists = outerHoists;
+        inGenerator = outerGenerator;
         return new FuncExpr(new Function(null, params, all, true, line), line);
     }
 
@@ -728,8 +746,9 @@ final class Parser {
                     case "undefined": return new Lit(Literal.UNDEFINED, line);
                     case "this": return new This(line);
                     case "function": {
+                        boolean generator = accept("*");
                         String name = peek().kind() == Token.Kind.IDENT ? expectIdent() : null;
-                        return new FuncExpr(function(name, false, line), line);
+                        return new FuncExpr(function(name, false, line, generator), line);
                     }
                     case "class": {
                         String name = peek().kind() == Token.Kind.IDENT ? expectIdent() : null;
@@ -794,9 +813,10 @@ final class Parser {
                 }
                 continue;
             }
+            boolean generator = accept("*");
             Token key = tokens.get(pos++);
             char kind = 'i';
-            if (key.kind() == Token.Kind.IDENT && (key.text().equals("get") || key.text().equals("set"))
+            if (!generator && key.kind() == Token.Kind.IDENT && (key.text().equals("get") || key.text().equals("set"))
                     && startsPropertyName(peek())) {
                 kind = key.text().charAt(0);
                 key = tokens.get(pos++);
@@ -820,7 +840,7 @@ final class Parser {
             } else if (accept(":")) {
                 value = assignment();
             } else if (peek().is("(")) {
-                value = new FuncExpr(function(name, false, key.line()), key.line());
+                value = new FuncExpr(function(name, false, key.line(), generator), key.line());
             } else if (computed == null && key.kind() == Token.Kind.IDENT) {
                 value = new Ident(name, key.line());
                 if (peek().is("=")) {
@@ -854,6 +874,9 @@ final class Parser {
         List<Expr> exprs = new ArrayList<>();
         for (String source : t.exprs()) {
             Parser inner = new Parser(file, source);
+            // The expression is part of the surrounding function: it may yield, and its temporaries belong to it.
+            inner.inGenerator = inGenerator;
+            inner.hoists = hoists;
             exprs.add(inner.expression());
             if (inner.peek().kind() != Token.Kind.EOF) {
                 throw error(t, "unexpected " + inner.peek() + " in template expression");
@@ -864,15 +887,31 @@ final class Parser {
 
     /** Parses {@code (params) { body }}. */
     private Function function(String name, boolean arrow, int line) {
+        return function(name, arrow, line, false);
+    }
+
+    /** True while parsing a generator's parameters and body, where {@code yield} is an operator. */
+    private boolean inGenerator;
+
+    private Function function(String name, boolean arrow, int line, boolean generator) {
         expect("(");
         List<String> params = new ArrayList<>();
         List<Stmt> body = new ArrayList<>();
         List<Stmt> outerHoists = hoists;
+        boolean outerGenerator = inGenerator;
         hoists = new ArrayList<>();
+        inGenerator = generator;
         parameters(params, body);
+        int prologue = body.size();
         body.addAll(block().body());
         List<Stmt> all = withHoists(body);
+        prologue += all.size() - body.size();
         hoists = outerHoists;
+        inGenerator = outerGenerator;
+        if (generator) {
+            // The generator's body becomes a state machine inside an ordinary function that returns the generator object.
+            all = new Generators(file).transform(params, all, prologue, line);
+        }
         return new Function(name, params, all, arrow, line);
     }
 
@@ -900,7 +939,8 @@ final class Parser {
 
     private record Binding(Expr target, Expr value) {}
 
-    private int hiddenNames;
+    /** Numbers for hidden names; static so a template expression's parser never reuses one of its parent's. */
+    private static int hiddenNames;
     /** Declarations that belong at the top of the function being parsed: temporaries for destructuring assignments. */
     private List<Stmt> hoists = new ArrayList<>();
 

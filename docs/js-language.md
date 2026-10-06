@@ -16,6 +16,7 @@ with `// backends: java` and skips it.
 | Functions | declarations, expressions, arrows, closures, `this`, `arguments`, default and rest parameters, `call`/`apply`/`bind`, name inference (`const f = () => 1` is named `f`) |
 | Destructuring | array and object patterns (nested, with defaults, rest and computed keys) in declarations, assignments, parameters, `for...of`/`for...in` heads and `catch`; array holes |
 | Spread | `...` in calls, `new`, array literals and object literals |
+| Generators | `function*`, generator methods (`*m() {}`, `static *m()`, `*[Symbol.iterator]()`), `yield`, `yield*` (arrays, strings, any iterable, other generators, with `throw`/`return` forwarded), `next(v)`/`throw`/`return`, `try`/`catch`/`finally` around yields, generators as iterators. They are compiled to state machines, so they need no threads |
 | Collections | `Map`, `Set` (insertion order, live iteration, `size`, `forEach`, `keys`/`values`/`entries`, iterable constructors), `WeakMap`, `WeakSet` (which hold their keys strongly) |
 | Symbols and iteration | `Symbol()`, `Symbol.for`/`keyFor`, `Symbol.iterator`/`asyncIterator`/`hasInstance`/`toStringTag`, symbol-keyed properties, `Object.getOwnPropertySymbols`; the iteration protocol drives `for...of`, spread, destructuring and `Array.from`-style consumers (an iterator's `return()` is called when a loop leaves early); array `keys`/`values`/`entries` and string iterators |
 | Classes | `class` declarations and expressions, `extends` (classes, constructor functions, `Error`, `null`), `super(...)`, `super.x` and `super.m()` in methods and static methods, instance and static fields, static blocks, private names (`#x`, fields and methods), getters and setters, computed member names; a class can't be called without `new` |
@@ -30,7 +31,7 @@ with `// backends: java` and skips it.
 
 ## Not yet (unbuilt)
 
-In the order we expect to do them: generators, modules
+In the order we expect to do them: modules
 (`import`/`export`), `Promise` and `async`/`await`, `JSON`, typed arrays.
 
 ## Waiting on the kernel
@@ -55,6 +56,10 @@ property operation). Calling `new Function` throws an error that says so.
 - Code always behaves as strict mode where it matters: writing to a read-only property or a frozen object, adding to a
   non-extensible one, or deleting a non-configurable property throws a `TypeError` (node only does in strict mode, and
   quietly ignores the write otherwise).
+- Generator limits: a generator can't redeclare a variable of an enclosing block (`let a` inside `{ let a }`), logical
+  assignment (`x ??= yield`) isn't supported with a yield, and closures made in a generator's loop share the loop's
+  variable (it is hoisted out of the loop), where node gives each iteration its own. `gen.constructor` and
+  `console.log(gen)` (`Object [Generator] {}` in node) aren't modelled.
 - Arrays have no holes: `delete a[i]` and growing past the end store `undefined` (node prints `<1 empty item>`).
 - `console.log` doesn't group arrays of more than six items into columns, as node does.
 - Methods in object literals can be used with `new`; node throws. `super` doesn't work in object-literal methods.

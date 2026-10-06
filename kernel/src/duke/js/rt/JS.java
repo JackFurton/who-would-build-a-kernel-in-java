@@ -81,6 +81,98 @@ public final class JS {
         return new Spreading(value);
     }
 
+    /** The generator object for a generator function's body: {@code resume} is the state machine jsc built. */
+    public static Object generator(Object resume) {
+        return Globals.generatorObject(new JsGenerator((JsFunction) resume));
+    }
+
+    /** What the state machine returns to hand a value out of {@code yield}. */
+    public static Object yielded(Object value) {
+        return new JsGenerator.Yielded(value);
+    }
+
+    /** What {@code yield* iterable} walks: a fast iterator for arrays and strings, else the iterator protocol. */
+    private static final class Delegate {
+        JsIter fast;
+        Object iterator;
+    }
+
+    public static Object delegate(Object iterable) {
+        Delegate d = new Delegate();
+        if (iterable instanceof JsArray || iterable instanceof String || iterable instanceof JsMap) {
+            d.fast = iter(iterable);
+        } else {
+            Object method = nullish(iterable) ? null : get(iterable, Globals.ITERATOR);
+            if (!(method instanceof JsFunction)) {
+                throw new JsError("TypeError: " + (iterable == null ? "undefined" : str(iterable)) + " is not iterable");
+            }
+            d.iterator = ((JsFunction) method).call(iterable, new Object[0]);
+        }
+        return d;
+    }
+
+    /** One step of {@code yield*}: forwards next, throw or return (mode 0, 1, 2) to the inner iterator. */
+    public static Object delegateStep(Object delegate, Object mode, Object arg) {
+        Delegate d = (Delegate) delegate;
+        long m = ((Long) mode).longValue();
+        if (d.fast != null) {
+            if (m == 1) {
+                // Array and string iterators have no throw method.
+                d.fast.close();
+                throw new JsError("TypeError: The iterator does not provide a 'throw' method");
+            }
+            if (m == 2) {
+                d.fast.close();
+                return JsGenerator.result(arg, true);
+            }
+            boolean more = d.fast.next();
+            return JsGenerator.result(more ? d.fast.value() : null, !more);
+        }
+        Object result;
+        if (m == 0) {
+            result = callWith(get(d.iterator, "next"), d.iterator, new Object[] {arg});
+        } else if (m == 1) {
+            Object thrower = get(d.iterator, "throw");
+            if (!(thrower instanceof JsFunction)) {
+                Object closer = get(d.iterator, "return");
+                if (closer instanceof JsFunction) {
+                    ((JsFunction) closer).call(d.iterator, new Object[0]);
+                }
+                throw new JsError("TypeError: The iterator does not provide a 'throw' method");
+            }
+            result = ((JsFunction) thrower).call(d.iterator, new Object[] {arg});
+        } else {
+            Object returner = get(d.iterator, "return");
+            if (!(returner instanceof JsFunction)) {
+                return JsGenerator.result(arg, true);
+            }
+            result = ((JsFunction) returner).call(d.iterator, new Object[] {arg});
+        }
+        if (!(result instanceof JsObject)) {
+            throw new JsError("TypeError: Iterator result " + str(result) + " is not an object");
+        }
+        return result;
+    }
+
+    // The loop machinery a for...of inside a generator is built from.
+
+    public static Object iterNext(Object it) {
+        return bool(((JsIter) it).next());
+    }
+
+    public static Object iterValue(Object it) {
+        return ((JsIter) it).value();
+    }
+
+    public static Object iterClose(Object it) {
+        ((JsIter) it).close();
+        return null;
+    }
+
+    public static Object lengthOf(Object o) {
+        return Long.valueOf(length(o));
+    }
+
     /** An iterator over {@code iterable}: what {@code for (x of iterable)} loops with. */
     public static JsIter iter(Object iterable) {
         if (iterable instanceof JsArray) {

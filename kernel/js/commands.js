@@ -67,3 +67,22 @@ Kernel.command("collections", function () {
   console.log("collections: " + seen.size + " distinct, the=" + counts.get("the") + ", " + objects.get(key) + ", "
     + [...counts.keys()].slice(0, 3).join("/"));
 });
+
+// Generators inside the kernel: a lazy endless sequence, cut short, with its cleanup running.
+Kernel.command("sequence", function () {
+  var cleaned = false;
+  function* fibs() {
+    var a = 0, b = 1;
+    try {
+      while (true) { yield a; var next = a + b; a = b; b = next; }
+    } finally {
+      cleaned = true;
+    }
+  }
+  var out = [];
+  for (var v of fibs()) {
+    if (out.length === 10) break;
+    out.push(v);
+  }
+  console.log("sequence: " + out.join(",") + " cleaned=" + cleaned);
+});

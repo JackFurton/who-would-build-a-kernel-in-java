@@ -89,7 +89,9 @@ public class ShellTest {
                     "catches: RangeError: thrown | TypeError | Maximum call stack size exceeded | try | finally");
             failures += check("javascript collections", () -> type(serial, "collections\n"),
                     "collections: 9 distinct, the=3, object key, the/quick/brown");
-            failures += check("help lists registered commands", () -> type(serial, "help\n"), "also: hello, fib, meminfo, churn, catches, collections");
+            failures += check("javascript generators", () -> type(serial, "sequence\n"),
+                    "sequence: 0,1,1,2,3,5,8,13,21,34 cleaned=true");
+            failures += check("help lists registered commands", () -> type(serial, "help\n"), "also: hello, fib, meminfo, churn, catches, collections, sequence");
             failures += framebuffer(serial, monitor);
             failures += check("panic", () -> type(serial, "panic\n"), "PANIC: requested from the shell");
         } finally {
