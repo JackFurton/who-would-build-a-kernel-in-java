@@ -31,10 +31,10 @@ with `// backends: java` and skips it.
 
 ## Not yet (unbuilt)
 
-In the order we expect to do them: `Promise`, timers and `async`/`await` (the event loop and the generator
+In the order we expect to do them: regular expressions (an engine in the runtime, Latin-1 only), `Date` (once the
+kernel gives JS a clock), `Promise`, timers and `async`/`await` (the event loop and the generator
 transform), modules (`import`/`export`), typed arrays, `ArrayBuffer` and `DataView`, `Proxy` and `Reflect` (see below),
-and small gaps (function `length`, `new.target`, `parseFloat`). Regular expressions and `Date` wait on the kernel
-(below) for their engine and clock.
+and small gaps (function `length`, `new.target`, `parseFloat`).
 
 ## Waiting on the kernel
 
@@ -42,7 +42,6 @@ and small gaps (function `length`, `new.target`, `parseFloat`). Regular expressi
 | --- | --- |
 | Fractions, `NaN`, `Infinity`, `Math.sqrt` and friends | floating point in `dukec` and SSE enabled in the kernel; numbers are 64-bit integers until then |
 | Non-Latin-1 text, `\u` escapes above 0xFF, `codePointAt` | UTF-16 strings (the kernel's are Latin-1) |
-| Regular expressions | a regex engine |
 | `Date` | a clock API for JS, then the date arithmetic |
 | `setTimeout`, timers | an event loop on top of the kernel timer |
 
