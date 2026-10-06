@@ -1052,7 +1052,9 @@ final class Parser {
             case PTarget t -> out.add(new Binding(t.target(), source));
             case PArray a -> {
                 String temp = hidden("d");
-                out.add(new Binding(new Ident(temp, line), new Internal("toArray", List.of(source), line)));
+                // Take only as many values as the pattern names, so an endless iterable can be destructured.
+                Expr limit = new Num(a.rest() != null ? -1 : a.elems().size(), line);
+                out.add(new Binding(new Ident(temp, line), new Internal("toArray", List.of(source, limit), line)));
                 for (int i = 0; i < a.elems().size(); i++) {
                     PElem e = a.elems().get(i);
                     if (e.target() != null) {

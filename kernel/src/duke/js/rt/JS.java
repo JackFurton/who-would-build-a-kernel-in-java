@@ -63,7 +63,7 @@ public final class JS {
         JsObject o = new JsObject();
         o.proto = Globals.objectPrototype();
         for (int i = 0; i < keysAndValues.length; i += 2) {
-            o.set(keyString(keysAndValues[i]), keysAndValues[i + 1]);
+            o.set(key(keysAndValues[i]), keysAndValues[i + 1]);
         }
         return o;
     }
@@ -81,20 +81,35 @@ public final class JS {
         return new Spreading(value);
     }
 
-    /** The values of an iterable, appended to {@code out}. Arrays and strings only for now. */
-    static void addAll(JsArray out, Object iterable) {
+    /** An iterator over {@code iterable}: what {@code for (x of iterable)} loops with. */
+    public static JsIter iter(Object iterable) {
         if (iterable instanceof JsArray) {
-            JsArray a = (JsArray) iterable;
-            for (int i = 0; i < a.length(); i++) {
-                out.add(a.get(i));
+            return new JsIter.ArrayIter((JsArray) iterable);
+        }
+        if (iterable instanceof String) {
+            return new JsIter.StringIter((String) iterable);
+        }
+        Object method = nullish(iterable) ? null : get(iterable, Globals.ITERATOR);
+        if (!(method instanceof JsFunction)) {
+            throw new JsError("TypeError: " + (iterable == null ? "undefined" : iterable instanceof JsSymbol
+                    ? iterable.toString() : str(iterable)) + " is not iterable");
+        }
+        Object iterator = ((JsFunction) method).call(iterable, new Object[0]);
+        if (!(iterator instanceof JsObject)) {
+            throw new JsError("TypeError: Result of the Symbol.iterator method is not an object");
+        }
+        return new JsIter.ProtocolIter(iterator);
+    }
+
+    /** The values of an iterable, appended to {@code out}. */
+    static void addAll(JsArray out, Object iterable) {
+        JsIter it = iter(iterable);
+        try {
+            while (it.next()) {
+                out.add(it.value());
             }
-        } else if (iterable instanceof String) {
-            String s = (String) iterable;
-            for (int i = 0; i < s.length(); i++) {
-                out.add(s.substring(i, i + 1));
-            }
-        } else {
-            throw new JsError("TypeError: " + (iterable == null ? "undefined" : str(iterable)) + " is not iterable");
+        } finally {
+            it.close();
         }
     }
 
@@ -149,10 +164,10 @@ public final class JS {
                 i++;
             } else if (parts[i] instanceof Accessing) {
                 Accessing a = (Accessing) parts[i];
-                o.defineAccessor(keyString(a.key), a.getter ? a.function : null, a.getter ? null : a.function);
+                o.defineAccessor(key(a.key), a.getter ? a.function : null, a.getter ? null : a.function);
                 i++;
             } else {
-                o.set(keyString(parts[i]), parts[i + 1]);
+                o.set(key(parts[i]), parts[i + 1]);
                 i += 2;
             }
         }
@@ -174,11 +189,24 @@ public final class JS {
 
     /** The value to destructure with {@code [a, b] = value}: an array, or the elements of an iterable as one. */
     public static Object toArray(Object value) {
+        return toArray(value, Long.valueOf(-1));
+    }
+
+    /** Like {@link #toArray(Object)} but takes at most {@code limitValue} values (all if negative), then closes the iterator. */
+    public static Object toArray(Object value, Object limitValue) {
         if (value instanceof JsArray) {
             return value;
         }
+        long limit = ((Long) limitValue).longValue();
         JsArray out = new JsArray();
-        addAll(out, value);
+        JsIter it = iter(value);
+        try {
+            while ((limit < 0 || out.length() < limit) && it.next()) {
+                out.add(it.value());
+            }
+        } finally {
+            it.close();
+        }
         return out;
     }
 
@@ -294,6 +322,9 @@ public final class JS {
         if (v == NULL) {
             return "null";
         }
+        if (v instanceof JsSymbol) {
+            throw new JsError("TypeError: Cannot convert a Symbol value to a string");
+        }
         if (v instanceof JsArray) {
             return Builtins.join((JsArray) v, ",");
         }
@@ -385,6 +416,9 @@ public final class JS {
         }
         if (v instanceof Boolean) {
             return "boolean";
+        }
+        if (v instanceof JsSymbol) {
+            return "symbol";
         }
         if (v instanceof JsFunction) {
             return "function";
@@ -548,7 +582,7 @@ public final class JS {
 
     public static Object get(Object o, Object key) {
         if (o instanceof JsObject) {
-            return ((JsObject) o).get(keyString(key));
+            return ((JsObject) o).get(key(key));
         }
         if (o instanceof JsArray) {
             JsArray array = (JsArray) o;
@@ -558,10 +592,10 @@ public final class JS {
             if ("length".equals(key)) {
                 return Long.valueOf(array.length());
             }
-            if (array.named() != null && array.named().has(keyString(key))) {
-                return array.named().get(keyString(key));
+            if (array.named() != null && array.named().has(key(key))) {
+                return array.named().get(key(key));
             }
-            return Builtins.method(o, keyString(key));
+            return key instanceof JsSymbol ? Builtins.symbolMethod(o, (JsSymbol) key) : Builtins.method(o, keyString(key));
         }
         if (o instanceof String) {
             String s = (String) o;
@@ -572,10 +606,20 @@ public final class JS {
             if ("length".equals(key)) {
                 return Long.valueOf(s.length());
             }
-            return Builtins.method(o, keyString(key));
+            return key instanceof JsSymbol ? Builtins.symbolMethod(o, (JsSymbol) key) : Builtins.method(o, keyString(key));
         }
         if (o instanceof JsFunction) {
-            return Builtins.functionProperty((JsFunction) o, keyString(key));
+            return Builtins.functionProperty((JsFunction) o, key(key));
+        }
+        if (o instanceof JsSymbol) {
+            JsSymbol symbol = (JsSymbol) o;
+            if ("description".equals(key)) {
+                return symbol.description;
+            }
+            if ("toString".equals(key)) {
+                return new JsFunction("toString", (callee, self, args) -> symbol.toString());
+            }
+            return null;
         }
         if (o instanceof Long || o instanceof Boolean) {
             return null;
@@ -589,7 +633,7 @@ public final class JS {
 
     public static Object set(Object o, Object key, Object value) {
         if (o instanceof JsObject) {
-            ((JsObject) o).assign(keyString(key), value);
+            ((JsObject) o).assign(key(key), value);
         } else if (o instanceof JsArray) {
             JsArray array = (JsArray) o;
             if (key instanceof Long && ((Long) key).longValue() < 0) {
@@ -599,14 +643,14 @@ public final class JS {
             } else if ("length".equals(key)) {
                 array.setLength((int) toNumber(value));
             } else {
-                array.namedOrCreate().set(keyString(key), value);
+                array.namedOrCreate().set(key(key), value);
             }
         } else if (o instanceof JsFunction) {
             JsFunction f = (JsFunction) o;
             if ("prototype".equals(key) && value instanceof JsObject) {
                 f.setPrototype((JsObject) value);
             } else {
-                f.props().assign(keyString(key), value);
+                f.props().assign(key(key), value);
             }
         } else if (nullish(o)) {
             throw new JsError("TypeError: Cannot set properties of " + str(o) + " (setting '" + str(key) + "')");
@@ -624,6 +668,11 @@ public final class JS {
             return Long.parseLong((String) key);
         }
         return -1;
+    }
+
+    /** The property key for {@code key}: a symbol stays one; anything else becomes its string. */
+    static Object key(Object key) {
+        return key instanceof JsSymbol ? key : keyString(key);
     }
 
     static String keyString(Object key) {
@@ -697,7 +746,7 @@ public final class JS {
         JsFunction c = (JsFunction) cls;
         JsFunction method = (JsFunction) fn;
         method.home = isStatic ? c : c.prototype();
-        (isStatic ? c.props() : c.prototype()).setHidden(keyString(key), method);
+        (isStatic ? c.props() : c.prototype()).setHidden(key(key), method);
         return cls;
     }
 
@@ -705,7 +754,7 @@ public final class JS {
         JsFunction c = (JsFunction) cls;
         JsFunction accessor = (JsFunction) fn;
         accessor.home = isStatic ? c : c.prototype();
-        (isStatic ? c.props() : c.prototype()).defineAccessor(keyString(key), getter ? accessor : null,
+        (isStatic ? c.props() : c.prototype()).defineAccessor(key(key), getter ? accessor : null,
                 getter ? null : accessor, false);
         return cls;
     }
@@ -731,7 +780,7 @@ public final class JS {
     /** {@code super.key}: looked up from the prototype of the object the running method was defined on. */
     public static Object superGet(Object callee, Object self, Object key) {
         Object home = ((JsFunction) callee).home;
-        String k = keyString(key);
+        Object k = key(key);
         if (home instanceof JsFunction) {
             JsFunction parent = ((JsFunction) home).parent();
             return parent == null ? null : Builtins.functionProperty(parent, k);
@@ -754,6 +803,10 @@ public final class JS {
             throw new JsError("TypeError: Right-hand side of 'instanceof' is not callable");
         }
         JsFunction function = (JsFunction) f;
+        Object custom = function.hasProps() ? function.props().get(Globals.HAS_INSTANCE) : null;
+        if (custom instanceof JsFunction) {
+            return truthy(((JsFunction) custom).call(f, new Object[] {a}));
+        }
         JsObject target = function.prototype();
         if (a instanceof JsObject) {
             for (JsObject p = ((JsObject) a).proto; p != null; p = p.proto) {
@@ -775,7 +828,7 @@ public final class JS {
     /** {@code key in o}. */
     public static boolean in(Object key, Object o) {
         if (o instanceof JsObject) {
-            return ((JsObject) o).has(keyString(key));
+            return ((JsObject) o).has(key(key));
         }
         if (o instanceof JsArray) {
             JsArray array = (JsArray) o;
@@ -783,7 +836,7 @@ public final class JS {
             return i >= 0 ? i < array.length() : "length".equals(key);
         }
         if (o instanceof JsFunction) {
-            return Builtins.functionProperty((JsFunction) o, keyString(key)) != null
+            return Builtins.functionProperty((JsFunction) o, key(key)) != null
                     || "name".equals(key) || "prototype".equals(key);
         }
         throw new JsError("TypeError: Cannot use 'in' operator to search for '" + str(key) + "' in " + str(o));
@@ -793,7 +846,7 @@ public final class JS {
     public static Object delete(Object o, Object key) {
         if (o instanceof JsObject) {
             JsObject object = (JsObject) o;
-            if (!object.remove(keyString(key)) && object.hasOwn(keyString(key))) {
+            if (!object.remove(key(key)) && object.hasOwn(key(key))) {
                 throw new JsError("TypeError: Cannot delete property '" + keyString(key) + "' of #<Object>");
             }
         } else if (o instanceof JsArray && key instanceof Long) {
@@ -804,7 +857,7 @@ public final class JS {
                 array.set(i, null);
             }
         } else if (o instanceof JsFunction) {
-            ((JsFunction) o).props().remove(keyString(key));
+            ((JsFunction) o).props().remove(key(key));
         } else if (nullish(o)) {
             throw new JsError("TypeError: Cannot convert undefined or null to object");
         }

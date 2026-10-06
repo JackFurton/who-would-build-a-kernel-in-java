@@ -182,6 +182,8 @@ class JsCompilerTest {
                 class Derived extends Base { constructor() { super(); this.d = super.m(); } m() { return super.m() + 1; } }
                 var klass = class { [key]() { } };
                 var acc = { get g() { return 1; }, set g(v) { }, get ["c" + 1]() { return 2; } };
+                for (const item of items) { if (item) break; }
+                var sym = Symbol("x"), withSym = { [sym]: 1 };
                 var [pa, { pb = 2, ...pc }] = [1, {}];
                 [pa, o.x] = [pb, pc];
                 function params(a, b = a, ...rest) { return [a, b, ...rest, arguments.length, { [a]: b, ...q }]; }

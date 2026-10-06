@@ -15,7 +15,8 @@ with `// backends: java` and skips it.
 | Declarations | `var`, `let`, `const`, function declarations (hoisted), per-iteration `let` in `for` loops |
 | Functions | declarations, expressions, arrows, closures, `this`, `arguments`, default and rest parameters, `call`/`apply`/`bind`, name inference (`const f = () => 1` is named `f`) |
 | Destructuring | array and object patterns (nested, with defaults, rest and computed keys) in declarations, assignments, parameters, `for...of`/`for...in` heads and `catch`; array holes |
-| Spread | `...` in calls, `new`, array literals and object literals (arrays and strings are the iterables for now) |
+| Spread | `...` in calls, `new`, array literals and object literals |
+| Symbols and iteration | `Symbol()`, `Symbol.for`/`keyFor`, `Symbol.iterator`/`asyncIterator`/`hasInstance`/`toStringTag`, symbol-keyed properties, `Object.getOwnPropertySymbols`; the iteration protocol drives `for...of`, spread, destructuring and `Array.from`-style consumers (an iterator's `return()` is called when a loop leaves early); array `keys`/`values`/`entries` and string iterators |
 | Classes | `class` declarations and expressions, `extends` (classes, constructor functions, `Error`, `null`), `super(...)`, `super.x` and `super.m()` in methods and static methods, instance and static fields, static blocks, private names (`#x`, fields and methods), getters and setters, computed member names; a class can't be called without `new` |
 | Objects | literals, shorthand properties and methods, getters and setters, computed keys (`{[k]: v}`), computed access, `Object.defineProperty`/`defineProperties`, property descriptors (`getOwnPropertyDescriptor(s)`, `getOwnPropertyNames`), `freeze`/`seal`/`preventExtensions` and their `is...` checks, `Object.is`/`fromEntries`, prototypes, `new`, constructor functions, `instanceof`, `in`, `delete`, `for...in`, property enumeration order (indexes first) |
 | Operators | arithmetic and bitwise (32-bit), comparison, `===`/`==`, logical, `??`, `?:`, optional chaining (`?.`, `?.[]`, `?.()`), `typeof`, `void`, `delete`, compound assignment, `++`/`--` |
@@ -28,7 +29,7 @@ with `// backends: java` and skips it.
 
 ## Not yet (unbuilt)
 
-In the order we expect to do them: `Symbol`, iterators and generators, `Map`/`Set`/`WeakMap`/`WeakSet`, modules
+In the order we expect to do them: generators, `Map`/`Set`/`WeakMap`/`WeakSet`, modules
 (`import`/`export`), `Promise` and `async`/`await`, `JSON`, typed arrays.
 
 ## Waiting on the kernel
@@ -61,7 +62,8 @@ property operation). Calling `new Function` throws an error that says so.
 - A class can extend another class, a constructor function, `Error` or `null`, but not `Array`, `Map` or `Set`.
 - `new.target` isn't supported, and a named class expression doesn't bind its own name inside the class.
 - Field initializers assign rather than define, so a setter on the prototype chain would run.
-- Array patterns read by index, so they work on arrays and strings only until iterators exist.
+- Iterator objects print as `{}` (node: `Object [Array Iterator] {}`). Symbol keys print as `[Symbol(x)]: v`; the newest
+  node drops the brackets.
 - Array literals with holes (`[1, , 2]`) store `undefined` there; node keeps a hole.
 - `arguments` is a plain array with no link back to the parameters, and `console.log(arguments)` prints it as one.
 - A tagged template's strings array is built on each call, so it is not the same object every time as in node.

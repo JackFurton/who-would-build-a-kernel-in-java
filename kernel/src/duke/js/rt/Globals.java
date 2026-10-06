@@ -11,6 +11,13 @@ public final class Globals {
     private static Sink sink;
     private static JsObject table;
     private static JsObject objectPrototype;
+    private static JsObject iteratorPrototype;
+
+    static final JsSymbol ITERATOR = new JsSymbol("Symbol.iterator");
+    static final JsSymbol ASYNC_ITERATOR = new JsSymbol("Symbol.asyncIterator");
+    static final JsSymbol HAS_INSTANCE = new JsSymbol("Symbol.hasInstance");
+    static final JsSymbol TO_STRING_TAG = new JsSymbol("Symbol.toStringTag");
+    private static JsObject symbolRegistry;
     private static final String[] ERROR_TYPES = {"Error", "TypeError", "RangeError", "ReferenceError", "SyntaxError",
         "EvalError", "URIError"};
 
@@ -95,7 +102,8 @@ public final class Globals {
         math.set("min", function("min", (callee, self, args) -> extreme(args, false)));
         g.set("Math", math);
 
-        JsFunction string = function("String", (callee, self, args) -> JS.str(arg(args, 0)));
+        JsFunction string = function("String", (callee, self, args) ->
+                arg(args, 0) instanceof JsSymbol ? arg(args, 0).toString() : JS.str(arg(args, 0)));
         string.props().set("fromCharCode", function("fromCharCode", (callee, self, args) ->
                 String.valueOf((char) JS.toNumber(arg(args, 0)))));
         string.props().setHidden("raw", function("raw", (callee, self, args) -> {
@@ -122,6 +130,7 @@ public final class Globals {
 
         installObject(g);
         installErrors(g);
+        installSymbol(g);
 
         JsFunction array = constructor("Array", (callee, self, args) -> {
             JsArray a = new JsArray();
@@ -161,7 +170,7 @@ public final class Globals {
         object.setPrototype(prototype);
         prototype.setHidden("constructor", object);
         prototype.setHidden("hasOwnProperty", function("hasOwnProperty", (callee, self, args) ->
-                JS.bool(hasOwn(self, JS.keyString(arg(args, 0))))));
+                JS.bool(hasOwn(self, JS.key(arg(args, 0))))));
         prototype.setHidden("isPrototypeOf", function("isPrototypeOf", (callee, self, args) -> {
             Object v = arg(args, 0);
             if (v instanceof JsObject) {
@@ -174,7 +183,7 @@ public final class Globals {
             return Boolean.FALSE;
         }));
         prototype.setHidden("propertyIsEnumerable", function("propertyIsEnumerable", (callee, self, args) -> {
-            String key = JS.keyString(arg(args, 0));
+            Object key = JS.key(arg(args, 0));
             return JS.bool(self instanceof JsObject ? ((JsObject) self).isEnumerable(key) : hasOwn(self, key));
         }));
         prototype.setHidden("toString", function("toString", (callee, self, args) -> "[object " + tag(self) + "]"));
@@ -185,7 +194,7 @@ public final class Globals {
         statics.setHidden("values", function("values", (callee, self, args) -> enumerate(arg(args, 0), 1)));
         statics.setHidden("entries", function("entries", (callee, self, args) -> enumerate(arg(args, 0), 2)));
         statics.setHidden("hasOwn", function("hasOwn", (callee, self, args) ->
-                JS.bool(hasOwn(arg(args, 0), JS.keyString(arg(args, 1))))));
+                JS.bool(hasOwn(arg(args, 0), JS.key(arg(args, 1))))));
         statics.setHidden("assign", function("assign", (callee, self, args) -> {
             Object target = arg(args, 0);
             for (int i = 1; i < args.length; i++) {
@@ -234,7 +243,7 @@ public final class Globals {
     /** The statics that deal in property attributes and extensibility. */
     private static void installProperties(JsObject statics) {
         statics.setHidden("defineProperty", function("defineProperty", (callee, self, args) -> {
-            define(arg(args, 0), JS.keyString(arg(args, 1)), arg(args, 2));
+            define(arg(args, 0), JS.key(arg(args, 1)), arg(args, 2));
             return arg(args, 0);
         }));
         statics.setHidden("defineProperties", function("defineProperties", (callee, self, args) -> {
@@ -246,12 +255,22 @@ public final class Globals {
             return arg(args, 0);
         }));
         statics.setHidden("getOwnPropertyDescriptor", function("getOwnPropertyDescriptor", (callee, self, args) ->
-                describe(arg(args, 0), JS.keyString(arg(args, 1)))));
+                describe(arg(args, 0), JS.key(arg(args, 1)))));
         statics.setHidden("getOwnPropertyDescriptors", function("getOwnPropertyDescriptors", (callee, self, args) -> {
             JsObject out = (JsObject) JS.object();
             JsArray names = (JsArray) ownNames(arg(args, 0));
             for (int i = 0; i < names.length(); i++) {
                 out.set((String) names.get(i), describe(arg(args, 0), (String) names.get(i)));
+            }
+            return out;
+        }));
+        statics.setHidden("getOwnPropertySymbols", function("getOwnPropertySymbols", (callee, self, args) -> {
+            JsArray out = new JsArray();
+            JsObject h = holder(arg(args, 0), false);
+            if (h != null) {
+                for (JsSymbol symbol : h.symbolKeys(true)) {
+                    out.add(symbol);
+                }
             }
             return out;
         }));
@@ -344,7 +363,7 @@ public final class Globals {
     }
 
     /** {@code Object.defineProperty(target, key, descriptor)}. */
-    private static void define(Object target, String key, Object descriptor) {
+    private static void define(Object target, Object key, Object descriptor) {
         JsObject holder = holder(target, true);
         if (holder == null) {
             throw new JsError("TypeError: Object.defineProperty called on non-object");
@@ -379,29 +398,29 @@ public final class Globals {
         }
         boolean writable = d.has("writable") ? JS.truthy(d.get("writable")) : exists && holder.isWritable(key);
         Object value = d.has("value") ? d.get("value") : exists ? holder.getOwn(key) : null;
-        if (target instanceof JsArray && JsObject.isIndex(key)) {
-            ((JsArray) target).set((int) Long.parseLong(key), value);
+        if (target instanceof JsArray && isIndexKey(key)) {
+            ((JsArray) target).set((int) Long.parseLong((String) key), value);
             return;
         }
         holder.define(key, value, enumerable, writable, configurable);
     }
 
     /** {@code Object.getOwnPropertyDescriptor}: undefined, or an object describing the property. */
-    private static Object describe(Object o, String key) {
+    private static Object describe(Object o, Object key) {
         JsObject d = (JsObject) JS.object();
-        if (o instanceof JsArray && (JsObject.isIndex(key) || key.equals("length"))) {
+        if (o instanceof JsArray && (isIndexKey(key) || "length".equals(key))) {
             JsArray a = (JsArray) o;
-            if (key.equals("length")) {
+            if ("length".equals(key)) {
                 d.set("value", Long.valueOf(a.length()));
                 d.set("writable", JS.bool(!a.isFrozen()));
                 d.set("enumerable", Boolean.FALSE);
                 d.set("configurable", Boolean.FALSE);
                 return d;
             }
-            if (Long.parseLong(key) >= a.length()) {
+            if (Long.parseLong((String) key) >= a.length()) {
                 return null;
             }
-            d.set("value", a.get((int) Long.parseLong(key)));
+            d.set("value", a.get((int) Long.parseLong((String) key)));
             d.set("writable", JS.bool(!a.isFrozen()));
             d.set("enumerable", Boolean.TRUE);
             d.set("configurable", JS.bool(!a.isSealed()));
@@ -423,6 +442,55 @@ public final class Globals {
         d.set("enumerable", JS.bool(h.isEnumerable(key)));
         d.set("configurable", JS.bool(h.isConfigurable(key)));
         return d;
+    }
+
+    private static void installSymbol(JsObject g) {
+        iteratorPrototype = new JsObject();
+        iteratorPrototype.proto = objectPrototype;
+        iteratorPrototype.setHidden(ITERATOR, function("[Symbol.iterator]", (callee, self, args) -> self));
+        symbolRegistry = new JsObject();
+        JsFunction symbol = function("Symbol", (callee, self, args) -> {
+            Object description = arg(args, 0);
+            return new JsSymbol(description == null ? null : JS.str(description));
+        });
+        JsObject statics = symbol.props();
+        statics.setHidden("iterator", ITERATOR);
+        statics.setHidden("asyncIterator", ASYNC_ITERATOR);
+        statics.setHidden("hasInstance", HAS_INSTANCE);
+        statics.setHidden("toStringTag", TO_STRING_TAG);
+        statics.setHidden("for", function("for", (callee, self, args) -> {
+            String key = JS.str(arg(args, 0));
+            Object existing = symbolRegistry.getOwn(key);
+            if (existing != null) {
+                return existing;
+            }
+            JsSymbol created = new JsSymbol(key);
+            symbolRegistry.set(key, created);
+            return created;
+        }));
+        statics.setHidden("keyFor", function("keyFor", (callee, self, args) -> {
+            Object sym = arg(args, 0);
+            if (!(sym instanceof JsSymbol)) {
+                throw new JsError("TypeError: " + JS.typeof(sym) + " is not a symbol");
+            }
+            String description = ((JsSymbol) sym).description;
+            return description != null && symbolRegistry.getOwn(description) == sym ? description : null;
+        }));
+        g.set("Symbol", symbol);
+    }
+
+    /** A JavaScript iterator object over a Java iterator: {@code next()} yields {@code {value, done}}. */
+    static JsObject iteratorObject(JsIter it) {
+        JsObject o = new JsObject();
+        o.proto = iteratorPrototype;
+        o.setHidden("next", function("next", (callee, self, args) -> {
+            JsObject result = (JsObject) JS.object();
+            boolean more = it.next();
+            result.set("value", more ? it.value() : null);
+            result.set("done", JS.bool(!more));
+            return result;
+        }));
+        return o;
     }
 
     private static void installErrors(JsObject g) {
@@ -497,6 +565,12 @@ public final class Globals {
     }
 
     private static String tag(Object v) {
+        if (v instanceof JsObject && ((JsObject) v).get(TO_STRING_TAG) instanceof String) {
+            return (String) ((JsObject) v).get(TO_STRING_TAG);
+        }
+        if (v instanceof JsSymbol) {
+            return "Symbol";
+        }
         if (v == null) {
             return "Undefined";
         }
@@ -521,20 +595,24 @@ public final class Globals {
         return "Object";
     }
 
+    private static boolean isIndexKey(Object key) {
+        return key instanceof String && JsObject.isIndex((String) key);
+    }
+
     /** {@code self.hasOwnProperty(key)} for any value. */
-    private static boolean hasOwn(Object o, String key) {
+    private static boolean hasOwn(Object o, Object key) {
         if (o instanceof JsObject) {
             return ((JsObject) o).hasOwn(key);
         }
         if (o instanceof JsArray) {
-            return JsObject.isIndex(key) ? Long.parseLong(key) < ((JsArray) o).length() : key.equals("length");
+            return isIndexKey(key) ? Long.parseLong((String) key) < ((JsArray) o).length() : "length".equals(key);
         }
         if (o instanceof String) {
-            return JsObject.isIndex(key) ? Long.parseLong(key) < ((String) o).length() : key.equals("length");
+            return isIndexKey(key) ? Long.parseLong((String) key) < ((String) o).length() : "length".equals(key);
         }
         if (o instanceof JsFunction) {
             JsFunction f = (JsFunction) o;
-            return key.equals("name") || key.equals("prototype") && f.isConstructible() || f.hasProps() && f.props().hasOwn(key);
+            return "name".equals(key) || "prototype".equals(key) && f.isConstructible() || f.hasProps() && f.props().hasOwn(key);
         }
         return false;
     }
