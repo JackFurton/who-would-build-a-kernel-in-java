@@ -6,6 +6,7 @@ import duke.js.rt.JsArray;
 import duke.js.rt.JsError;
 import duke.js.rt.JsFunction;
 import duke.js.rt.JsObject;
+import duke.js.rt.Modules;
 import duke.kernel.mm.PhysicalMemory;
 import duke.kernel.time.Timer;
 import duke.rt.Heap;
@@ -26,8 +27,13 @@ public final class JsHost {
     private JsHost() {
     }
 
-    /** Points console.log at the console and defines {@code Kernel}. Call before running any module. */
-    public static void install() {
+    /** Starts JavaScript: sets up console.log and {@code Kernel}, then runs every compiled module. */
+    public static void start() {
+        install();
+        Modules.runAll();
+    }
+
+    private static void install() {
         Globals.setSink(s -> Console.print(s));
         JsObject kernel = new JsObject();
         kernel.set("print", Globals.function("print", (callee, self, args) -> {

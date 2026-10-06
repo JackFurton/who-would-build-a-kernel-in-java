@@ -16,10 +16,8 @@ export OVMF
 
 KERNEL_SRCS   := $(shell find kernel/src -name '*.java')
 # JavaScript modules: jsc translates them to Java under build/jsgen, and the kernel compiles that as
-# one more source root. Its generated duke.js.Modules replaces the empty one in kernel/src, which is
-# what lets Kernel call Modules.init() without naming generated code.
+# one more source root. dukec includes duke/js/gen by default, so nothing refers to the generated code.
 JS_SRCS       := $(wildcard kernel/js/*.js)
-EMPTY_MODULES := kernel/src/duke/js/Modules.java
 # Keep in sync with tools/Harness.java and CompilerTest. javac's default string concatenation is
 # invokedynamic; inline makes it plain StringBuilder calls the compiler can handle.
 KERNEL_JAVAC  := javac --system none -XDstringConcat=inline
@@ -43,7 +41,7 @@ $(BUILD)/jsgen.stamp: $(JS_SRCS) $(DUKEC)
 $(BUILD)/kclasses.stamp: $(KERNEL_SRCS) $(BUILD)/jsgen.stamp
 	rm -rf $(BUILD)/kclasses
 	$(KERNEL_JAVAC) --module-source-path java.base=kernel/src:$(BUILD)/jsgen -d $(BUILD)/kclasses \
-		$(filter-out $(EMPTY_MODULES),$(KERNEL_SRCS)) $$(find $(BUILD)/jsgen -name '*.java')
+		$(KERNEL_SRCS) $$(find $(BUILD)/jsgen -name '*.java')
 	touch $@
 
 $(BUILD)/kernel.elf: $(DUKEC) $(BUILD)/kclasses.stamp

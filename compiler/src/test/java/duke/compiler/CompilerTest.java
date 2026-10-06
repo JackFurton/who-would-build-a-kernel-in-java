@@ -2,6 +2,7 @@ package duke.compiler;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -179,6 +180,51 @@ class CompilerTest {
         CompileException e = assertThrows(CompileException.class,
                 () -> new Compiler(ClassPool.load(classes)).compile("duke/test/Entry", "main"));
         assertTrue(e.getMessage().contains("non-Latin-1"), e.getMessage());
+    }
+
+    private static final String ENTRY_WITH_HITS = """
+            package duke.test;
+            public final class Entry {
+                static int hits;
+                public static void main() {
+                }
+            }
+            """;
+
+    private static final String UNREFERENCED_HOOK = """
+            package duke.test;
+            final class Hook {
+                static {
+                    Entry.hits++;
+                }
+            }
+            """;
+
+    @Test
+    void includedClassesAreCompiledInAndInitializedAtBoot() throws IOException {
+        Path classes = compile(ENTRY_WITH_HITS, UNREFERENCED_HOOK);
+        String hook = "initialize:duke/test/Hook";
+        assertFalse(new Compiler(ClassPool.load(classes)).compile("duke/test/Entry", "main").isDefined(hook),
+                "nothing refers to Hook, so it is left out unless included");
+        assertTrue(new Compiler(ClassPool.load(classes)).include("duke/test/Hook")
+                .compile("duke/test/Entry", "main").isDefined(hook));
+        assertTrue(new Compiler(ClassPool.load(classes)).include("duke/test/")
+                .compile("duke/test/Entry", "main").isDefined(hook), "a trailing slash includes a whole package");
+        assertFalse(new Compiler(ClassPool.load(classes)).include("duke/other/")
+                .compile("duke/test/Entry", "main").isDefined(hook), "a package with no classes includes nothing");
+    }
+
+    @Test
+    void includingAMissingClassIsAnError() throws IOException {
+        Path classes = compile(ENTRY_WITH_HITS);
+        CompileException e = assertThrows(CompileException.class,
+                () -> new Compiler(ClassPool.load(classes)).include("duke/test/Nope").compile("duke/test/Entry", "main"));
+        assertTrue(e.getMessage().contains("duke/test/Nope"), e.getMessage());
+    }
+
+    @Test
+    void generatedJavaScriptIsIncludedByDefault() {
+        assertTrue(Compiler.DEFAULT_INCLUDES.contains("duke/js/gen/"));
     }
 
     /** Compiles the kernel sources plus {@code extra} (each a full compilation unit in package duke.test). */

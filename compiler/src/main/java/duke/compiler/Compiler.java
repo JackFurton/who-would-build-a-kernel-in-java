@@ -23,6 +23,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeSet;
 
 /**
  * Whole-program compilation: starting from the entry point, compiles every reachable method into
@@ -113,6 +114,12 @@ public final class Compiler {
 
     private final Map<String, List<Safepoint>> safepoints = new LinkedHashMap<>();
 
+    /** Packages every build includes without being asked. Generated code lives here, so no flag is needed for it. */
+    public static final List<String> DEFAULT_INCLUDES = List.of("duke/js/gen/");
+
+    private final List<String> includes = new ArrayList<>();
+    private final List<String> bootInitializers = new ArrayList<>();
+
     public Compiler(ClassPool pool) {
         this.pool = pool;
         this.layouts = new Layouts(pool);
@@ -121,6 +128,36 @@ public final class Compiler {
     }
 
     private record VirtualCall(String owner, String name, String descriptor) {}
+
+    /**
+     * Adds extra roots besides the entry point: a class name ({@code pkg/Class}) or, ending in a slash, every
+     * class under a package prefix ({@code pkg/}). Each is compiled into the image and its static
+     * initializer runs at boot, before the entry point, so code nothing refers to (generated modules,
+     * say) can register itself. Initializers that early must not need anything the entry point sets up.
+     */
+    public Compiler include(String spec) {
+        includes.add(spec);
+        return this;
+    }
+
+    private Set<String> includedClasses() {
+        Set<String> found = new TreeSet<>();
+        for (String spec : includes) {
+            if (spec.endsWith("/")) {
+                for (ClassModel model : pool.all()) {
+                    String name = model.thisClass().asInternalName();
+                    if (name.startsWith(spec)) {
+                        found.add(name);
+                    }
+                }
+            } else if (pool.find(spec) == null) {
+                throw new CompileException("included class " + spec + " is not in the class pool");
+            } else {
+                found.add(spec);
+            }
+        }
+        return found;
+    }
 
     public Image compile(String entryClass, String entryMethod) {
         ClassPool.ResolvedMethod main = pool.resolveMethod(entryClass, entryMethod, "()V");
@@ -139,6 +176,13 @@ public final class Compiler {
         requireClass(entryClass);
         if (needsInit(entryClass)) {
             requireInitializer(entryClass);
+        }
+        for (String type : includedClasses()) {
+            requireClass(type);
+            if (needsInit(type)) {
+                requireInitializer(type);
+                bootInitializers.add(type);
+            }
         }
         String mainSymbol = requireMethod(main);
 
@@ -1002,6 +1046,9 @@ public final class Compiler {
         }
         if (initializers.contains(entryClass)) {
             a.call(initializerSymbol(entryClass));
+        }
+        for (String type : bootInitializers) {
+            a.call(initializerSymbol(type));
         }
         a.call(mainSymbol);
         X64.Label hang = new X64.Label();

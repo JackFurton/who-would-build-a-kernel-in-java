@@ -402,10 +402,14 @@ JS and Java share one heap, collector, calling convention and exception system, 
   and every generated name carries a number, because Java forbids a lambda to shadow an enclosing name.
 - **The runtime** (`kernel/src/duke/js/rt`) is plain Java with no kernel dependencies, so it also runs on
   HotSpot. That is what lets `make js-test` check the translator against node without booting anything.
-- **How the kernel reaches it:** `Kernel.main` calls `duke.js.Modules.init()` just before the shell
-  starts. The checked-in `Modules` is empty, which is what the test harnesses compile. The kernel build
-  swaps it for the one jsc generates, which calls each module's top-level code once, so nothing under
-  `kernel/src` has to name generated code and the entry point is still `Kernel.main`.
+- **How the kernel reaches it:** each generated module has a static initializer that registers its
+  top-level code with `duke.js.rt.Modules`. Nothing refers to the generated classes, so `dukec`'s
+  `--include` is what keeps them: it compiles extra root classes into the image and runs their static
+  initializers at boot, before the entry point. `duke/js/gen/` is a default include, so the Makefile passes
+  no flag, and the entry point is still `Kernel.main`. `JsHost.start()` then runs every registered module
+  once, just before the shell starts, in alphabetical order by class name. An include is a class
+  (`--include pkg/Class`) or, with a trailing slash, a package prefix (`--include pkg/`). Initializers run
+  that early can't rely on anything `Kernel.main` sets up, which is why modules only register there.
 - **What JS can touch** is whatever `duke.kernel.JsHost` puts in the `Kernel` global: printing, uptime,
   free memory, and `Kernel.command(name, fn)`, which adds a shell command. It's deliberately small and
   explicit. `kernel/js/commands.js` has the first commands (`hello`, `fib`, `meminfo`).
