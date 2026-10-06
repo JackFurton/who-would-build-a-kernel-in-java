@@ -1,0 +1,77 @@
+name: duke-bot
+
+# Lets anyone take an issue without waiting on a maintainer: "@duke-bot claim" assigns the
+# commenter, "@duke-bot release" gives it back. New issues get a footer saying so.
+on:
+  issue_comment:
+    types: [created]
+  issues:
+    types: [opened]
+
+permissions:
+  issues: write
+
+jobs:
+  claim:
+    if: github.event_name == 'issue_comment' && !github.event.issue.pull_request
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/github-script@v9
+        with:
+          script: |
+            const command = context.payload.comment.body.trim().match(/^@duke-bot\s+(claim|release)\b/i);
+            if (!command) {
+              return;
+            }
+            const user = context.payload.comment.user.login;
+            const issue = context.payload.issue;
+            const assignees = issue.assignees.map(a => a.login);
+            const where = { owner: context.repo.owner, repo: context.repo.repo, issue_number: issue.number };
+            const reply = body => github.rest.issues.createComment({ ...where, body });
+
+            if (issue.state !== 'open') {
+              return reply(`This issue is closed, @${user}, so there's nothing to ${command[1].toLowerCase()}.`);
+            }
+            if (command[1].toLowerCase() === 'release') {
+              if (!assignees.includes(user)) {
+                return reply(`@${user}, you're not assigned to this issue, so there's nothing to release.`);
+              }
+              await github.rest.issues.removeAssignees({ ...where, assignees: [user] });
+              return reply(`Released. Thanks for letting us know, @${user}: this issue is open for anyone again.`);
+            }
+            const others = assignees.filter(a => a !== user);
+            if (others.length > 0) {
+              return reply(`@${user}, this one is already claimed by @${others.join(', @')}. `
+                  + 'If it looks stalled, ask them here, or ask a maintainer to reassign it.');
+            }
+            if (assignees.includes(user)) {
+              return reply(`@${user}, it's already yours.`);
+            }
+            // GitHub only assigns people who can be assigned (commenters on public repos can) and
+            // silently skips anyone else, so check what actually happened.
+            const { data } = await github.rest.issues.addAssignees({ ...where, assignees: [user] });
+            if (!data.assignees.some(a => a.login === user)) {
+              return reply(`@${user}, GitHub wouldn't let me assign you. A maintainer will sort it out.`);
+            }
+            return reply(`Assigned to @${user}. Have fun! Put \`Closes #${issue.number}\` in your pull request, `
+                + "and comment `@duke-bot release` if you can't finish it.");
+
+  footer:
+    if: github.event_name == 'issues'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/github-script@v9
+        with:
+          script: |
+            const issue = context.payload.issue;
+            const body = issue.body || '';
+            if (body.includes('@duke-bot claim')) {
+              return;
+            }
+            const footer = '\n\n---\nNew here? [CONTRIBUTING.md](https://github.com/JackFurton/who-would-build-a-kernel-in-java/blob/main/CONTRIBUTING.md)'
+                + ' covers setup. Comment `@duke-bot claim` to take this issue.';
+            await github.rest.issues.update({
+              owner: context.repo.owner, repo: context.repo.repo, issue_number: issue.number, body: body + footer,
+            });
