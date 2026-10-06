@@ -1,3 +1,4 @@
+// backends: java
 // JSON.parse and JSON.stringify.
 const text = '{"a": [1, 2, {"b": null}], "c": "x\\ny", "d": true, "e": {}, "f": [], "g": -12}';
 const v = JSON.parse(text);
