@@ -34,6 +34,10 @@ make test    # everything CI runs
 - `kernel/src` is the kernel *and* its own `java.lang`/`java.util`. There's no JDK underneath, so
   if a class or method doesn't exist there, it doesn't exist.
 - `compiler/` is `dukec`, which turns the kernel's bytecode into x86-64.
+- `kernel/js` is kernel code in JavaScript. `jsc` turns it into Java at build time and `dukec` compiles that
+  with everything else; `Kernel.command("name", fn)` adds a shell command. A kernel with no files there has
+  no JavaScript in it. See
+  [JavaScript in the kernel](docs/architecture.md#javascript-in-the-kernel).
 - [docs/architecture.md](docs/architecture.md) explains the details.
 
 ## Tests
@@ -43,7 +47,7 @@ make test    # everything CI runs
 | `make conformance` | `tests/conformance`: each static method runs on HotSpot and in the kernel; results must match | You add or change library behaviour (`java.lang`, `java.util`) or compiler features |
 | `make ktest` | `tests/kernel`: tests that run inside the booted kernel | You touch memory, interrupts, devices |
 | `make panic-tests` | `tests/panics`: kernels that must die with a specific message | You add a failure path |
-| `make shell-test` | Types into the real shell over serial and PS/2 | You add a shell command |
+| `make shell-test` | Types into the real shell over serial and PS/2 | You add a shell command, in Java or JavaScript |
 | `make js-test` | `tests/js`: JavaScript programs compiled by `jsc`; output must match node | You touch `compiler/.../duke/js` |
 | `make unit-test` | JUnit tests for the compiler | You touch `compiler/` |
 

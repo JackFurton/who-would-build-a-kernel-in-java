@@ -411,12 +411,18 @@ Lexer ─▶ Parser ─▶ Analyzer (scopes, captures, frame slots) ─▶ CodeG
   exit status 1. `console.log` doesn't group arrays of more than six items like node does, and
   object keys keep insertion order even when they look like integers.
 
-### JavaScript as Java
+### JavaScript in the kernel
 
-`jsc --java DIR modules...` is a second back end. It translates each JS module to a Java class under
-`duke/js/gen`. That is ordinary Java: any JVM runs it with the runtime in `kernel/src/duke/js/rt`,
-and `dukec` can compile it like any other class. The translator (`JavaGen`) reuses the lexer, parser
-and analyzer.
+`jsc --java DIR modules...` is a second back end. It translates each JS module to a Java class, and
+those classes are compiled with the kernel's own sources, so `dukec` sees them as ordinary Java:
+
+```
+kernel/js/*.js ──jsc --java──▶ build/jsgen/duke/js/**/*.java ──┐
+kernel/src/**/*.java ───────────────────────────────────────────┴─javac──▶ .class ──dukec──▶ kernel.elf
+```
+
+JS and Java share one heap, collector, calling convention and exception system, because to
+`dukec` there is no difference. The translator (`JavaGen`) reuses the lexer, parser and analyzer.
 
 - **Values** are plain Java objects: `Long` numbers, `String`, `Boolean`, `JsArray`, `JsObject`,
   `JsFunction`, Java `null` for undefined and `JS.NULL` for null. Operators and property access are
@@ -424,15 +430,27 @@ and analyzer.
 - **Variables:** top-level ones are static fields. Others are Java locals, or one-element arrays when
   a closure captures them, since Java lambdas need effectively final variables. Functions are lambdas,
   and every generated name carries a number, because Java forbids a lambda to shadow an enclosing name.
-- **Modules:** each generated class has a `run()` with the module's top-level code, and a static
-  initializer that registers it with `duke.js.rt.Modules`. `Modules.runAll()` runs what has signed up.
-- **The runtime** is plain Java with no kernel dependencies, built only from what the kernel's own
-  `java.lang` and `java.util` offer, so it compiles both ways. That lets `make js-test` check the
-  translator against node on a normal JVM.
-- **Limits** are the same as for the x86 back end: integers only, no exceptions or classes. The runtime
-  keeps static state (the global table, `console.log`'s formatting depth), so it is not safe to call
-  from several threads.
+- **The runtime** (`kernel/src/duke/js/rt`) is plain Java with no kernel dependencies, so it also runs on
+  HotSpot. That is what lets `make js-test` check the translator against node without booting anything.
+- **How the kernel reaches it:** each generated module registers its top-level code with
+  `duke.js.rt.Modules` from a static initializer. Nothing refers to the generated classes, so they are
+  kept by `dukec`'s default include of `duke/js/gen/` (see Extra roots above), which runs those
+  initializers at boot. When there is at least one module, jsc also generates `JsStartup`, whose
+  initializer registers `JsHost.start()` with `duke.kernel.Startup`; `Kernel.main` runs the startup hooks
+  just before the shell, and `JsHost.start()` runs the modules in alphabetical order by class name. So
+  `Kernel` and `Shell` know nothing about JavaScript. They have two generic registries, `Startup` for boot
+  hooks and `Commands` for shell commands, and a kernel built with no modules contains no JavaScript
+  runtime at all. The entry point is still `Kernel.main`.
+- **What JS can touch** is whatever `duke.kernel.JsHost` puts in the `Kernel` global: printing, uptime,
+  free memory, and `Kernel.command(name, fn)`, which registers a shell command with `Commands`. It's
+  deliberately small and explicit. `kernel/js/commands.js` has the first commands (`hello`, `fib`, `meminfo`).
+- **Limits** are the same as for the x86 back end (integers only, no exceptions or classes), plus the
+  kernel's: JS code must stay out of interrupt handlers, since those can't allocate, and the stack it runs
+  on is small, so deep recursion in a command overflows it. The runtime keeps static state (the global
+  table, the command registry, `console.log`'s formatting depth), so JS runs only on the thread that runs
+  the shell; it is not safe to call from several threads yet.
 
 `make js-test` runs every program in `tests/js` under node, as an x86-64 executable and through
 the Java back end on this JVM, and compares output and exit status (off x86-64 Linux the
-executables run in an amd64 Docker container; `JS_BACKENDS=java` skips them).
+executables run in an amd64 Docker container; `JS_BACKENDS=java` skips them). `make shell-test`
+runs the JS shell commands in the booted kernel.

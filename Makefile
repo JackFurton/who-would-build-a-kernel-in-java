@@ -1,5 +1,6 @@
 BUILD := build
 DUKEC := compiler/build/install/dukec/bin/dukec
+JSC   := compiler/build/install/dukec/bin/jsc
 
 # v11.x-binary. Bump deliberately: the Limine protocol changes between majors.
 LIMINE_REPO := https://github.com/Limine-Bootloader/limine.git
@@ -14,6 +15,9 @@ OVMF ?= $(firstword $(wildcard \
 export OVMF
 
 KERNEL_SRCS   := $(shell find kernel/src -name '*.java')
+# JavaScript modules: jsc translates them to Java under build/jsgen, and the kernel compiles that as
+# one more source root. dukec includes duke/js/gen by default, so nothing refers to the generated code.
+JS_SRCS       := $(wildcard kernel/js/*.js)
 # Keep in sync with tools/Harness.java and CompilerTest. javac's default string concatenation is
 # invokedynamic; inline makes it plain StringBuilder calls the compiler can handle.
 KERNEL_JAVAC  := javac --system none -XDstringConcat=inline
@@ -29,9 +33,15 @@ $(DUKEC): $(COMPILER_SRCS)
 	./gradlew -q :compiler:installDist
 	touch $@
 
-$(BUILD)/kclasses.stamp: $(KERNEL_SRCS)
+$(BUILD)/jsgen.stamp: $(JS_SRCS) $(DUKEC)
+	rm -rf $(BUILD)/jsgen
+	$(JSC) --java $(BUILD)/jsgen $(JS_SRCS)
+	touch $@
+
+$(BUILD)/kclasses.stamp: $(KERNEL_SRCS) $(BUILD)/jsgen.stamp
 	rm -rf $(BUILD)/kclasses
-	$(KERNEL_JAVAC) --module-source-path java.base=kernel/src -d $(BUILD)/kclasses $(KERNEL_SRCS)
+	$(KERNEL_JAVAC) --module-source-path java.base=kernel/src:$(BUILD)/jsgen -d $(BUILD)/kclasses \
+		$(KERNEL_SRCS) $$(find $(BUILD)/jsgen -name '*.java')
 	touch $@
 
 $(BUILD)/kernel.elf: $(DUKEC) $(BUILD)/kclasses.stamp

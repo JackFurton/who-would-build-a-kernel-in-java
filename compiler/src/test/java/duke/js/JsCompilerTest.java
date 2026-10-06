@@ -87,8 +87,15 @@ class JsCompilerTest {
         modules.put("kernel/js/commands.js", "console.log(1);");
         modules.put("kernel/js/fs-tools.js", "var x = 2;");
         Map<String, String> files = Main.translateAll(modules);
-        assertEquals(List.of("duke/js/gen/Commands.java", "duke/js/gen/FsTools.java"), List.copyOf(files.keySet()));
+        assertEquals(List.of("duke/js/gen/Commands.java", "duke/js/gen/FsTools.java", "duke/js/gen/JsStartup.java"),
+                List.copyOf(files.keySet()));
         assertTrue(files.get("duke/js/gen/Commands.java").contains("Modules.register(() -> run());"));
+        assertTrue(files.get("duke/js/gen/JsStartup.java").contains("Startup.register(() -> JsHost.start());"));
+    }
+
+    @Test
+    void generatesNothingWithoutModules() {
+        assertEquals(Map.of(), Main.translateAll(Map.of()));
     }
 
     @Test
