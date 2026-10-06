@@ -52,9 +52,12 @@ public class ShellTest {
         int failures = 0;
         try {
             if (!await("duke> ", 0)) {
+                // A triple fault exits silently under -no-reboot, which looks just like a hang.
+                String state = qemu.isAlive() ? "still running" : "exited with status " + qemu.exitValue();
                 qemu.destroy();
                 qemu.waitFor(10, TimeUnit.SECONDS);
-                System.out.println("shell-test: the kernel never reached its prompt; QEMU said:\n" + clean(output.toString()).indent(4));
+                System.out.println("shell-test: the kernel never reached its prompt (QEMU " + state + "); QEMU said:\n"
+                        + clean(output.toString()).indent(4));
                 System.exit(1);
             }
             failures += check("serial", () -> type(serial, "echo hello over serial\n"), "hello over serial");

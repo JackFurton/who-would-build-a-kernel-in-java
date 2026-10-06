@@ -26,7 +26,8 @@ public final class Smp {
     private static final int STACK_TOP = 40;
     private static final int CR3 = 48;
     private static final int GDT = 56;
-    private static final long CHECK_IN_NANOS = 1_000_000_000L;
+    /** Generous: under emulation on a loaded machine a CPU can take a while to get scheduled at all. */
+    private static final long CHECK_IN_NANOS = 5_000_000_000L;
 
     /** Blocks for CPUs other than the boot CPU, whose block the compiler emits. Image data, so Limine's page tables map it too. */
     private static final long[] BLOCKS = new long[MAX_CPUS * BLOCK_LONGS];
@@ -37,13 +38,16 @@ public final class Smp {
     private Smp() {
     }
 
-    /** Starts every CPU Limine parked and waits for each to check in. Interrupts must be off. */
-    public static void start() {
+    /**
+     * Starts every CPU Limine parked and waits for each to check in. Interrupts must be off. False if
+     * one never did: it may still be running in bootloader memory, which then mustn't be reclaimed.
+     */
+    public static boolean start() {
         long response = Limine.mpResponse();
         APIC_IDS[0] = LocalApic.id();
         ONLINE[0] = true;
         if (response == 0) {
-            return;
+            return true;
         }
         int bspApic = Magic.peekInt(response + 12);
         long count = Magic.peekLong(response + 16);
@@ -75,6 +79,7 @@ public final class Smp {
         while (!allOnline() && HpetClock.nanos() < deadline) {
             Magic.pause();
         }
+        return allOnline();
     }
 
     /** Where Magic.apEntry lands, on the new CPU, with GS at its block and interrupts off. */
