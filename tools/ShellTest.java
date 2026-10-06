@@ -33,6 +33,7 @@ public class ShellTest {
     }
 
     static final StringBuffer output = new StringBuffer();
+    static int checks;
 
     public static void main(String[] args) throws Exception {
         Harness.deleteRecursively(OUT);
@@ -79,7 +80,7 @@ public class ShellTest {
             qemu.waitFor(10, TimeUnit.SECONDS);
             Files.writeString(OUT.resolve("serial.log"), output.toString());
         }
-        System.out.println("shell-test: " + (8 - failures) + "/8 passed");
+        System.out.println("shell-test: " + (checks - failures) + "/" + checks + " passed");
         System.exit(failures == 0 ? 0 : 1);
     }
 
@@ -88,6 +89,7 @@ public class ShellTest {
      * screendump pixel for pixel against the kernel's own font. The dump stays in build/shell-test.
      */
     static int framebuffer(OutputStream serial, Path monitor) throws Exception {
+        checks++;
         int from = output.length();
         type(serial, "clear\necho XYZ\n");
         if (!await("XYZ", from) || !await("duke> ", output.length() - 8)) {
@@ -155,6 +157,7 @@ public class ShellTest {
 
     /** Runs {@code action}, then waits for {@code expected} to appear after where output stood before. */
     static int check(String name, Action action, String expected) throws Exception {
+        checks++;
         int from = output.length();
         action.run();
         if (await(expected, from)) {
