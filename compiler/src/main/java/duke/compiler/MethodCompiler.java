@@ -515,7 +515,7 @@ final class MethodCompiler {
     private void preemptionPoll() {
         program.requireStackOverflowStub();
         X64.Label ok = new X64.Label();
-        a.aluImm(Alu.CMP, true, Mem.rip(Compiler.STACK_LIMIT), Compiler.PREEMPT);
+        a.aluImm(Alu.CMP, true, Compiler.STACK_LIMIT, Compiler.PREEMPT);
         a.jcc(Cond.NE, ok);
         emitCall(Compiler.STACK_OVERFLOW);
         a.bind(ok);
@@ -947,10 +947,11 @@ final class MethodCompiler {
                 pushLong(RAX);
             }
             case "loadSegments" -> {
-                // loadSegments(code, data): data selectors directly, cs through a far return.
+                // loadSegments(code, data): data selectors directly, cs through a far return. Not gs:
+                // loading a selector would zero the GS base, which points at the per-CPU block.
                 a.pop(RAX);
                 a.pop(RCX);
-                for (int sreg : new int[] {3, 0, 2, 4, 5}) {
+                for (int sreg : new int[] {3, 0, 2, 4}) {
                     a.movToSegment(sreg, RAX);
                 }
                 X64.Label reloaded = new X64.Label();
@@ -964,13 +965,17 @@ final class MethodCompiler {
                 a.pop(RAX);
                 a.ltr(RAX);
             }
+            case "cpuBlock" -> {
+                a.load(8, false, RAX, Compiler.CPU_SELF);
+                pushLong(RAX);
+            }
             case "stackLimit" -> {
-                a.load(8, false, RAX, Mem.rip(Compiler.STACK_LIMIT));
+                a.load(8, false, RAX, Compiler.STACK_LIMIT);
                 pushLong(RAX);
             }
             case "setStackLimit" -> {
                 popLong(RAX);
-                a.store(8, Mem.rip(Compiler.STACK_LIMIT), RAX);
+                a.store(8, Compiler.STACK_LIMIT, RAX);
             }
             case "loadIdt" -> {
                 popLong(RAX);
@@ -1027,37 +1032,37 @@ final class MethodCompiler {
             }
             case "breakpoint" -> a.int3();
             case "resetStackLimit" -> {
-                a.load(8, false, RAX, Mem.rip(Compiler.STACK_BASE));
+                a.load(8, false, RAX, Compiler.STACK_BASE);
                 a.lea(RAX, Mem.at(RAX, Compiler.STACK_RESERVE));
-                a.store(8, Mem.rip(Compiler.STACK_LIMIT), RAX);
+                a.store(8, Compiler.STACK_LIMIT, RAX);
             }
             case "stackBase" -> {
-                a.load(8, false, RAX, Mem.rip(Compiler.STACK_BASE));
+                a.load(8, false, RAX, Compiler.STACK_BASE);
                 pushLong(RAX);
             }
             case "setStackBase" -> {
                 popLong(RAX);
-                a.store(8, Mem.rip(Compiler.STACK_BASE), RAX);
+                a.store(8, Compiler.STACK_BASE, RAX);
             }
             case "requestPreemption" -> {
                 // Leaves a disabled (0) or already requested limit alone.
                 X64.Label done = new X64.Label();
-                a.load(8, false, RAX, Mem.rip(Compiler.STACK_LIMIT));
+                a.load(8, false, RAX, Compiler.STACK_LIMIT);
                 a.test(true, RAX, RAX);
                 a.jcc(Cond.E, done);
                 a.aluImm(Alu.CMP, true, RAX, Compiler.PREEMPT);
                 a.jcc(Cond.E, done);
-                a.store(8, Mem.rip(Compiler.STACK_LIMIT_SAVED), RAX);
+                a.store(8, Compiler.STACK_LIMIT_SAVED, RAX);
                 a.movImm64(RAX, Compiler.PREEMPT);
-                a.store(8, Mem.rip(Compiler.STACK_LIMIT), RAX);
+                a.store(8, Compiler.STACK_LIMIT, RAX);
                 a.bind(done);
             }
             case "cancelPreemption" -> {
                 X64.Label done = new X64.Label();
-                a.aluImm(Alu.CMP, true, Mem.rip(Compiler.STACK_LIMIT), Compiler.PREEMPT);
+                a.aluImm(Alu.CMP, true, Compiler.STACK_LIMIT, Compiler.PREEMPT);
                 a.jcc(Cond.NE, done);
-                a.load(8, false, RAX, Mem.rip(Compiler.STACK_LIMIT_SAVED));
-                a.store(8, Mem.rip(Compiler.STACK_LIMIT), RAX);
+                a.load(8, false, RAX, Compiler.STACK_LIMIT_SAVED);
+                a.store(8, Compiler.STACK_LIMIT, RAX);
                 a.bind(done);
             }
             case "switchStack" -> {
@@ -1232,7 +1237,7 @@ final class MethodCompiler {
     private void stackCheck() {
         program.requireStackOverflowStub();
         X64.Label ok = new X64.Label();
-        a.alu(Alu.CMP, true, Mem.rip(Compiler.STACK_LIMIT), RSP);
+        a.alu(Alu.CMP, true, Compiler.STACK_LIMIT, RSP);
         a.jcc(Cond.BE, ok);
         emitCall(Compiler.STACK_OVERFLOW);
         a.bind(ok);

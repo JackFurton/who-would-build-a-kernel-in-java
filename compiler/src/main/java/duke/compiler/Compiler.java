@@ -50,11 +50,20 @@ public final class Compiler {
             Reg.RAX, Reg.RCX, Reg.RDX, Reg.RBX, Reg.RBP, Reg.RSI, Reg.RDI,
             Reg.R8, Reg.R9, Reg.R10, Reg.R11, Reg.R12, Reg.R13, Reg.R14, Reg.R15};
 
-    static final String STACK_LIMIT = "stack.limit";
-    /** The running thread's lowest usable stack address; the limits are offsets from it. */
-    static final String STACK_BASE = "stack.base";
-    /** The real limit while stack.limit holds {@link #PREEMPT}. */
-    static final String STACK_LIMIT_SAVED = "stack.limit.saved";
+    /**
+     * Each CPU's own block, which GS points at (IA32_GS_BASE). Layout: the block's own address, the
+     * stack limit every prologue checks, the real limit while a preemption request replaces it, the
+     * running thread's stack base (the limits are offsets from it), and the CPU's index.
+     */
+    static final int CPU_BLOCK_SIZE = 64;
+    static final Mem CPU_SELF = Mem.gs(0);
+    static final Mem STACK_LIMIT = Mem.gs(8);
+    /** The real limit while STACK_LIMIT holds {@link #PREEMPT}. */
+    static final Mem STACK_LIMIT_SAVED = Mem.gs(16);
+    static final Mem STACK_BASE = Mem.gs(24);
+    static final Mem CPU_INDEX = Mem.gs(32);
+    static final String BSP_CPU_BLOCK = "cpu.bsp";
+    private static final int IA32_GS_BASE = 0xC0000101;
     /**
      * A stack limit no rsp can satisfy. The timer stores it to make the next prologue or loop
      * back-edge take the slow path, which yields instead of throwing.
@@ -635,34 +644,27 @@ public final class Compiler {
      * Runtime.stackExhausted panics.
      */
     private void emitStackOverflowStub() {
-        image.data.align(8);
-        for (String symbol : List.of(STACK_LIMIT, STACK_LIMIT_SAVED, STACK_BASE)) {
-            int offset = image.data.size();
-            image.data.emit64(0);
-            image.define(symbol, image.data, offset, 8, Image.SymbolType.OBJECT);
-        }
-
         Section text = image.text;
         text.align(16);
         int start = text.size();
         X64 a = new X64(text);
         X64.Label overflow = new X64.Label();
         X64.Label exhausted = new X64.Label();
-        a.aluImm(X64.Alu.CMP, true, Mem.rip(STACK_LIMIT), PREEMPT);
+        a.aluImm(X64.Alu.CMP, true, STACK_LIMIT, PREEMPT);
         a.jcc(Cond.NE, overflow);
-        a.load(8, false, Reg.RAX, Mem.rip(STACK_LIMIT_SAVED));
-        a.store(8, Mem.rip(STACK_LIMIT), Reg.RAX);
+        a.load(8, false, Reg.RAX, STACK_LIMIT_SAVED);
+        a.store(8, STACK_LIMIT, Reg.RAX);
         a.jmp(methodSymbol("duke/rt/Runtime", "preempt", "()V"));
         a.bind(overflow);
-        a.load(8, false, Reg.RAX, Mem.rip(STACK_BASE));
+        a.load(8, false, Reg.RAX, STACK_BASE);
         a.lea(Reg.RAX, Mem.at(Reg.RAX, STACK_EMERGENCY));
-        a.alu(X64.Alu.CMP, true, Mem.rip(STACK_LIMIT), Reg.RAX);
+        a.alu(X64.Alu.CMP, true, STACK_LIMIT, Reg.RAX);
         a.jcc(Cond.E, exhausted);
-        a.store(8, Mem.rip(STACK_LIMIT), Reg.RAX);
+        a.store(8, STACK_LIMIT, Reg.RAX);
         a.jmp(methodSymbol("duke/rt/Runtime", "stackOverflow", "()V"));
         a.bind(exhausted);
         a.alu(X64.Alu.XOR, false, Reg.RAX, Reg.RAX);
-        a.store(8, Mem.rip(STACK_LIMIT), Reg.RAX);
+        a.store(8, STACK_LIMIT, Reg.RAX);
         a.jmp(methodSymbol("duke/rt/Runtime", "stackExhausted", "()V"));
         image.define(STACK_OVERFLOW, text, start, text.size() - start, Image.SymbolType.FUNC);
     }
@@ -713,7 +715,7 @@ public final class Compiler {
                 // switch the prologue stack checks off rather than have them fire right away.
                 a.push(Reg.RAX);
                 a.alu(X64.Alu.XOR, false, Reg.RAX, Reg.RAX);
-                a.store(8, Mem.rip(STACK_LIMIT), Reg.RAX);
+                a.store(8, STACK_LIMIT, Reg.RAX);
                 a.pop(Reg.RAX);
             }
             a.pushImm(vector);
@@ -1078,17 +1080,30 @@ public final class Compiler {
         image.bss.reserve(BOOT_STACK_SIZE);
         image.define("boot.stack", image.bss, stackOffset, BOOT_STACK_SIZE, Image.SymbolType.OBJECT);
 
+        image.bss.align(CPU_BLOCK_SIZE);
+        int cpuBlock = image.bss.size();
+        image.bss.reserve(CPU_BLOCK_SIZE);
+        image.define(BSP_CPU_BLOCK, image.bss, cpuBlock, CPU_BLOCK_SIZE, Image.SymbolType.OBJECT);
+
         Section text = image.text;
         text.align(16);
         int start = text.size();
         X64 a = new X64(text);
         a.lea(Reg.RSP, Mem.rip("boot.stack", BOOT_STACK_SIZE));
         a.alu(X64.Alu.XOR, false, Reg.RBP, Reg.RBP);
+        // GS before any Java runs: every prologue reads the stack limit through it.
+        a.lea(Reg.RAX, Mem.rip(BSP_CPU_BLOCK));
+        a.mov(Reg.RDX, Reg.RAX);
+        a.shiftImm(X64.Shift.SHR, true, Reg.RDX, 32);
+        a.movImm32(Reg.RCX, IA32_GS_BASE);
+        a.wrmsr();
+        a.lea(Reg.RAX, Mem.rip(BSP_CPU_BLOCK));
+        a.store(8, CPU_SELF, Reg.RAX);
         if (stackOverflowStub) {
             a.lea(Reg.RAX, Mem.rip("boot.stack", 0));
-            a.store(8, Mem.rip(STACK_BASE), Reg.RAX);
+            a.store(8, STACK_BASE, Reg.RAX);
             a.lea(Reg.RAX, Mem.rip("boot.stack", STACK_RESERVE));
-            a.store(8, Mem.rip(STACK_LIMIT), Reg.RAX);
+            a.store(8, STACK_LIMIT, Reg.RAX);
         }
         if (initializers.contains(entryClass)) {
             a.call(initializerSymbol(entryClass));

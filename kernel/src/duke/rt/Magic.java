@@ -63,10 +63,16 @@ public final class Magic {
 
     public static native void loadIdt(long descriptor);
 
-    /** Loads ds, es, ss, fs and gs with {@code data} and reloads cs with {@code code}. */
+    /** Loads ds, es, ss and fs with {@code data} and reloads cs with {@code code}; gs keeps the per-CPU block. */
     public static native void loadSegments(int code, int data);
 
     public static native void loadTaskRegister(int selector);
+
+    /**
+     * This CPU's block, which GS points at: its own address, then the stack limit, the saved limit,
+     * the stack base and the CPU index, 8 bytes each (Compiler.CPU_BLOCK_SIZE in all).
+     */
+    public static native long cpuBlock();
 
     /** The rsp below which method prologues throw StackOverflowError; 0 disables the checks. */
     public static native long stackLimit();

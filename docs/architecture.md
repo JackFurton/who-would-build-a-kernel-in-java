@@ -31,7 +31,7 @@ bootloader-reclaimable memory, and the CPU reads the GDT on every interrupt. The
 a separate stack for double faults. A page below the boot stack is left unmapped, so running off the
 stack faults. That fault can't push its frame, so it escalates to a double fault, which lands on
 the IST stack and gets reported. The double-fault entry stub also switches the prologue stack
-checks off (`stack.limit = 0`), since the IST stack sits below the boot stack's limit.
+checks off (a stack limit of 0), since the IST stack sits below the boot stack's limit.
 
 `Interrupts.dispatch` runs a registered `Handler` if there is one. Otherwise it panics with the
 exception name, error code, CR2 for page faults, and a register dump. Handlers must not allocate
@@ -132,7 +132,7 @@ threads itself. It calls `Magic.requestPreemption`, which stores an impossible v
 stack limit every method prologue already compares rsp against. The next prologue takes its slow
 path into the overflow stub, which sees -1, puts the real limit back and calls
 `Runtime.preempt`, which yields. A loop that makes no calls never reaches a prologue, so backward
-branches also compare the limit with -1 (`cmp qword [stack.limit], -1; jne`), at the cost of one
+branches also compare the limit with -1 (`cmp qword gs:[8], -1; jne`), at the cost of one
 compare per iteration. This is the stack-limit trick from Jikes RVM, and it means a parked thread
 is always stopped at a call site with a stack map. The collector walks every parked stack with
 those maps, so there is no conservative scanning and no separate safepoint flag to poll.
@@ -313,10 +313,16 @@ state) and jumps. `finally`, multi-catch and try-with-resources are just javac's
 Unwinding stops at an interrupt entry, since exceptions can't propagate out of an interrupt.
 
 Stack overflow is a real, catchable `StackOverflowError`. Every prologue compares rsp against
-`stack.limit`, which sits 16 KiB above the bottom of the stack. Crossing it calls a stub that lowers
+the stack limit, which sits 16 KiB above the bottom of the stack. Crossing it calls a stub that lowers
 the limit to 4 KiB above the bottom and throws from inside that reserve. The unwinder restores the
 normal limit when it resumes in a handler. Overflowing the reserve too panics instead of
-corrupting memory. The check is 18 bytes per method, about 12% of `.text` today.
+corrupting memory. The check is 20 bytes per method.
+
+The limit, the saved limit during a preemption request and the stack base live in a per-CPU block
+that GS points at (`IA32_GS_BASE`), so every CPU checks against its own running thread's stack. The
+compiler addresses them as `gs:[offset]`, the same cost as the RIP-relative globals they replaced
+plus a prefix byte. `_start` points GS at the boot CPU's block before any Java runs, and
+`Magic.loadSegments` leaves GS alone, since loading a selector into it would zero the base.
 
 An uncaught exception panics with `uncaught <toString>`, its stack trace and its causes.
 `Throwable` captures return addresses at construction. The compiler flags Throwable constructors
