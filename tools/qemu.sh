@@ -9,7 +9,7 @@ shift
 rm -f "$esp/NvVars"
 
 exec qemu-system-x86_64 \
-    -M q35 -m 256M -smp 4 \
+    -M q35 -m 256M -smp 2 \
     -display none -no-reboot \
     -drive if=pflash,format=raw,readonly=on,file="$OVMF" \
     -drive format=raw,file=fat:rw:"$esp" \

@@ -94,7 +94,8 @@ Java objects still come from the fixed bump arena in `.bss` (see Objects below).
 checksum. It parses the MADT (CPUs, I/O APICs, ISA interrupt overrides) and the HPET's address.
 Device registers live in reserved physical memory outside the direct map, so
 `KernelAddressSpace.mapDevice` maps them uncached into their own PML4 slot. QEMU runs with
-`-smp 4`, so the CPU count is a real check.
+`-smp 2`, so the CPU count is a real check. (With `-smp 4`, Ubuntu 24.04's QEMU hangs in
+the firmware now and then on CI, before Limine runs; it boots fine locally.)
 
 Time comes from the local APIC timer. `Pic.disable()` remaps the legacy PICs to vectors
 0xE0-0xEF and masks them, so a spurious IRQ can't land on a CPU exception vector. The APIC timer
