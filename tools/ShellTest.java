@@ -54,6 +54,9 @@ public class ShellTest {
             if (!await("duke> ", 0)) {
                 // A triple fault exits silently under -no-reboot, which looks just like a hang.
                 String state = qemu.isAlive() ? "still running" : "exited with status " + qemu.exitValue();
+                System.out.println("shell-test: " + Runtime.getRuntime().availableProcessors() + " cores; busiest processes:");
+                new ProcessBuilder("sh", "-c", "ps -eo pid,pcpu,etime,args --sort=-pcpu 2>/dev/null | head -12 || ps -Ao pid,pcpu,etime,command -r | head -12")
+                        .inheritIO().start().waitFor();
                 qemu.destroy();
                 qemu.waitFor(10, TimeUnit.SECONDS);
                 System.out.println("shell-test: the kernel never reached its prompt (QEMU " + state + "); QEMU said:\n"
