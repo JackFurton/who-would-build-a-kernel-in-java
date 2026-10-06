@@ -12,9 +12,7 @@ public final class JsArray {
 
     public JsArray(Object[] initial) {
         items = new Object[Math.max(4, initial.length)];
-        for (int i = 0; i < initial.length; i++) {
-            items[i] = initial[i];
-        }
+        System.arraycopy(initial, 0, items, 0, initial.length);
         length = initial.length;
     }
 
@@ -36,9 +34,7 @@ public final class JsArray {
     public void add(Object value) {
         if (length == items.length) {
             Object[] bigger = new Object[length * 2];
-            for (int i = 0; i < length; i++) {
-                bigger[i] = items[i];
-            }
+            System.arraycopy(items, 0, bigger, 0, length);
             items = bigger;
         }
         items[length++] = value;
@@ -58,18 +54,14 @@ public final class JsArray {
             return null;
         }
         Object value = items[0];
-        for (int i = 1; i < length; i++) {
-            items[i - 1] = items[i];
-        }
+        System.arraycopy(items, 1, items, 0, length - 1);
         items[--length] = null;
         return value;
     }
 
     public void addFirst(Object value) {
         add(null);
-        for (int i = length - 1; i > 0; i--) {
-            items[i] = items[i - 1];
-        }
+        System.arraycopy(items, 0, items, 1, length - 1);
         items[0] = value;
     }
 
