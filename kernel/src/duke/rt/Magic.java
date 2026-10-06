@@ -37,7 +37,11 @@ public final class Magic {
 
     public static native void pokeLong(long address, long value);
 
-    /** memmove: correct for overlapping ranges in either direction. */
+    /**
+     * memmove: copies exactly {@code bytes}, including unaligned and overlapping ranges in either
+     * direction. The count must be nonnegative; zero does not dereference either address.
+     * May use eight-byte accesses, so use this for RAM and linear framebuffers, not device registers.
+     */
     public static native void copyMemory(long destination, long source, long bytes);
 
     /** Zero exactly {@code words * 8} bytes of aligned ordinary RAM; {@code words} must be nonnegative. */
