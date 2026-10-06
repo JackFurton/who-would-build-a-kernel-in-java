@@ -40,6 +40,7 @@ public final class Compiler {
     static final String BYTE_ARRAY = "[B";
 
     static final String INTERRUPTS = "duke/kernel/x86/Interrupts";
+    static final String RUNTIME = "duke/rt/Runtime";
     static final String INTERRUPT_STUBS = "interrupt.stubs";
     /** Vectors where the CPU pushes an error code; every other stub pushes a 0 in its place. */
     private static final int DOUBLE_FAULT = 8;
@@ -282,14 +283,26 @@ public final class Compiler {
         }
     }
 
+    /** Class initialization states, in each class's one-byte flag. */
+    static final int INITIALIZED = 1;
+    static final int INITIALIZING = 2;
+
     /**
      * The stub that initializes {@code type} on first use (JVMS 5.5): superclass first, then its
-     * {@code <clinit>}. The flag is set before running, so re-entry from the same initializer sees
-     * the class as initialized, as the JVM's same-thread rule specifies.
+     * {@code <clinit>}. The flag goes to INITIALIZING before anything runs, with no safepoint
+     * between the test and the store, and the initializing thread's id is recorded beside it.
+     * Meeting INITIALIZING means Runtime.awaitInitialization: the initializing thread itself
+     * carries on (the JVM's same-thread rule), any other waits until the class is done.
      */
     String requireInitializer(String type) {
         requireClass(type);
         if (initializers.add(type)) {
+            if (type.equals(RUNTIME) || type.equals("duke/kernel/Scheduler")) {
+                // Every initializer stub calls into these, so their own stub would recurse forever.
+                throw new CompileException(type + " must not need class initialization at run time");
+            }
+            requireMethod(RUNTIME, "currentThreadId", "()J");
+            requireMethod(RUNTIME, "awaitInitialization", "(JJ)V");
             ClassModel model = pool.get(type);
             String superName = pool.superName(model);
             if (superName != null && !model.flags().has(AccessFlag.INTERFACE) && needsInit(superName)) {
@@ -313,18 +326,28 @@ public final class Compiler {
             image.bss.reserve(1);
             String flagSymbol = "initialized:" + type;
             image.define(flagSymbol, image.bss, flag, 1, Image.SymbolType.OBJECT);
+            image.bss.align(8);
+            int owner = image.bss.size();
+            image.bss.reserve(8);
+            String ownerSymbol = "initializer:" + type;
+            image.define(ownerSymbol, image.bss, owner, 8, Image.SymbolType.OBJECT);
 
             Section text = image.text;
             text.align(16);
             int start = text.size();
             X64 a = new X64(text);
             X64.Label done = new X64.Label();
+            X64.Label busy = new X64.Label();
             // A real frame, so stack walks (GC, exceptions) step through the stub to its caller.
             a.push(Reg.RBP);
             a.mov(Reg.RBP, Reg.RSP);
+            a.cmpByte(Mem.rip(flagSymbol), INITIALIZED);
+            a.jcc(Cond.E, done);
             a.cmpByte(Mem.rip(flagSymbol), 0);
-            a.jcc(Cond.NE, done);
-            a.movByte(Mem.rip(flagSymbol), 1);
+            a.jcc(Cond.NE, busy);
+            a.movByte(Mem.rip(flagSymbol), INITIALIZING);
+            a.call(methodSymbol(RUNTIME, "currentThreadId", "()J"));
+            a.store(8, Mem.rip(ownerSymbol), Reg.RAX);
             ClassModel model = pool.get(type);
             String superName = pool.superName(model);
             if (superName != null && initializers.contains(superName) && !model.flags().has(AccessFlag.INTERFACE)) {
@@ -333,6 +356,17 @@ public final class Compiler {
             if (hasRuntimeClinit(type)) {
                 a.call(methodSymbol(type, "<clinit>", "()V"));
             }
+            a.movByte(Mem.rip(flagSymbol), INITIALIZED);
+            a.jmp(done);
+            a.bind(busy);
+            // awaitInitialization(long flag, long owner): a long is two slots, value in the lower.
+            a.lea(Reg.RAX, Mem.rip(flagSymbol));
+            a.push(Reg.RAX);
+            a.push(Reg.RAX);
+            a.lea(Reg.RAX, Mem.rip(ownerSymbol));
+            a.push(Reg.RAX);
+            a.push(Reg.RAX);
+            a.call(methodSymbol(RUNTIME, "awaitInitialization", "(JJ)V"));
             a.bind(done);
             a.leave();
             a.ret();

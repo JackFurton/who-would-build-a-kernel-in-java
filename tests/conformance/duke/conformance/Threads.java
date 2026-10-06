@@ -142,4 +142,36 @@ final class Threads {
         }
         return total;
     }
+
+    // The initializer yields halfway, so the second thread arrives while the first is still in it.
+    static final class SlowToInitialize {
+        static final long VALUE;
+
+        static {
+            long sum = 0;
+            for (int i = 0; i < 1000; i++) {
+                sum += i;
+                if (i == 500) {
+                    Thread.yield();
+                }
+            }
+            VALUE = sum;
+        }
+    }
+
+    static long secondThreadWaitsForAClassInitializer() throws InterruptedException {
+        long[] seen = new long[2];
+        Thread[] readers = new Thread[seen.length];
+        for (int r = 0; r < readers.length; r++) {
+            int index = r;
+            readers[r] = new Thread(() -> seen[index] = SlowToInitialize.VALUE, "reader-" + r);
+        }
+        for (Thread reader : readers) {
+            reader.start();
+        }
+        for (Thread reader : readers) {
+            reader.join();
+        }
+        return seen[0] * 1_000_000L + seen[1];
+    }
 }
