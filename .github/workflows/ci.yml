@@ -42,6 +42,9 @@ jobs:
       - name: Boot test
         run: make boot-test
 
+      - name: Record the boot environment
+        run: tools/boot-env.sh | tee build-env.txt >> "$GITHUB_STEP_SUMMARY"
+
       - name: Conformance (HotSpot vs Duke)
         run: make conformance
 
@@ -66,6 +69,8 @@ jobs:
             build/kernel.elf
             build/kernel.map
             build/serial.log
+            build/shell-test/
+            build-env.txt
             build/conformance/serial.log
             build/conformance/boot.txt
             build/panics/*/serial.log

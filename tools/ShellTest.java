@@ -41,7 +41,9 @@ public class ShellTest {
         // Unix socket paths max out at 108 bytes, which a CI checkout path alone can come close to.
         Path monitor = Files.createTempDirectory("duke").resolve("monitor.sock");
         Process qemu = new ProcessBuilder("tools/qemu.sh", ESP.toString(), "-serial", "stdio",
-                "-monitor", "unix:" + monitor + ",server=on,wait=off")
+                "-monitor", "unix:" + monitor + ",server=on,wait=off",
+                // QEMU's own account of guest errors and CPU resets, for boots that die before the kernel runs.
+                "-d", "guest_errors,cpu_reset,unimp", "-D", OUT.resolve("qemu.log").toString())
                 .directory(Harness.ROOT.toFile())
                 .redirectErrorStream(true)
                 .start();
@@ -63,6 +65,7 @@ public class ShellTest {
                 }
                 qemu.destroy();
                 qemu.waitFor(10, TimeUnit.SECONDS);
+                Files.writeString(OUT.resolve("serial.log"), output.toString());
                 System.out.println("shell-test: the kernel never reached its prompt (QEMU " + state + "); QEMU said:\n"
                         + clean(output.toString()).indent(4));
                 System.exit(1);
