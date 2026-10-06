@@ -634,10 +634,11 @@ final class CodeGen {
             case Spread sp -> throw error(sp.line(), "spread is not supported by the x86 back end");
             case TaggedTemplate tt -> throw error(tt.line(), "tagged templates are not supported by the x86 back end");
             case Hole h -> throw error(h.line(), "array holes are not supported by the x86 back end");
+            case Yield y -> throw error(y.line(), "generators are not supported by the x86 back end");
             case ClassExpr c -> throw error(c.line(), "classes are not supported by the x86 back end");
             case SuperCall sc -> throw error(sc.line(), "classes are not supported by the x86 back end");
             case SuperMember sm -> throw error(sm.line(), "classes are not supported by the x86 back end");
-            case Internal in -> throw error(in.line(), "rest parameters and destructuring are not supported by the x86 back end");
+            case Internal in -> throw error(in.line(), "rest parameters, destructuring and generators are not supported by the x86 back end");
             case Member m -> {
                 gen(m.object());
                 asm.push(RAX);

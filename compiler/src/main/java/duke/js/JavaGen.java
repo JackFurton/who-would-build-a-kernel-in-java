@@ -456,9 +456,7 @@ final class JavaGen {
         Loop loop = enterLoop("break " + label + ";");
         line(prefix(loop) + "for (;;) {");
         indent++;
-        if (f.test() != null) {
-            line("if (!(" + cond(f.test()) + ")) break;");
-        }
+        line(f.test() != null ? "if (!(" + cond(f.test()) + ")) break;" : "if (!JS.T) break;");
         List<Var> captured = new ArrayList<>();
         for (Var v : scope.vars.values()) {
             if (isCell(v)) {
@@ -664,11 +662,12 @@ final class JavaGen {
     /** A Java boolean expression for the truthiness of {@code e}. */
     private String cond(Expr e) {
         switch (e) {
+            // JS.T is a non-constant true, so javac doesn't call the code after `while (true)` unreachable.
             case Lit l when l.value() == Literal.TRUE -> {
-                return "true";
+                return "JS.T";
             }
             case Lit l when l.value() == Literal.FALSE -> {
-                return "false";
+                return "!JS.T";
             }
             case Unary u when u.op().equals("!") -> {
                 return "!" + cond(u.operand());
@@ -803,6 +802,7 @@ final class JavaGen {
             case Hole h -> {
                 return "JS.U";
             }
+            case Yield y -> throw error(y.line(), "yield is only valid inside a generator");
             case ClassExpr c -> {
                 return classExpression(c, null);
             }

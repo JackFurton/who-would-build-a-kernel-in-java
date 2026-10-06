@@ -75,6 +75,21 @@ class JsCompilerTest {
     }
 
     @Test
+    void generatorsExplainTheirLimits() {
+        assertTrue(assertThrows(JsException.class, () -> Main.translate("t.js",
+                "function* g() { let a = 1; { let a = 2; yield a; } }", "T")).getMessage()
+                .contains("a generator can't redeclare 'a' from an enclosing block yet"));
+        assertTrue(assertThrows(JsException.class, () -> Main.translate("t.js",
+                "function* g() { x ??= yield 1; var x; }", "T")).getMessage().contains("logical assignment with a yield"));
+        assertTrue(error("function* g() { yield 1; }").contains("generators are not supported by the x86 back end"));
+    }
+
+    @Test
+    void yieldIsAnOrdinaryNameOutsideGenerators() {
+        Main.translate("t.js", "var yield = 1; function f() { return yield + 1; }", "T");
+    }
+
+    @Test
     void javaBackEndRejectsSuperOutsideAMethod() {
         assertTrue(assertThrows(JsException.class, () -> Main.translate("t.js", "super.x;", "T"))
                 .getMessage().contains("'super' is only valid inside a method"));
@@ -96,10 +111,10 @@ class JsCompilerTest {
         assertTrue(error("switch (1) { }").contains("'switch' is not supported by the x86 back end"));
         assertTrue(error("a: for (;;) { break a; }").contains("labels are not supported by the x86 back end"));
         assertTrue(error("var o; o?.x;").contains("optional chaining is not supported by the x86 back end"));
-        assertTrue(error("function f(...a) {}").contains("rest parameters and destructuring are not supported by the x86 back end"));
+        assertTrue(error("function f(...a) {}").contains("rest parameters, destructuring and generators are not supported by the x86 back end"));
         assertTrue(error("var o = { get x() { return 1; } };").contains("accessors in object literals are not supported by the x86 back end"));
         assertTrue(error("class A {}").contains("classes are not supported by the x86 back end"));
-        assertTrue(error("var [a] = [1];").contains("destructuring are not supported by the x86 back end"));
+        assertTrue(error("var [a] = [1];").contains("destructuring and generators are not supported by the x86 back end"));
         assertTrue(error("function f() {}\nf(...[]);").contains("spread is not supported by the x86 back end"));
         assertTrue(error("function f() {}\nvar t = f`x`;").contains("tagged templates are not supported by the x86 back end"));
         assertTrue(error("throw 1;").contains("'throw' is not supported by the x86 back end"));
@@ -183,6 +198,8 @@ class JsCompilerTest {
                 var klass = class { [key]() { } };
                 var acc = { get g() { return 1; }, set g(v) { }, get ["c" + 1]() { return 2; } };
                 for (const item of items) { if (item) break; }
+                function* gen(n = 2) { for (let i = 0; i < n; i++) { const got = yield i; if (got) break; } try { yield* [1]; } finally { }
+                  return yield; }
                 var coll = new Map([[1, 2]]), uniq = new Set([...items]), weak = new WeakMap(), ws = new WeakSet();
                 var sym = Symbol("x"), withSym = { [sym]: 1 };
                 var [pa, { pb = 2, ...pc }] = [1, {}];
