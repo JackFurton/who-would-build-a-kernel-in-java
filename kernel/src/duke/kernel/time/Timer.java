@@ -7,8 +7,10 @@ import duke.kernel.x86.LocalApicTimer;
 import duke.rt.Magic;
 
 /**
- * The periodic tick: the local APIC timer, calibrated against the HPET, interrupting HZ times a
- * second. The handler runs with interrupts off and must not allocate.
+ * The periodic tick: every CPU's local APIC timer, calibrated against the HPET, interrupting HZ
+ * times a second. The handler runs with interrupts off and must not allocate. Time itself comes
+ * from the HPET, not from counting interrupts, so whichever CPU's timer fires first after a
+ * sleeper's deadline wakes it, rather than always the CPU that counts.
  */
 public final class Timer {
 
@@ -16,7 +18,6 @@ public final class Timer {
     public static final int VECTOR = 0x20;
     private static final long CALIBRATION_NANOS = 10_000_000;
 
-    private static volatile long ticks;
     private static long apicTicksPerSecond;
 
     private Timer() {
@@ -26,19 +27,23 @@ public final class Timer {
         HpetClock.init();
         apicTicksPerSecond = LocalApicTimer.calibrate(CALIBRATION_NANOS) * (1_000_000_000L / CALIBRATION_NANOS);
         Interrupts.register(VECTOR, frame -> {
-            ticks++;
             LocalApic.endOfInterrupt();
             Scheduler.tick();
         });
+        startOnThisCpu();
+    }
+
+    /** Starts the calling CPU's tick. Local APIC timers all run off the bus clock {@link #init} measured. */
+    public static void startOnThisCpu() {
         LocalApicTimer.startPeriodic(VECTOR, apicTicksPerSecond / HZ);
     }
 
     public static long ticks() {
-        return ticks;
+        return HpetClock.nanos() / (1_000_000_000 / HZ);
     }
 
     public static long uptimeMillis() {
-        return ticks * 1000 / HZ;
+        return HpetClock.nanos() / 1_000_000;
     }
 
     /** Local APIC timer ticks per second, as measured against the HPET. */
@@ -48,8 +53,8 @@ public final class Timer {
 
     /** Sleeps at least {@code millis} by halting between ticks. Interrupts must be enabled. */
     public static void sleep(long millis) {
-        long until = ticks + (millis * HZ + 999) / 1000;
-        while (ticks < until) {
+        long until = ticks() + (millis * HZ + 999) / 1000;
+        while (ticks() < until) {
             Magic.halt();
         }
     }

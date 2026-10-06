@@ -134,10 +134,12 @@ socket. It types over serial and as PS/2 keystrokes (`sendkey`) and checks the r
 
 ## Threads
 
-`java.lang.Thread` runs on `duke.kernel.Scheduler`: kernel threads on one CPU, round-robin, with
-`start`, `join`, `sleep`, `yield` and `currentThread`. The boot thread becomes `main`, and an idle
-thread halts when nothing else can run. Each thread gets a 64 KiB stack from `KernelStacks`, in its
-own PML4 slot with an unmapped guard page below each stack.
+`java.lang.Thread` runs on `duke.kernel.Scheduler`: kernel threads, round-robin, with `start`,
+`join`, `sleep`, `yield` and `currentThread`. The boot thread becomes `main`, and every CPU has an
+idle thread that halts when nothing else can run. Each thread gets a 64 KiB stack from
+`KernelStacks`, in its own PML4 slot with an unmapped guard page below each stack. A stack that
+comes back keeps its frames mapped for the next thread: the old thread may have run on any CPU,
+and unmapping would need a TLB shootdown to stop them writing through stale translations.
 
 Preemption is timer-driven but only lands at safepoints. The timer interrupt doesn't switch
 threads itself. It calls `Magic.requestPreemption`, which stores an impossible value (-1) in the
@@ -158,10 +160,20 @@ stub and the unwinder compute limits from it). Stack checks are off between savi
 limit and the next thread installing its own, so nothing compares one thread's rsp against
 another's limit.
 
-Code that must not be interrupted by another thread says so cheaply: the scheduler only switches
-when interrupts are on, so its own bookkeeping runs with them off, and the allocator and
-collector are skipped by `Runtime.preempt` while they run, since neither is reentrant. Not yet: a
-second CPU (#24).
+Scheduler and monitor state is guarded by one spinlock (`Scheduler.lock`, an `xchg` loop), taken
+with interrupts off. A switch hands the lock over: whichever thread is switched to releases it,
+possibly on another CPU than the one it last ran on. The allocator and collector are skipped by
+`Runtime.preempt` while they run, since neither is reentrant.
+
+Threads move between CPUs, but only one CPU at a time, the runner, runs anything other than its
+idle thread. The heap, the collector and class initialization still assume Java runs on one CPU,
+so this keeps them correct until they stop doing so (#93). A CPU becomes the runner by taking a
+thread off the run queue while no CPU is, and gives it up when it switches back to its idle
+thread. Idle loops allocate nothing, so the collector, which only runs on the runner, skips the
+stacks of idle threads running on other CPUs. Every CPU's local APIC timer ticks, and time comes
+from the HPET rather than from counting those interrupts, so the first CPU whose timer fires after
+a sleeper's deadline wakes it: a thread that sleeps often runs on every CPU in turn. `threads` in
+the shell shows which CPU each running thread is on.
 
 ### Monitors
 
@@ -169,7 +181,7 @@ second CPU (#24).
 There's no lock word in object headers. A monitor exists only while some thread holds, waits on
 or is blocked on it, as an entry in a small table keyed by the object's address, which the
 non-moving collector keeps stable. Uncontended enter and exit cost a call and a short scan with
-interrupts off. Releasing hands the monitor straight to the first blocked thread.
+the scheduler's lock. Releasing hands the monitor straight to the first blocked thread.
 
 `monitorenter` and `monitorexit` compile to calls into `duke.rt.Runtime`, and javac's own
 handlers release block monitors on exceptions. A synchronized method gets the same calls in its
@@ -345,8 +357,8 @@ bootloader-reclaimable memory, so this has to happen before the kernel reclaims 
 `KernelStacks`, and a GDT, TSS and double-fault stack, then writes the block into the info's extra
 argument and `Magic.apEntry` into its goto address. The entry stub reads CR3 and the stack from
 the block (image data, so Limine's tables map it too), moves onto them, points GS at the block and
-calls `Smp.apMain`, which loads the CPU's GDT and the shared IDT, enables its local APIC, checks in
-and halts. Nothing runs on those CPUs yet (#93), but the boot log shows each one online.
+calls `Smp.apMain`, which loads the CPU's GDT and the shared IDT, starts its local APIC and timer,
+checks in and becomes the idle thread `Smp.start` created for it, on the stack it already has.
 
 An uncaught exception panics with `uncaught <toString>`, its stack trace and its causes.
 `Throwable` captures return addresses at construction. The compiler flags Throwable constructors
