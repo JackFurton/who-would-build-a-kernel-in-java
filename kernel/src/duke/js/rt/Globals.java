@@ -131,6 +131,7 @@ public final class Globals {
         installObject(g);
         installErrors(g);
         installSymbol(g);
+        installCollections(g);
 
         JsFunction array = constructor("Array", (callee, self, args) -> {
             JsArray a = new JsArray();
@@ -444,6 +445,47 @@ public final class Globals {
         return d;
     }
 
+    /** Map, Set, WeakMap and WeakSet: constructors that take an optional iterable of entries (or values). */
+    private static void installCollections(JsObject g) {
+        for (int kind = 0; kind < 4; kind++) {
+            boolean isSet = kind % 2 == 1;
+            boolean weak = kind >= 2;
+            String name = (weak ? "Weak" : "") + (isSet ? "Set" : "Map");
+            JsFunction ctor = new JsFunction(name,
+                    (callee, self, args) -> {
+                        throw new JsError("TypeError: Constructor " + name + " requires 'new'");
+                    },
+                    (callee, self, args) -> {
+                        JsMap m = new JsMap(isSet, weak);
+                        Object source = arg(args, 0);
+                        if (!JS.nullish(source)) {
+                            JsIter it = JS.iter(source);
+                            try {
+                                while (it.next()) {
+                                    Object item = it.value();
+                                    if (isSet) {
+                                        JS.invoke(m, "add", item);
+                                    } else {
+                                        if (!JS.isObject(item)) {
+                                            throw new JsError("TypeError: Iterator value " + JS.str(item) + " is not an entry object");
+                                        }
+                                        JS.invoke(m, "set", JS.getIndex(item, 0), JS.getIndex(item, 1));
+                                    }
+                                }
+                            } finally {
+                                it.close();
+                            }
+                        }
+                        return m;
+                    });
+            JsObject prototype = new JsObject();
+            prototype.proto = objectPrototype;
+            prototype.setHidden("constructor", ctor);
+            ctor.setPrototype(prototype);
+            g.set(name, ctor);
+        }
+    }
+
     private static void installSymbol(JsObject g) {
         iteratorPrototype = new JsObject();
         iteratorPrototype.proto = objectPrototype;
@@ -579,6 +621,10 @@ public final class Globals {
         }
         if (v instanceof JsArray) {
             return "Array";
+        }
+        if (v instanceof JsMap) {
+            String t = Builtins.mapTag((JsMap) v);
+            return t.substring(8, t.length() - 1);
         }
         if (v instanceof JsFunction) {
             return "Function";
