@@ -50,6 +50,22 @@ public final class JsObject {
         return null;
     }
 
+    /** Like {@link #get}, but a getter runs with {@code receiver} as {@code this}: for {@code super.x}. */
+    Object getFor(String key, Object receiver) {
+        for (JsObject o = this; o != null; o = o.proto) {
+            int i = o.find(key);
+            if (i >= 0) {
+                Object stored = o.values[i];
+                if (stored instanceof Accessor) {
+                    Accessor a = (Accessor) stored;
+                    return a.getter == null ? null : a.getter.call(receiver, new Object[0]);
+                }
+                return stored;
+            }
+        }
+        return null;
+    }
+
     public Object getOwn(String key) {
         int i = find(key);
         return i < 0 ? null : resolve(values[i]);
@@ -175,6 +191,11 @@ public final class JsObject {
     }
 
     void defineAccessor(String key, JsFunction getter, JsFunction setter) {
+        defineAccessor(key, getter, setter, true);
+    }
+
+    /** Adds a getter or setter, joining an accessor already there; a class's are not enumerable. */
+    void defineAccessor(String key, JsFunction getter, JsFunction setter, boolean enumerable) {
         int i = find(key);
         if (i >= 0 && values[i] instanceof Accessor) {
             Accessor a = (Accessor) values[i];
@@ -182,7 +203,7 @@ public final class JsObject {
             a.setter = setter != null ? setter : a.setter;
             return;
         }
-        define(key, new Accessor(getter, setter), true, true, true);
+        define(key, new Accessor(getter, setter), enumerable, true, true);
     }
 
     /** Removes an own property; false if it can't be removed (non-configurable) or there was none. */
@@ -262,14 +283,14 @@ public final class JsObject {
     private String[] orderedKeys(boolean includeHidden) {
         int count = 0;
         for (int i = 0; i < size; i++) {
-            if (includeHidden || (flags[i] & HIDDEN) == 0) {
+            if (counted(i, includeHidden)) {
                 count++;
             }
         }
         String[] out = new String[count];
         int n = 0;
         for (int i = 0; i < size; i++) {
-            if ((includeHidden || (flags[i] & HIDDEN) == 0) && isIndex(keys[i])) {
+            if (counted(i, includeHidden) && isIndex(keys[i])) {
                 int at = n++;
                 while (at > 0 && Long.parseLong(out[at - 1]) > Long.parseLong(keys[i])) {
                     out[at] = out[at - 1];
@@ -279,11 +300,16 @@ public final class JsObject {
             }
         }
         for (int i = 0; i < size; i++) {
-            if ((includeHidden || (flags[i] & HIDDEN) == 0) && !isIndex(keys[i])) {
+            if (counted(i, includeHidden) && !isIndex(keys[i])) {
                 out[n++] = keys[i];
             }
         }
         return out;
+    }
+
+    /** Whether key {@code i} is reported: enumerable ones, plus the others when asked, but never a private '#' name. */
+    private boolean counted(int i, boolean includeHidden) {
+        return (includeHidden || (flags[i] & HIDDEN) == 0) && !keys[i].startsWith("#");
     }
 
     /** A canonical array index: "0", or digits with no leading zero, below 2^32 - 1. */

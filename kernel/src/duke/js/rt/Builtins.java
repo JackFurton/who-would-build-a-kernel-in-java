@@ -58,7 +58,10 @@ final class Builtins {
         if (key.equals("call") || key.equals("apply") || key.equals("bind")) {
             return new JsFunction(key, (callee, self, args) -> functionMethod((JsFunction) self, key, args));
         }
-        return f.hasProps() ? f.props().get(key) : null;
+        if (f.hasProps() && f.props().has(key)) {
+            return f.props().getFor(key, f);
+        }
+        return f.parent() == null ? null : functionProperty(f.parent(), key);
     }
 
     /** {@code f.call(this, ...)}, {@code f.apply(this, array)} and {@code f.bind(this, ...)}. */

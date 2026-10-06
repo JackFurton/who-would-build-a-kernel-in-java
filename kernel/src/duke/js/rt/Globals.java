@@ -214,6 +214,9 @@ public final class Globals {
             if (v instanceof JsArray) {
                 return ((JsFunction) lookup("Array")).prototype();
             }
+            if (v instanceof JsFunction && ((JsFunction) v).parent() != null) {
+                return ((JsFunction) v).parent();
+            }
             return prototype;
         }));
         statics.setHidden("setPrototypeOf", function("setPrototypeOf", (callee, self, args) -> {
@@ -444,7 +447,9 @@ public final class Globals {
 
     /** Fills in an Error: an own, non-enumerable {@code message} if one was given, and a {@code stack}. */
     private static Object initError(JsObject e, JsObject prototype, Object[] args) {
-        e.proto = prototype;
+        if (e.proto == null) {
+            e.proto = prototype;
+        }
         Object message = arg(args, 0);
         if (message != null) {
             e.setHidden("message", JS.str(message));

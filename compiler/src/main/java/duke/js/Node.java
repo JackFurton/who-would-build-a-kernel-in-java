@@ -63,6 +63,23 @@ final class Node {
 
     record Sequence(List<Expr> exprs, int line) implements Expr {}
 
+    /** {@code kind} is 'm' (method), 'g' (getter) or 's' (setter); {@code value} is the function. */
+    record ClassMember(char kind, boolean isStatic, String key, Expr computed, Expr value) {}
+
+    /**
+     * A class. {@code constructor} is null for a base class without one; fields and static members are already
+     * desugared into the {@code fields} function (run on each new instance) and the {@code statics} function (run
+     * once, with the class as {@code this}), either of which may be null.
+     */
+    record ClassExpr(String name, Expr superclass, boolean hasSuper, Function constructor, List<ClassMember> members,
+            Function fields, Function statics, int line) implements Expr {}
+
+    /** {@code super(args)} in a constructor. */
+    record SuperCall(List<Expr> args, int line) implements Expr {}
+
+    /** {@code super.name} or {@code super[index]}. */
+    record SuperMember(String name, Expr index, int line) implements Expr {}
+
     /** An elision in an array literal or pattern: the gap in {@code [a, , b]}. */
     record Hole(int line) implements Expr {}
 
@@ -130,6 +147,8 @@ final class Node {
     record FunctionDecl(Function function, int line) implements Stmt {}
 
     record Empty(int line) implements Stmt {}
+
+    record ClassDecl(String name, ClassExpr cls, int line) implements Stmt {}
 
     /** A function body is always a statement list; an arrow with an expression body gets a Return. */
     record Function(String name, List<String> params, List<Stmt> body, boolean arrow, int line) {}

@@ -57,6 +57,10 @@ final class Inspect {
         if (v instanceof JsFunction) {
             JsFunction f = (JsFunction) v;
             String head = f.name().isEmpty() ? "[Function (anonymous)]" : "[Function: " + f.name() + "]";
+            if (f.isClass()) {
+                head = "[class " + (f.name().isEmpty() ? "(anonymous)" : f.name())
+                        + (f.parent() != null ? " extends " + f.parent().name() : "") + "]";
+            }
             String[] keys = f.hasProps() ? f.props().keys() : new String[0];
             if (keys.length == 0 || depth > 2) {
                 return head;

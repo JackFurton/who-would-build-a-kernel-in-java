@@ -173,6 +173,7 @@ final class Analyzer {
                         resolved.put(decl, declare(scope, decl.name(), d.kind(), d.line()));
                     }
                 }
+                case ClassDecl c -> resolved.put(c, declare(scope, c.name(), "let", c.line()));
                 case FunctionDecl f -> {
                     Var v = declare(scope, f.function().name(), "function", f.line());
                     v.declared = f.function();
@@ -316,6 +317,7 @@ final class Analyzer {
                     }
                 });
             }
+            case ClassDecl c -> visit(c.cls());
             case Throw t -> visit(t.value());
             case Try t -> {
                 visit(t.block());
@@ -408,6 +410,28 @@ final class Analyzer {
                 visit(p.value());
             });
             case Hole h -> { }
+            case ClassExpr c -> {
+                if (c.superclass() != null) {
+                    visit(c.superclass());
+                }
+                for (Function f : new Function[] {c.constructor(), c.fields(), c.statics()}) {
+                    if (f != null) {
+                        visitFunction(f, false);
+                    }
+                }
+                for (ClassMember m : c.members()) {
+                    if (m.computed() != null) {
+                        visit(m.computed());
+                    }
+                    visit(m.value());
+                }
+            }
+            case SuperCall sc -> sc.args().forEach(this::visit);
+            case SuperMember sm -> {
+                if (sm.index() != null) {
+                    visit(sm.index());
+                }
+            }
             case Spread sp -> visit(sp.value());
             case TaggedTemplate tt -> {
                 visit(tt.tag());

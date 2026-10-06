@@ -664,6 +664,82 @@ public final class JS {
         return Globals.makeError("Error", message);
     }
 
+    /**
+     * The class function for {@code class name extends superclass {...}}: its prototype chain and statics follow the
+     * superclass, and {@code ctor} and {@code fields} run for each instance. Members are added by the calls that follow.
+     */
+    public static Object classDef(String name, Object superclass, boolean hasSuper, JsFunction.Body ctor,
+            JsFunction.Body fields) {
+        JsObject parentPrototype = Globals.objectPrototype();
+        JsFunction parent = null;
+        if (hasSuper) {
+            if (superclass == NULL) {
+                parentPrototype = null;
+            } else if (superclass instanceof JsFunction && ((JsFunction) superclass).isConstructible()) {
+                parent = (JsFunction) superclass;
+                parentPrototype = parent.prototype();
+            } else {
+                throw new JsError("TypeError: Class extends value " + str(superclass) + " is not a constructor or null");
+            }
+        }
+        JsFunction.Body body = ctor != null ? ctor : (callee, self, args) -> null;
+        JsFunction cls = JsFunction.classFunction(name, body, fields, hasSuper, parent);
+        JsObject prototype = new JsObject();
+        prototype.proto = parentPrototype;
+        prototype.setHidden("constructor", cls);
+        cls.setPrototype(prototype);
+        cls.home = prototype;
+        return cls;
+    }
+
+    /** Adds a method to a class (static ones to the class itself); class members are not enumerable. */
+    public static Object classMethod(Object cls, Object key, Object fn, boolean isStatic) {
+        JsFunction c = (JsFunction) cls;
+        JsFunction method = (JsFunction) fn;
+        method.home = isStatic ? c : c.prototype();
+        (isStatic ? c.props() : c.prototype()).setHidden(keyString(key), method);
+        return cls;
+    }
+
+    public static Object classAccessor(Object cls, Object key, Object fn, boolean isStatic, boolean getter) {
+        JsFunction c = (JsFunction) cls;
+        JsFunction accessor = (JsFunction) fn;
+        accessor.home = isStatic ? c : c.prototype();
+        (isStatic ? c.props() : c.prototype()).defineAccessor(keyString(key), getter ? accessor : null,
+                getter ? null : accessor, false);
+        return cls;
+    }
+
+    /** Runs the static fields and blocks, in order, with the class as {@code this}. */
+    public static Object classStatics(Object cls, JsFunction.Body statics) {
+        statics.call((JsFunction) cls, cls, new Object[0]);
+        return cls;
+    }
+
+    /** {@code super(...args)}: the parent runs its constructor on this object, then this class's fields are set up. */
+    public static Object superCall(Object callee, Object self, Object... args) {
+        JsFunction cls = (JsFunction) callee;
+        JsFunction parent = cls.parent();
+        if (parent == null || !(self instanceof JsObject)) {
+            throw new JsError("TypeError: Super constructor is not a constructor");
+        }
+        parent.initialize((JsObject) self, args);
+        cls.runFieldInit(self);
+        return self;
+    }
+
+    /** {@code super.key}: looked up from the prototype of the object the running method was defined on. */
+    public static Object superGet(Object callee, Object self, Object key) {
+        Object home = ((JsFunction) callee).home;
+        String k = keyString(key);
+        if (home instanceof JsFunction) {
+            JsFunction parent = ((JsFunction) home).parent();
+            return parent == null ? null : Builtins.functionProperty(parent, k);
+        }
+        JsObject start = home instanceof JsObject ? ((JsObject) home).proto : null;
+        return start == null ? null : start.getFor(k, self);
+    }
+
     /** {@code new f(...args)}. */
     public static Object construct(Object f, Object... args) {
         if (!(f instanceof JsFunction)) {
