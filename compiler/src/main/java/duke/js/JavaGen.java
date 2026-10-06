@@ -703,6 +703,10 @@ final class JavaGen {
                     if (p.key() == null && p.computed() == null) {
                         spreads = true;
                         parts.add("JS.spreadOf(" + expr(((Spread) p.value()).value()) + ")");
+                    } else if (p.kind() != 'i') {
+                        spreads = true;
+                        String key = p.computed() != null ? expr(p.computed()) : quote(p.key());
+                        parts.add("JS." + (p.kind() == 'g' ? "getter(" : "setter(") + key + ", " + expr(p.value()) + ")");
                     } else if (p.computed() != null) {
                         parts.add(expr(p.computed()));
                         parts.add(expr(p.value()));

@@ -224,7 +224,202 @@ public final class Globals {
             }
             return v;
         }));
+        installProperties(statics);
         table().set("Object", object);
+    }
+
+    /** The statics that deal in property attributes and extensibility. */
+    private static void installProperties(JsObject statics) {
+        statics.setHidden("defineProperty", function("defineProperty", (callee, self, args) -> {
+            define(arg(args, 0), JS.keyString(arg(args, 1)), arg(args, 2));
+            return arg(args, 0);
+        }));
+        statics.setHidden("defineProperties", function("defineProperties", (callee, self, args) -> {
+            Object descriptors = arg(args, 1);
+            JsArray keys = (JsArray) enumerate(descriptors, 0);
+            for (int i = 0; i < keys.length(); i++) {
+                define(arg(args, 0), (String) keys.get(i), JS.get(descriptors, keys.get(i)));
+            }
+            return arg(args, 0);
+        }));
+        statics.setHidden("getOwnPropertyDescriptor", function("getOwnPropertyDescriptor", (callee, self, args) ->
+                describe(arg(args, 0), JS.keyString(arg(args, 1)))));
+        statics.setHidden("getOwnPropertyDescriptors", function("getOwnPropertyDescriptors", (callee, self, args) -> {
+            JsObject out = (JsObject) JS.object();
+            JsArray names = (JsArray) ownNames(arg(args, 0));
+            for (int i = 0; i < names.length(); i++) {
+                out.set((String) names.get(i), describe(arg(args, 0), (String) names.get(i)));
+            }
+            return out;
+        }));
+        statics.setHidden("getOwnPropertyNames", function("getOwnPropertyNames", (callee, self, args) ->
+                ownNames(arg(args, 0))));
+        statics.setHidden("freeze", function("freeze", (callee, self, args) -> lock(arg(args, 0), true)));
+        statics.setHidden("seal", function("seal", (callee, self, args) -> lock(arg(args, 0), false)));
+        statics.setHidden("preventExtensions", function("preventExtensions", (callee, self, args) -> {
+            Object o = arg(args, 0);
+            if (o instanceof JsObject) {
+                ((JsObject) o).preventExtensions();
+            } else if (o instanceof JsArray) {
+                ((JsArray) o).lock(false);
+            }
+            return o;
+        }));
+        statics.setHidden("isFrozen", function("isFrozen", (callee, self, args) -> JS.bool(isLocked(arg(args, 0), true))));
+        statics.setHidden("isSealed", function("isSealed", (callee, self, args) -> JS.bool(isLocked(arg(args, 0), false))));
+        statics.setHidden("isExtensible", function("isExtensible", (callee, self, args) -> {
+            Object o = arg(args, 0);
+            return JS.bool(o instanceof JsObject ? ((JsObject) o).isExtensible() : o instanceof JsArray && !((JsArray) o).isSealed());
+        }));
+        statics.setHidden("is", function("is", (callee, self, args) -> JS.bool(JS.seq(arg(args, 0), arg(args, 1)))));
+        statics.setHidden("fromEntries", function("fromEntries", (callee, self, args) -> {
+            JsArray entries = (JsArray) JS.toArray(arg(args, 0));
+            JsObject out = (JsObject) JS.object();
+            for (int i = 0; i < entries.length(); i++) {
+                JsArray pair = (JsArray) JS.toArray(entries.get(i));
+                out.set(JS.keyString(pair.get(0)), pair.get(1));
+            }
+            return out;
+        }));
+    }
+
+    private static Object lock(Object o, boolean readonly) {
+        if (o instanceof JsObject) {
+            ((JsObject) o).lock(readonly);
+        } else if (o instanceof JsArray) {
+            ((JsArray) o).lock(readonly);
+        } else if (o instanceof JsFunction && ((JsFunction) o).hasProps()) {
+            ((JsFunction) o).props().lock(readonly);
+        }
+        return o;
+    }
+
+    private static boolean isLocked(Object o, boolean readonly) {
+        if (o instanceof JsObject) {
+            return ((JsObject) o).isLocked(readonly);
+        }
+        if (o instanceof JsArray) {
+            return readonly ? ((JsArray) o).isFrozen() : ((JsArray) o).isSealed();
+        }
+        return !(o instanceof JsFunction);
+    }
+
+    /** The object that holds {@code o}'s named properties, or null (strings and numbers have none). */
+    private static JsObject holder(Object o, boolean create) {
+        if (o instanceof JsObject) {
+            return (JsObject) o;
+        }
+        if (o instanceof JsFunction) {
+            return ((JsFunction) o).props();
+        }
+        if (o instanceof JsArray) {
+            return create ? ((JsArray) o).namedOrCreate() : ((JsArray) o).named();
+        }
+        return null;
+    }
+
+    private static Object ownNames(Object o) {
+        JsArray out = new JsArray();
+        if (o instanceof JsArray) {
+            for (int i = 0; i < ((JsArray) o).length(); i++) {
+                out.add(Long.toString(i));
+            }
+            out.add("length");
+        } else if (o instanceof String) {
+            for (int i = 0; i < ((String) o).length(); i++) {
+                out.add(Long.toString(i));
+            }
+            out.add("length");
+        }
+        JsObject h = holder(o, false);
+        if (h != null) {
+            for (String key : h.allKeys()) {
+                out.add(key);
+            }
+        }
+        return out;
+    }
+
+    /** {@code Object.defineProperty(target, key, descriptor)}. */
+    private static void define(Object target, String key, Object descriptor) {
+        JsObject holder = holder(target, true);
+        if (holder == null) {
+            throw new JsError("TypeError: Object.defineProperty called on non-object");
+        }
+        if (!(descriptor instanceof JsObject)) {
+            throw new JsError("TypeError: Property description must be an object: " + JS.str(descriptor));
+        }
+        JsObject d = (JsObject) descriptor;
+        boolean exists = holder.hasOwn(key);
+        if (!exists && !holder.isExtensible()) {
+            throw new JsError("TypeError: Cannot define property " + key + ", object is not extensible");
+        }
+        if (exists && !holder.isConfigurable(key)) {
+            // A non-configurable property may only have its value changed, and only if it is writable.
+            boolean changesShape = d.has("get") || d.has("set") || d.has("enumerable") && JS.truthy(d.get("enumerable")) != holder.isEnumerable(key)
+                    || d.has("configurable") && JS.truthy(d.get("configurable"));
+            boolean changesValue = d.has("value") && !JS.seq(d.get("value"), holder.getOwn(key));
+            if (changesShape || changesValue && !holder.isWritable(key) || d.has("writable") && JS.truthy(d.get("writable")) && !holder.isWritable(key)) {
+                throw new JsError("TypeError: Cannot redefine property: " + key);
+            }
+        }
+        boolean enumerable = d.has("enumerable") ? JS.truthy(d.get("enumerable")) : exists && holder.isEnumerable(key);
+        boolean configurable = d.has("configurable") ? JS.truthy(d.get("configurable")) : exists && holder.isConfigurable(key);
+        if (d.has("get") || d.has("set")) {
+            Object getter = d.get("get");
+            Object setter = d.get("set");
+            if (getter != null && !(getter instanceof JsFunction) || setter != null && !(setter instanceof JsFunction)) {
+                throw new JsError("TypeError: Getter and setter must be functions");
+            }
+            holder.define(key, new JsObject.Accessor((JsFunction) getter, (JsFunction) setter), enumerable, true, configurable);
+            return;
+        }
+        boolean writable = d.has("writable") ? JS.truthy(d.get("writable")) : exists && holder.isWritable(key);
+        Object value = d.has("value") ? d.get("value") : exists ? holder.getOwn(key) : null;
+        if (target instanceof JsArray && JsObject.isIndex(key)) {
+            ((JsArray) target).set((int) Long.parseLong(key), value);
+            return;
+        }
+        holder.define(key, value, enumerable, writable, configurable);
+    }
+
+    /** {@code Object.getOwnPropertyDescriptor}: undefined, or an object describing the property. */
+    private static Object describe(Object o, String key) {
+        JsObject d = (JsObject) JS.object();
+        if (o instanceof JsArray && (JsObject.isIndex(key) || key.equals("length"))) {
+            JsArray a = (JsArray) o;
+            if (key.equals("length")) {
+                d.set("value", Long.valueOf(a.length()));
+                d.set("writable", JS.bool(!a.isFrozen()));
+                d.set("enumerable", Boolean.FALSE);
+                d.set("configurable", Boolean.FALSE);
+                return d;
+            }
+            if (Long.parseLong(key) >= a.length()) {
+                return null;
+            }
+            d.set("value", a.get((int) Long.parseLong(key)));
+            d.set("writable", JS.bool(!a.isFrozen()));
+            d.set("enumerable", Boolean.TRUE);
+            d.set("configurable", JS.bool(!a.isSealed()));
+            return d;
+        }
+        JsObject h = holder(o, false);
+        if (h == null || !h.hasOwn(key)) {
+            return null;
+        }
+        Object raw = h.getOwnRaw(key);
+        if (raw instanceof JsObject.Accessor) {
+            JsObject.Accessor accessor = (JsObject.Accessor) raw;
+            d.set("get", accessor.getter);
+            d.set("set", accessor.setter);
+        } else {
+            d.set("value", raw);
+            d.set("writable", JS.bool(h.isWritable(key)));
+        }
+        d.set("enumerable", JS.bool(h.isEnumerable(key)));
+        d.set("configurable", JS.bool(h.isConfigurable(key)));
+        return d;
     }
 
     private static void installErrors(JsObject g) {

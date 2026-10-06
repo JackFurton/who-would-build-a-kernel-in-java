@@ -29,8 +29,11 @@ final class Node {
 
     record ArrayLit(List<Expr> elements, int line) implements Expr {}
 
-    /** {@code key} is the name; {@code computed} is set instead for {@code [expr]: value}; a spread has neither. */
-    record Property(String key, Expr computed, Expr value) {}
+    /**
+     * {@code key} is the name; {@code computed} is set instead for {@code [expr]: value}; a spread has neither.
+     * {@code kind} is 'i' for an ordinary member, 'g' for a getter and 's' for a setter (whose value is the function).
+     */
+    record Property(String key, Expr computed, Expr value, char kind) {}
 
     record ObjectLit(List<Property> properties, int line) implements Expr {}
 

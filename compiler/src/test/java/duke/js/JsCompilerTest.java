@@ -91,6 +91,7 @@ class JsCompilerTest {
         assertTrue(error("a: for (;;) { break a; }").contains("labels are not supported by the x86 back end"));
         assertTrue(error("var o; o?.x;").contains("optional chaining is not supported by the x86 back end"));
         assertTrue(error("function f(...a) {}").contains("rest parameters and destructuring are not supported by the x86 back end"));
+        assertTrue(error("var o = { get x() { return 1; } };").contains("accessors in object literals are not supported by the x86 back end"));
         assertTrue(error("var [a] = [1];").contains("destructuring are not supported by the x86 back end"));
         assertTrue(error("function f() {}\nf(...[]);").contains("spread is not supported by the x86 back end"));
         assertTrue(error("function f() {}\nvar t = f`x`;").contains("tagged templates are not supported by the x86 back end"));
@@ -169,6 +170,7 @@ class JsCompilerTest {
                 for (let k2 in items) items[k2]++;
                 try { throw new Error("x"); } catch (e) { has = e; } finally { has = null; }
                 try { has = 1; } catch { has = 2; }
+                var acc = { get g() { return 1; }, set g(v) { }, get ["c" + 1]() { return 2; } };
                 var [pa, { pb = 2, ...pc }] = [1, {}];
                 [pa, o.x] = [pb, pc];
                 function params(a, b = a, ...rest) { return [a, b, ...rest, arguments.length, { [a]: b, ...q }]; }

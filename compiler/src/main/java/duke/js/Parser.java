@@ -686,13 +686,19 @@ final class Parser {
         while (!peek().is("}")) {
             if (peek().is("...")) {
                 int spreadLine = tokens.get(pos++).line();
-                props.add(new Property(null, null, new Spread(assignment(), spreadLine)));
+                props.add(new Property(null, null, new Spread(assignment(), spreadLine), 'i'));
                 if (!peek().is("}")) {
                     expect(",");
                 }
                 continue;
             }
             Token key = tokens.get(pos++);
+            char kind = 'i';
+            if (key.kind() == Token.Kind.IDENT && (key.text().equals("get") || key.text().equals("set"))
+                    && startsPropertyName(peek())) {
+                kind = key.text().charAt(0);
+                key = tokens.get(pos++);
+            }
             String name = null;
             Expr computed = null;
             if (key.is("[")) {
@@ -706,7 +712,10 @@ final class Parser {
                 }
             }
             Expr value;
-            if (accept(":")) {
+            if (kind != 'i') {
+                value = new FuncExpr(function(name == null ? null : (kind == 'g' ? "get " : "set ") + name, false, key.line()),
+                        key.line());
+            } else if (accept(":")) {
                 value = assignment();
             } else if (peek().is("(")) {
                 value = new FuncExpr(function(name, false, key.line()), key.line());
@@ -720,13 +729,19 @@ final class Parser {
             } else {
                 throw error(peek(), "expected ':' but found " + peek());
             }
-            props.add(new Property(name, computed, value));
+            props.add(new Property(name, computed, value, kind));
             if (!peek().is("}")) {
                 expect(",");
             }
         }
         pos++;
         return new ObjectLit(props, line);
+    }
+
+    /** Can this token begin a property name? It does after {@code get} or {@code set}, which then mark an accessor. */
+    private static boolean startsPropertyName(Token t) {
+        return t.kind() == Token.Kind.IDENT || t.kind() == Token.Kind.KEYWORD || t.kind() == Token.Kind.STR
+                || t.kind() == Token.Kind.NUM || t.is("[");
     }
 
     private Expr template(Token t) {
