@@ -57,6 +57,8 @@ final class JavaGen {
     private StringBuilder out = new StringBuilder();
     private List<String> temps = new ArrayList<>();
     private FuncInfo fn;
+    /** The name of the Java variable holding the current function's arguments array. */
+    private String currentArgs;
     private int indent;
     private int uid;
 
@@ -186,7 +188,8 @@ final class JavaGen {
             return;
         }
         for (Var v : scope.vars.values()) {
-            if (!v.kind.equals("this") && !v.kind.equals("self") && !v.kind.equals("param")) {
+            if (!v.kind.equals("this") && !v.kind.equals("self") && !v.kind.equals("param")
+                    && !v.kind.equals("arguments")) {
                 declare(v, "null");
             }
         }
@@ -227,6 +230,8 @@ final class JavaGen {
         Deque<String> savedLoops = new ArrayDeque<>(continueLabels);
         Deque<Target> savedTargets = new ArrayDeque<>(targets);
         targets.clear();
+        String savedArgs = currentArgs;
+        currentArgs = args;
         out = new StringBuilder();
         temps = new ArrayList<>();
         fn = info;
@@ -238,6 +243,8 @@ final class JavaGen {
                 names.put(v, self);
             } else if (v.kind.equals("self")) {
                 names.put(v, callee);
+            } else if (v.kind.equals("arguments")) {
+                declare(v, "JS.arguments(" + args + ")");
             }
         }
         for (int i = 0; i < f.params().size(); i++) {
@@ -261,6 +268,7 @@ final class JavaGen {
         continueLabels.addAll(savedLoops);
         targets.clear();
         targets.addAll(savedTargets);
+        currentArgs = savedArgs;
         return (f.arrow() ? "JS.arrow(" : "JS.fn(") + quote(name == null ? "" : name) + ", (" + callee + ", " + self + ", " + args
                 + ") -> {\n" + body + "    ".repeat(indent) + "})";
     }
@@ -690,11 +698,38 @@ final class JavaGen {
             }
             case ObjectLit o -> {
                 List<String> parts = new ArrayList<>();
+                boolean spreads = false;
                 for (Property p : o.properties()) {
-                    parts.add(quote(p.key()));
-                    parts.add(named(p.value(), p.key()));
+                    if (p.key() == null && p.computed() == null) {
+                        spreads = true;
+                        parts.add("JS.spreadOf(" + expr(((Spread) p.value()).value()) + ")");
+                    } else if (p.computed() != null) {
+                        parts.add(expr(p.computed()));
+                        parts.add(expr(p.value()));
+                    } else {
+                        parts.add(quote(p.key()));
+                        parts.add(named(p.value(), p.key()));
+                    }
                 }
-                return "JS.object(" + String.join(", ", parts) + ")";
+                return (spreads ? "JS.objectSpread(" : "JS.object(") + String.join(", ", parts) + ")";
+            }
+            case Spread sp -> throw error(sp.line(), "unexpected spread: it can only appear in a call, an array or an object literal");
+            case TaggedTemplate tt -> {
+                String strings = "JS.templateStrings(new String[] {" + joinQuoted(tt.cooked()) + "}, new String[] {"
+                        + joinQuoted(tt.raw()) + "})";
+                String subs = list(tt.exprs());
+                String tail = ", " + strings + (subs.isEmpty() ? "" : ", " + subs);
+                return switch (tt.tag()) {
+                    case Member m -> "JS.invoke(" + expr(m.object()) + ", " + quote(m.name()) + tail + ")";
+                    case Index i -> "JS.invoke(" + expr(i.object()) + ", " + expr(i.index()) + tail + ")";
+                    default -> "JS.call(" + expr(tt.tag()) + tail + ")";
+                };
+            }
+            case Internal in -> {
+                if (in.name().equals("restArgs")) {
+                    return "JS.restArgs(" + currentArgs + ", " + ((Num) in.args().get(0)).value() + ")";
+                }
+                throw new IllegalStateException("internal " + in.name());
             }
             case FuncExpr f -> {
                 return function(f.function());
@@ -832,8 +867,23 @@ final class JavaGen {
 
     private String list(List<Expr> exprs) {
         List<String> parts = new ArrayList<>();
+        boolean spread = false;
         for (Expr e : exprs) {
-            parts.add(expr(e));
+            if (e instanceof Spread sp) {
+                spread = true;
+                parts.add("JS.spreadOf(" + expr(sp.value()) + ")");
+            } else {
+                parts.add(expr(e));
+            }
+        }
+        // With a spread the arguments are built at run time, as one array that is passed as the varargs.
+        return spread ? "JS.spread(" + String.join(", ", parts) + ")" : String.join(", ", parts);
+    }
+
+    private static String joinQuoted(List<String> strings) {
+        List<String> parts = new ArrayList<>();
+        for (String s : strings) {
+            parts.add(quote(s));
         }
         return String.join(", ", parts);
     }

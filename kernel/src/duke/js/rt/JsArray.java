@@ -5,6 +5,7 @@ public final class JsArray {
 
     private Object[] items;
     private int length;
+    private JsObject named;
 
     public JsArray() {
         items = new Object[4];
@@ -16,6 +17,18 @@ public final class JsArray {
             items[i] = initial[i];
         }
         length = initial.length;
+    }
+
+    /** Properties other than indexes and {@code length}, such as the {@code raw} of a template's strings; null if none. */
+    JsObject named() {
+        return named;
+    }
+
+    JsObject namedOrCreate() {
+        if (named == null) {
+            named = new JsObject();
+        }
+        return named;
     }
 
     public int length() {

@@ -29,7 +29,8 @@ final class Node {
 
     record ArrayLit(List<Expr> elements, int line) implements Expr {}
 
-    record Property(String key, Expr value) {}
+    /** {@code key} is the name; {@code computed} is set instead for {@code [expr]: value}; a spread has neither. */
+    record Property(String key, Expr computed, Expr value) {}
 
     record ObjectLit(List<Property> properties, int line) implements Expr {}
 
@@ -58,6 +59,15 @@ final class Node {
     record Index(Expr object, Expr index, int line) implements Expr {}
 
     record Sequence(List<Expr> exprs, int line) implements Expr {}
+
+    /** {@code ...value} in a call's arguments, an array literal or an object literal. */
+    record Spread(Expr value, int line) implements Expr {}
+
+    /** {@code tag`a${b}c`}: cooked and raw text of each chunk, and the substitutions between them. */
+    record TaggedTemplate(Expr tag, List<String> cooked, List<String> raw, List<Expr> exprs, int line) implements Expr {}
+
+    /** A call the parser makes on the program's behalf, into the runtime (the rest of a function's arguments, say). */
+    record Internal(String name, List<Expr> args, int line) implements Expr {}
 
     /**
      * One step of a property or call chain. {@code kind} is 'm' (member: {@code name}), 'i' (index: {@code index})

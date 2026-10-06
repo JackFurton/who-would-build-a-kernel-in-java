@@ -312,28 +312,60 @@ final class Parser {
         return false;
     }
 
+    private int hiddenParameters;
+
+    /**
+     * Parses a parameter list after its opening parenthesis. A parameter with a default or a rest parameter is
+     * desugared: the function gets a positional hidden name, and statements added to {@code prologue} (which run
+     * first in the body) bind the real name.
+     */
+    private void parameters(List<String> names, List<Stmt> prologue) {
+        while (!peek().is(")")) {
+            if (peek().is("...")) {
+                int line = tokens.get(pos++).line();
+                String name = expectIdent();
+                Expr rest = new Internal("restArgs", List.of(new Num(names.size(), line)), line);
+                prologue.add(new VarDecl("var", List.of(new Declarator(name, rest)), line));
+                if (!peek().is(")")) {
+                    throw error(peek(), "a rest parameter must be last");
+                }
+                break;
+            }
+            Token t = peek();
+            String name = expectIdent();
+            if (accept("=")) {
+                String hidden = "$p" + hiddenParameters++;
+                Expr fallback = assignment();
+                Expr value = new Conditional(new Binary("===", new Ident(hidden, t.line()), new Lit(Literal.UNDEFINED, t.line()),
+                        t.line()), fallback, new Ident(hidden, t.line()), t.line());
+                prologue.add(new VarDecl("var", List.of(new Declarator(name, value)), t.line()));
+                names.add(hidden);
+            } else {
+                names.add(name);
+            }
+            if (!peek().is(")")) {
+                expect(",");
+            }
+        }
+        pos++;
+    }
+
     private Expr arrow() {
         int line = peek().line();
         List<String> params = new ArrayList<>();
+        List<Stmt> body = new ArrayList<>();
         if (peek().is("(")) {
             pos++;
-            while (!peek().is(")")) {
-                params.add(expectIdent());
-                if (!peek().is(")")) {
-                    expect(",");
-                }
-            }
-            pos++;
+            parameters(params, body);
         } else {
             params.add(expectIdent());
         }
         expect("=>");
-        List<Stmt> body;
         if (peek().is("{")) {
-            body = block().body();
+            body.addAll(block().body());
         } else {
             Expr e = assignment();
-            body = List.of(new Return(e, e.line()));
+            body.add(new Return(e, e.line()));
         }
         return new FuncExpr(new Function(null, params, body, true, line), line);
     }
@@ -422,7 +454,7 @@ final class Parser {
         if (peek().is("(")) {
             pos++;
             while (!peek().is(")")) {
-                args.add(assignment());
+                args.add(argument());
                 if (!peek().is(")")) {
                     expect(",");
                 }
@@ -482,10 +514,25 @@ final class Parser {
                 } else {
                     e = new Call(e, args, t.line());
                 }
+            } else if (t.kind() == Token.Kind.TEMPLATE) {
+                if (ops != null) {
+                    throw error(t, "a tagged template cannot follow an optional chain");
+                }
+                pos++;
+                e = new TaggedTemplate(e, t.chunks(), t.raws(), templateExpressions(t), t.line());
             } else {
                 return ops == null ? e : new Chain(e, ops, e.line());
             }
         }
+    }
+
+    /** One call argument or array element: an expression, or {@code ...expression}. */
+    private Expr argument() {
+        if (peek().is("...")) {
+            int line = tokens.get(pos++).line();
+            return new Spread(assignment(), line);
+        }
+        return assignment();
     }
 
     /** A property name after a dot: an identifier or a keyword. */
@@ -501,7 +548,7 @@ final class Parser {
     private List<Expr> arguments() {
         List<Expr> args = new ArrayList<>();
         while (!peek().is(")")) {
-            args.add(assignment());
+            args.add(argument());
             if (!peek().is(")")) {
                 expect(",");
             }
@@ -548,10 +595,7 @@ final class Parser {
                 if (t.is("[")) {
                     List<Expr> elements = new ArrayList<>();
                     while (!peek().is("]")) {
-                        if (peek().is("...")) {
-                            throw error(peek(), "spread is not supported yet");
-                        }
-                        elements.add(assignment());
+                        elements.add(argument());
                         if (!peek().is("]")) {
                             expect(",");
                         }
@@ -571,24 +615,38 @@ final class Parser {
     private Expr objectLiteral(int line) {
         List<Property> props = new ArrayList<>();
         while (!peek().is("}")) {
+            if (peek().is("...")) {
+                int spreadLine = tokens.get(pos++).line();
+                props.add(new Property(null, null, new Spread(assignment(), spreadLine)));
+                if (!peek().is("}")) {
+                    expect(",");
+                }
+                continue;
+            }
             Token key = tokens.get(pos++);
-            String name;
-            switch (key.kind()) {
-                case IDENT, KEYWORD, STR -> name = key.text();
-                case NUM -> name = Long.toString(key.number());
-                default -> throw error(key, "unexpected " + key + " in object literal");
+            String name = null;
+            Expr computed = null;
+            if (key.is("[")) {
+                computed = assignment();
+                expect("]");
+            } else {
+                switch (key.kind()) {
+                    case IDENT, KEYWORD, STR -> name = key.text();
+                    case NUM -> name = Long.toString(key.number());
+                    default -> throw error(key, "unexpected " + key + " in object literal");
+                }
             }
             Expr value;
             if (accept(":")) {
                 value = assignment();
             } else if (peek().is("(")) {
                 value = new FuncExpr(function(name, false, key.line()), key.line());
-            } else if (key.kind() == Token.Kind.IDENT) {
+            } else if (computed == null && key.kind() == Token.Kind.IDENT) {
                 value = new Ident(name, key.line());
             } else {
                 throw error(peek(), "expected ':' but found " + peek());
             }
-            props.add(new Property(name, value));
+            props.add(new Property(name, computed, value));
             if (!peek().is("}")) {
                 expect(",");
             }
@@ -598,6 +656,10 @@ final class Parser {
     }
 
     private Expr template(Token t) {
+        return new Template(t.chunks(), templateExpressions(t), t.line());
+    }
+
+    private List<Expr> templateExpressions(Token t) {
         List<Expr> exprs = new ArrayList<>();
         for (String source : t.exprs()) {
             Parser inner = new Parser(file, source);
@@ -606,21 +668,17 @@ final class Parser {
                 throw error(t, "unexpected " + inner.peek() + " in template expression");
             }
         }
-        return new Template(t.chunks(), exprs, t.line());
+        return exprs;
     }
 
     /** Parses {@code (params) { body }}. */
     private Function function(String name, boolean arrow, int line) {
         expect("(");
         List<String> params = new ArrayList<>();
-        while (!peek().is(")")) {
-            params.add(expectIdent());
-            if (!peek().is(")")) {
-                expect(",");
-            }
-        }
-        pos++;
-        return new Function(name, params, block().body(), arrow, line);
+        List<Stmt> body = new ArrayList<>();
+        parameters(params, body);
+        body.addAll(block().body());
+        return new Function(name, params, body, arrow, line);
     }
 
     // ---- token helpers ----

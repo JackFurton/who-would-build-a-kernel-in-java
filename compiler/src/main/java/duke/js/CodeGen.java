@@ -593,6 +593,9 @@ final class CodeGen {
                 callRuntime("__newObject", 0);
                 asm.push(RAX);
                 for (Property p : o.properties()) {
+                    if (p.key() == null) {
+                        throw error(o.line(), "computed keys and spread in object literals are not supported by the x86 back end");
+                    }
                     asm.push(Mem.at(RSP));
                     loadString(p.key());
                     asm.push(RAX);
@@ -627,6 +630,9 @@ final class CodeGen {
             case Call c -> genCall(c);
             case New n -> throw error(n.line(), "'new' is not supported by the x86 back end");
             case Chain c -> throw error(c.line(), "optional chaining is not supported by the x86 back end");
+            case Spread sp -> throw error(sp.line(), "spread is not supported by the x86 back end");
+            case TaggedTemplate tt -> throw error(tt.line(), "tagged templates are not supported by the x86 back end");
+            case Internal in -> throw error(in.line(), "rest parameters are not supported by the x86 back end");
             case Member m -> {
                 gen(m.object());
                 asm.push(RAX);

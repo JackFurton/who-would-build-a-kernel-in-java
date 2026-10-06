@@ -4,10 +4,11 @@ import java.util.List;
 
 /**
  * One lexical token. {@code text} is the identifier, punctuator or decoded string; templates carry
- * their literal chunks in {@code chunks} and the source of each {@code ${}} in {@code exprs}.
+ * their literal chunks in {@code chunks} (escapes processed) and {@code raws} (as written), and the source of each
+ * {@code ${}} in {@code exprs}.
  */
 record Token(Kind kind, String text, long number, int line, boolean newlineBefore, List<String> chunks,
-        List<String> exprs) {
+        List<String> exprs, List<String> raws) {
 
     enum Kind { NUM, STR, TEMPLATE, IDENT, KEYWORD, PUNCT, EOF }
 
