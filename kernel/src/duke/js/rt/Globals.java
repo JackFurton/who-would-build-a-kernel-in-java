@@ -11,6 +11,8 @@ public final class Globals {
     private static Sink sink;
     private static JsObject table;
     private static JsObject objectPrototype;
+    private static final String[] ERROR_TYPES = {"Error", "TypeError", "RangeError", "ReferenceError", "SyntaxError",
+        "EvalError", "URIError"};
 
     private Globals() {
     }
@@ -107,6 +109,7 @@ public final class Globals {
                 Long.valueOf(JS.parseInteger(JS.str(arg(args, 0)), false))));
 
         installObject(g);
+        installErrors(g);
 
         JsFunction array = constructor("Array", (callee, self, args) -> {
             JsArray a = new JsArray();
@@ -210,6 +213,75 @@ public final class Globals {
             return v;
         }));
         table().set("Object", object);
+    }
+
+    private static void installErrors(JsObject g) {
+        JsObject errorPrototype = null;
+        for (String type : ERROR_TYPES) {
+            JsObject prototype = new JsObject();
+            prototype.proto = errorPrototype == null ? objectPrototype : errorPrototype;
+            prototype.setHidden("name", type);
+            prototype.setHidden("message", "");
+            JsFunction ctor = new JsFunction(type,
+                    (callee, self, args) -> initError(new JsObject(), callee.prototype(), args),
+                    (callee, self, args) -> initError((JsObject) self, callee.prototype(), args));
+            ctor.setPrototype(prototype);
+            prototype.setHidden("constructor", ctor);
+            if (errorPrototype == null) {
+                errorPrototype = prototype;
+                prototype.setHidden("toString", function("toString", (callee, self, args) -> errorText(self)));
+            }
+            g.set(type, ctor);
+        }
+    }
+
+    /** Fills in an Error: an own, non-enumerable {@code message} if one was given, and a {@code stack}. */
+    private static Object initError(JsObject e, JsObject prototype, Object[] args) {
+        e.proto = prototype;
+        Object message = arg(args, 0);
+        if (message != null) {
+            e.setHidden("message", JS.str(message));
+        }
+        e.setHidden("stack", errorText(e));
+        return e;
+    }
+
+    /** {@code Error.prototype.toString}: "Name: message", or just one of them if the other is empty. */
+    static String errorText(Object e) {
+        Object name = JS.get(e, "name");
+        Object message = JS.get(e, "message");
+        String n = name == null ? "Error" : JS.str(name);
+        String m = message == null ? "" : JS.str(message);
+        return n.isEmpty() ? m : m.isEmpty() ? n : n + ": " + m;
+    }
+
+    static boolean isErrorType(String name) {
+        for (String type : ERROR_TYPES) {
+            if (type.equals(name)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** True for an Error object: one whose prototype chain includes {@code Error.prototype}. */
+    static boolean isError(Object v) {
+        if (!(v instanceof JsObject)) {
+            return false;
+        }
+        JsObject target = ((JsFunction) lookup("Error")).prototype();
+        for (JsObject p = ((JsObject) v).proto; p != null; p = p.proto) {
+            if (p == target) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** A new error of a built-in type, for the runtime to throw as JavaScript sees it. */
+    static Object makeError(String type, String message) {
+        JsFunction ctor = (JsFunction) lookup(type);
+        return ctor.construct(new Object[] {message});
     }
 
     private static String tag(Object v) {

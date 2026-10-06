@@ -218,6 +218,15 @@ final class Analyzer {
                     hoistVars(inner, fnScope);
                 }
             }
+            case Try t -> {
+                hoistVars(t.block(), fnScope);
+                if (t.handler() != null) {
+                    hoistVars(t.handler(), fnScope);
+                }
+                if (t.finalizer() != null) {
+                    hoistVars(t.finalizer(), fnScope);
+                }
+            }
             default -> { }
         }
     }
@@ -281,6 +290,22 @@ final class Analyzer {
             case Return r -> {
                 if (r.value() != null) {
                     visit(r.value());
+                }
+            }
+            case Throw t -> visit(t.value());
+            case Try t -> {
+                visit(t.block());
+                if (t.handler() != null) {
+                    // The catch parameter lives in a scope of its own around the handler's block.
+                    inScope(t, () -> {
+                        if (t.param() != null) {
+                            resolved.put(t, declare(current, t.param(), "let", t.line()));
+                        }
+                        visit(t.handler());
+                    });
+                }
+                if (t.finalizer() != null) {
+                    visit(t.finalizer());
                 }
             }
             case FunctionDecl f -> visitFunction(f.function(), false);

@@ -56,7 +56,8 @@ class JsCompilerTest {
         return Stream.of(
                 Arguments.of("var x = 1.5;", "floating-point numbers are not supported"),
                 Arguments.of("class A {}", "'class' is not supported yet"),
-                Arguments.of("try { } catch (e) { }", "'try' is not supported yet"),
+                Arguments.of("try { }", "missing catch or finally after try"),
+                Arguments.of("throw\n1;", "a line break is not allowed after 'throw'"),
                 Arguments.of("var s = \"\u00e9\";", "only ASCII strings"),
                 Arguments.of("var x = 1 +;", "unexpected ';'"),
                 Arguments.of("break;", "'break' outside a loop"),
@@ -74,6 +75,8 @@ class JsCompilerTest {
         assertTrue(error("function F() {}\nnew F();").contains("'new' is not supported by the x86 back end"));
         assertTrue(error("for (var k in {}) {}").contains("'for...in' is not supported by the x86 back end"));
         assertTrue(error("var a = 1 instanceof Object;").contains("unsupported operator instanceof"));
+        assertTrue(error("throw 1;").contains("'throw' is not supported by the x86 back end"));
+        assertTrue(error("try { } finally { }").contains("'try' is not supported by the x86 back end"));
     }
 
     @Test
@@ -145,6 +148,8 @@ class JsCompilerTest {
                 var has = "x" in p && p instanceof Point && delete p.x && void 0 === undefined;
                 for (var key in o) { if (key === "a") continue; }
                 for (let k2 in items) items[k2]++;
+                try { throw new Error("x"); } catch (e) { has = e; } finally { has = null; }
+                try { has = 1; } catch { has = 2; }
                 console.log(t, u, twice((x) => x * 2, 3), early(2), nested(3), (1, 2), has, q);
                 """;
         Path dir = Files.createTempDirectory("jsgen");

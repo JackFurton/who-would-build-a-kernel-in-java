@@ -16,15 +16,15 @@ with `// backends: java` and skips it.
 | Functions | declarations, expressions, arrows, closures, `this`, `call`/`apply`/`bind`, name inference (`const f = () => 1` is named `f`) |
 | Objects | literals, shorthand properties and methods, computed access, prototypes, `new`, constructor functions, `instanceof`, `in`, `delete`, `for...in`, property enumeration order (indexes first) |
 | Operators | arithmetic and bitwise (32-bit), comparison, `===`/`==`, logical, `??`, `?:`, `typeof`, `void`, `delete`, compound assignment, `++`/`--` |
-| Statements | `if`, `for`, `for...of`, `for...in`, `while`, `do...while`, `break`, `continue`, blocks |
+| Statements | `if`, `for`, `for...of`, `for...in`, `while`, `do...while`, `break`, `continue`, blocks, `throw`, `try`/`catch`/`finally` (with or without a catch binding) |
+| Errors | `Error`, `TypeError`, `RangeError`, `ReferenceError`, `SyntaxError`, `EvalError`, `URIError`; runtime errors (reading a property of `undefined`, calling a non-function, stack overflow) are catchable |
 | Strings | literals, template literals, the usual methods (`slice`, `split`, `indexOf`, `padStart`, ...) |
 | Arrays | literals, indexing, `length`, and the common methods (`push`, `map`, `filter`, `reduce`, `sort`, ...) |
 | Built-ins | `console.log`/`error` (node-style formatting), `Math` (integer subset), `Object` statics (`keys`, `values`, `entries`, `assign`, `create`, `getPrototypeOf`, `setPrototypeOf`, `hasOwn`), `Object.prototype` methods, `Array.isArray`/`of`, `String`, `Number`, `parseInt` |
 
 ## Not yet (unbuilt)
 
-In the order we expect to do them: `throw`/`try`/`catch`/`finally` and the `Error` types, `switch`,
-labels, classes (`extends`, `super`, `static`, getters and setters), default parameters, rest and
+In the order we expect to do them: `switch`, labels, classes (`extends`, `super`, `static`, getters and setters), default parameters, rest and
 spread, destructuring, `arguments`, tagged templates, `Symbol`, iterators and generators, `Map`/`Set`/
 `WeakMap`/`WeakSet`, modules (`import`/`export`), `Promise` and `async`/`await`, optional chaining,
 `Object.defineProperty` and property descriptors, `Object.freeze`, `JSON`, typed arrays.
@@ -51,5 +51,9 @@ property operation). Calling `new Function` throws an error that says so.
 - Arrays have no holes: `delete a[i]` and growing past the end store `undefined` (node prints `<1 empty item>`).
 - `console.log` doesn't group arrays of more than six items into columns, as node does.
 - Methods in object literals can be used with `new`; node throws.
+- An undeclared name is a compile error, where node throws a `ReferenceError` when the line runs.
+- Errors have no stack trace: `stack` is just `Name: message`, and `console.log(err)` prints that (inside an object, in
+  brackets) where node prints the trace.
+- An uncaught throw ends the shell command with `error: Uncaught ...`.
 - `for...in` and `Object.keys` don't see inherited built-ins because they are non-enumerable; there is no way
   yet to create a non-enumerable property from JavaScript.

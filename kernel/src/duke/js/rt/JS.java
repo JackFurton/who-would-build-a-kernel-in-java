@@ -462,6 +462,30 @@ public final class JS {
         throw new JsError("TypeError: " + typeof(o) + " is not iterable");
     }
 
+    /** The exception for {@code throw value}. */
+    public static RuntimeException thrown(Object value) {
+        return new JsThrow(value);
+    }
+
+    /**
+     * The JavaScript value a {@code catch} sees for a Java exception: what was thrown, or an Error object for a
+     * runtime error (a TypeError from reading a property of undefined, say).
+     */
+    public static Object caught(Throwable t) {
+        if (t instanceof JsThrow) {
+            return ((JsThrow) t).value;
+        }
+        if (t instanceof StackOverflowError) {
+            return Globals.makeError("RangeError", "Maximum call stack size exceeded");
+        }
+        String message = t instanceof JsError ? t.getMessage() : String.valueOf(t);
+        int colon = Builtins.indexOf(message, ": ", 0);
+        if (colon > 0 && Globals.isErrorType(message.substring(0, colon))) {
+            return Globals.makeError(message.substring(0, colon), message.substring(colon + 2));
+        }
+        return Globals.makeError("Error", message);
+    }
+
     /** {@code new f(...args)}. */
     public static Object construct(Object f, Object... args) {
         if (!(f instanceof JsFunction)) {

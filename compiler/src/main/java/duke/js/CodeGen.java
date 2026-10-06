@@ -429,6 +429,8 @@ final class CodeGen {
                 asm.leave();
                 asm.ret();
             }
+            case Throw t -> throw error(t.line(), "'throw' is not supported by the x86 back end");
+            case Try t -> throw error(t.line(), "'try' is not supported by the x86 back end");
             case Break b -> {
                 if (loops.isEmpty()) {
                     throw error(b.line(), "'break' outside a loop");

@@ -42,3 +42,14 @@ Kernel.command("churn", function () {
   console.log("churn: kept " + keep.length + ", total " + total + ", ids " + ids + ", collections " +
     (Kernel.collections() - before > 0 ? "ran" : "did not run"));
 });
+
+// Exceptions inside the kernel: a throw, a runtime error and a stack overflow, all caught.
+Kernel.command("catches", function () {
+  var results = [];
+  try { throw new RangeError("thrown"); } catch (e) { results.push(e.name + ": " + e.message); }
+  try { null.x; } catch (e) { results.push(e.name); }
+  function recurse() { return recurse() + 1; }
+  try { recurse(); } catch (e) { results.push(e.message); }
+  try { results.push("try"); } finally { results.push("finally"); }
+  console.log("catches: " + results.join(" | "));
+});

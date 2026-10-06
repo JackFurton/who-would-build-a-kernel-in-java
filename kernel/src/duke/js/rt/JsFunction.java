@@ -11,6 +11,8 @@ public final class JsFunction {
     final String name;
     private final Body body;
     private final boolean constructible;
+    /** What {@code new} runs instead of {@code body}, for built-ins that behave differently when constructed. */
+    private final Body constructBody;
     private JsObject props;
     private JsObject prototype;
 
@@ -20,9 +22,19 @@ public final class JsFunction {
     }
 
     public JsFunction(String name, Body body, boolean constructible) {
+        this(name, body, constructible, null);
+    }
+
+    /** A built-in whose {@code new f()} runs {@code constructBody} on the fresh object, and whose plain call runs {@code body}. */
+    public JsFunction(String name, Body body, Body constructBody) {
+        this(name, body, true, constructBody);
+    }
+
+    private JsFunction(String name, Body body, boolean constructible, Body constructBody) {
         this.name = name;
         this.body = body;
         this.constructible = constructible;
+        this.constructBody = constructBody;
     }
 
     public Object call(Object self, Object[] args) {
@@ -36,7 +48,7 @@ public final class JsFunction {
         }
         JsObject self = new JsObject();
         self.proto = prototype();
-        Object result = body.call(this, self, args);
+        Object result = (constructBody != null ? constructBody : body).call(this, self, args);
         return result instanceof JsObject || result instanceof JsArray || result instanceof JsFunction ? result : self;
     }
 
