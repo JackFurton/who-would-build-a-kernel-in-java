@@ -31,8 +31,10 @@ with `// backends: java` and skips it.
 
 ## Not yet (unbuilt)
 
-In the order we expect to do them: modules
-(`import`/`export`), `Promise` and `async`/`await`, `JSON`, typed arrays.
+In the order we expect to do them: `Promise`, timers and `async`/`await` (the event loop and the generator
+transform), modules (`import`/`export`), typed arrays, `ArrayBuffer` and `DataView`, `Proxy` and `Reflect` (see below),
+and small gaps (function `length`, `new.target`, `parseFloat`). Regular expressions and `Date` wait on the kernel
+(below) for their engine and clock.
 
 ## Waiting on the kernel
 
