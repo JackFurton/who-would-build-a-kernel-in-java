@@ -86,14 +86,15 @@ public final class Pci {
             }
         }
 
+        /** {@code 00:1f.2}, with the segment in front when it isn't 0. */
+        public String address() {
+            String bdf = hex(bus, 2) + ":" + hex(device, 2) + "." + function;
+            return segment == 0 ? bdf : hex(segment, 4) + ":" + bdf;
+        }
+
         /** {@code 00:1f.2 8086:2922 class 01.06.01 bar4 io 0xc040 bar5 mem 0xfebd5000}, like lspci -n. */
         public String describe() {
-            StringBuilder sb = new StringBuilder();
-            if (segment != 0) {
-                sb.append(hex(segment, 4)).append(':');
-            }
-            sb.append(hex(bus, 2)).append(':').append(hex(device, 2)).append('.').append(function)
-                    .append(' ').append(hex(vendorId, 4)).append(':').append(hex(deviceId, 4))
+            StringBuilder sb = new StringBuilder(address()).append(' ').append(hex(vendorId, 4)).append(':').append(hex(deviceId, 4))
                     .append(" class ").append(hex(classCode, 2)).append('.').append(hex(subclass, 2))
                     .append('.').append(hex(progIf, 2));
             for (Bar bar : bars) {
