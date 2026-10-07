@@ -18,10 +18,10 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * The calibration committee (#111): levels everyone from what they've merged to main, counts their
+ * The calibration committee (#111): levels everyone from what they've merged to master, counts their
  * open PRs as in review, and projects 30 days out. {@code java benchmarking-meatspace/Calibration.java
  * [out-dir]} prints the table; with an out-dir it also writes calibration-{light,dark}.svg and
- * external-race-{light,dark}.svg. The metrics job runs it on every push to main. Open PRs come from
+ * external-race-{light,dark}.svg. The metrics job runs it on every push to master. Open PRs come from
  * {@code gh} and are skipped when it isn't available. The rules are in the README next to this file;
  * change them in both places.
  */

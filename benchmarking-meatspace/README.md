@@ -16,12 +16,12 @@ founding team.
   <img alt="The external race: impact over time for contributors outside the founding team, projected 30 days out" src="https://raw.githubusercontent.com/JackFurton/who-would-build-a-kernel-in-java/metrics/external-race-light.svg">
 </picture>
 
-CI recalibrates on every push to main. Run it yourself with
+CI recalibrates on every push to master. Run it yourself with
 `java benchmarking-meatspace/Calibration.java` (add a directory to get the SVGs).
 
 ## How calibration works
 
-The committee reads two things: the git history of main, and open PRs on GitHub. Anyone who has
+The committee reads two things: the git history of master, and open PRs on GitHub. Anyone who has
 merged a PR is calibrated, collaborator or not; anyone with an open, non-draft PR shows up the
 moment they open it, with their work counted as in review.
 

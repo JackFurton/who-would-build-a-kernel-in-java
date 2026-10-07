@@ -31,7 +31,7 @@ DUKE-BOOT-OK
   <img alt="Tests in the suites, boot kernel code size and lines of Java over time" src="https://raw.githubusercontent.com/JackFurton/who-would-build-a-kernel-in-java/metrics/progress-light.svg">
 </picture>
 
-CI appends a row for every commit to main. The data is
+CI appends a row for every commit to master. The data is
 [metrics.csv](https://github.com/JackFurton/who-would-build-a-kernel-in-java/blob/metrics/metrics.csv)
 on the `metrics` branch.
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# CI, on pushes to main: appends this commit's metrics to the metrics branch and re-renders the
+# CI, on pushes to master: appends this commit's metrics to the metrics branch and re-renders the
 # progress chart and calibration charts the READMEs embed. Expects the kernel and compiler test
 # results already built.
 set -euo pipefail
@@ -25,7 +25,7 @@ for attempt in 1 2 3; do
     if git -C "$dir" push -q origin HEAD:metrics; then
         exit 0
     fi
-    # Another main push recorded first: start again from its version.
+    # Another master push recorded first: start again from its version.
     git -C "$dir" fetch -q origin metrics
     git -C "$dir" reset -q --hard origin/metrics
 done
