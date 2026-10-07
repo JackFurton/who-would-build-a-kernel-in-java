@@ -7,6 +7,7 @@ import duke.kernel.acpi.Madt;
 import duke.kernel.mm.KernelAddressSpace;
 import duke.kernel.mm.KernelHeap;
 import duke.kernel.mm.PhysicalMemory;
+import duke.kernel.pci.Pci;
 import duke.kernel.time.Timer;
 import duke.kernel.x86.Gdt;
 import duke.kernel.x86.IoApic;
@@ -40,6 +41,7 @@ public final class Kernel {
         Acpi.init();
         Madt.init();
         Hpet.init();
+        Pci.init();
         Pic.disable();
         LocalApic.init();
         Timer.init();
@@ -120,6 +122,7 @@ public final class Kernel {
                     .append(o.gsi).append(o.levelTriggered() ? " level" : "").append(o.activeLow() ? " low" : "");
         }
         Console.println("irq overrides: " + overrides + "; hpet at 0x" + Long.toHexString(Hpet.address()));
+        Console.println("pci: " + Pci.functions().size() + " functions, ECAM at 0x" + Long.toHexString(Pci.ecamBase()));
     }
 
     private static void printMemoryMap() {
