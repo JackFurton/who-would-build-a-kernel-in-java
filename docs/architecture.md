@@ -119,6 +119,12 @@ Device registers live in reserved physical memory outside the direct map, so
 `KernelAddressSpace.mapDevice` maps them uncached into their own PML4 slot. QEMU runs with
 `-smp 4`, so the CPU count is a real check.
 
+`duke.kernel.pci` reads the MCFG table and walks PCI configuration space through ECAM. It starts at
+the host bridges and follows PCI-to-PCI bridges to their secondary buses, mapping each bus's 1 MiB
+of config space only when the scan reaches it, so a q35 machine maps one bus rather than 256 MiB.
+Each function keeps its ids, class and decoded BARs (I/O or memory, 64-bit ones joined), and the
+`pci` shell command prints one line per function.
+
 Time comes from the local APIC timer. `Pic.disable()` remaps the legacy PICs to vectors
 0xE0-0xEF and masks them, so a spurious IRQ can't land on a CPU exception vector. The APIC timer
 is calibrated against the HPET's main counter over 10 ms, then runs periodic at 100 Hz into a
@@ -140,7 +146,7 @@ its BDF by `tools/GenerateFont.java` into a string literal, so the glyphs are im
 PS/2 keyboard (IRQ 1, scan code set 1, US layout) and COM1's receive interrupt (IRQ 4) both push
 characters into `Input`, a ring buffer of image arrays, so handlers never allocate. After the boot
 log, `Kernel.main` runs `Shell`: line editing plus `help`, `uptime`, `mem`, `gc`, `cpus`,
-`threads`, `echo` and `panic`. `make shell-test` boots the real kernel with serial on pipes and the QEMU monitor on a
+`threads`, `pci`, `echo` and `panic`. `make shell-test` boots the real kernel with serial on pipes and the QEMU monitor on a
 socket. It types over serial and as PS/2 keystrokes (`sendkey`) and checks the replies.
 
 ## Threads

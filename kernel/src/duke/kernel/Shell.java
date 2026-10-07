@@ -2,6 +2,7 @@ package duke.kernel;
 
 import duke.kernel.acpi.Madt;
 import duke.kernel.mm.PhysicalMemory;
+import duke.kernel.pci.Pci;
 import duke.kernel.time.Timer;
 import duke.rt.Heap;
 import java.util.ArrayList;
@@ -107,7 +108,7 @@ public final class Shell {
         }
         switch (words.get(0)) {
             case "help" -> {
-                Console.println("commands: help, uptime, mem, gc, cpus, threads, echo <text>, clear, panic");
+                Console.println("commands: help, uptime, mem, gc, cpus, threads, pci, echo <text>, clear, panic");
                 if (!Commands.names().isEmpty()) {
                     StringBuilder more = new StringBuilder("also:");
                     for (int i = 0; i < Commands.names().size(); i++) {
@@ -131,6 +132,11 @@ public final class Shell {
                 }
             }
             case "threads" -> Scheduler.list();
+            case "pci" -> {
+                for (Pci.Function f : Pci.functions()) {
+                    Console.println(f.describe());
+                }
+            }
             case "echo" -> Console.println(line.substring(4).strip());
             case "panic" -> Panic.panic("requested from the shell");
             default -> {

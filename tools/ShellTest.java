@@ -77,6 +77,8 @@ public class ShellTest {
             failures += check("ps/2 shift", () -> keys(monitor, "e c h o spc shift-d u k e shift-1 ret"), "Duke!");
             failures += check("mem", () -> type(serial, "mem\n"), "frames: ");
             failures += check("threads", () -> type(serial, "threads\n"), "main: running");
+            failures += check("pci host bridge", () -> type(serial, "pci\n"), "00:00.0 8086:29c0 class 06.00.00");
+            failures += check("pci ahci", () -> type(serial, "pci\n"), "00:1f.2 8086:2922 class 01.06.01");
             failures += check("ps/2 insert", () -> keys(monitor, "e c h o spc d u e left k ret"), "duke");
             failures += check("javascript command", () -> type(serial, "hello\n"),
                     "hello from JavaScript running in the Duke kernel");
