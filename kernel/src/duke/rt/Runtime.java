@@ -3,6 +3,7 @@ package duke.rt;
 import duke.kernel.Monitors;
 import duke.kernel.Panic;
 import duke.kernel.Scheduler;
+import duke.kernel.Smp;
 
 /** Entry points the compiler calls inline when a runtime check fails. Messages match HotSpot's. */
 public final class Runtime {
@@ -56,6 +57,7 @@ public final class Runtime {
     /** A prologue or loop back-edge found a preemption request (Magic.requestPreemption). */
     static void preempt() {
         if (!Heap.allocating()) {
+            Smp.stopIfRequested();
             Scheduler.preempted();
         }
     }

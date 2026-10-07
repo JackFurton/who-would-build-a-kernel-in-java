@@ -53,8 +53,8 @@ public final class Timer {
 
     /** Sleeps at least {@code millis} by halting between ticks. Interrupts must be enabled. */
     public static void sleep(long millis) {
-        long until = ticks() + (millis * HZ + 999) / 1000;
-        while (ticks() < until) {
+        long until = HpetClock.nanos() + millis * 1_000_000;
+        while (HpetClock.nanos() < until) {
             Magic.halt();
         }
     }

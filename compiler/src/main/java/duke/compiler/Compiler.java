@@ -347,8 +347,8 @@ public final class Compiler {
 
     /**
      * The stub that initializes {@code type} on first use (JVMS 5.5): superclass first, then its
-     * {@code <clinit>}. The flag goes to INITIALIZING before anything runs, with no safepoint
-     * between the test and the store, and the initializing thread's id is recorded beside it.
+     * {@code <clinit>}. The flag goes from 0 to INITIALIZING with a lock cmpxchg before anything
+     * runs, and the initializing thread's id is recorded beside it.
      * Meeting INITIALIZING means Runtime.awaitInitialization: the initializing thread itself
      * carries on (the JVM's same-thread rule), any other waits until the class is done.
      */
@@ -401,9 +401,11 @@ public final class Compiler {
             a.mov(Reg.RBP, Reg.RSP);
             a.cmpByte(Mem.rip(flagSymbol), INITIALIZED);
             a.jcc(Cond.E, done);
-            a.cmpByte(Mem.rip(flagSymbol), 0);
+            // 0 to INITIALIZING atomically: on another CPU, another thread may be testing it too.
+            a.alu(X64.Alu.XOR, false, Reg.RAX, Reg.RAX);
+            a.movImm32(Reg.RCX, INITIALIZING);
+            a.lockCmpxchgByte(Mem.rip(flagSymbol), Reg.RCX);
             a.jcc(Cond.NE, busy);
-            a.movByte(Mem.rip(flagSymbol), INITIALIZING);
             a.call(methodSymbol(RUNTIME, "currentThreadId", "()J"));
             a.store(8, Mem.rip(ownerSymbol), Reg.RAX);
             ClassModel model = pool.get(type);

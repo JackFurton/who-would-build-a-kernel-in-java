@@ -3,8 +3,11 @@ package duke.ktest;
 import static duke.ktest.Assert.assertEquals;
 import static duke.ktest.Assert.assertTrue;
 
+import duke.kernel.Scheduler;
 import duke.kernel.Smp;
 import duke.kernel.acpi.Madt;
+import duke.kernel.time.HpetClock;
+import duke.rt.Heap;
 import duke.rt.Magic;
 import duke.rt.Tib;
 
@@ -59,5 +62,85 @@ final class SmpTest {
             cpus++;
         }
         assertTrue(cpus > 1, "ran on cpus 0x" + Long.toHexString(seen[0]));
+    }
+
+    private static volatile boolean stop;
+
+    static void testThreadsRunAtTheSameTime() throws InterruptedException {
+        if (Smp.onlineCount() < 2) {
+            return;
+        }
+        stop = false;
+        Thread[] spinners = new Thread[3];
+        for (int i = 0; i < spinners.length; i++) {
+            spinners[i] = new Thread(() -> {
+                while (!stop) {
+                    Magic.pause();
+                }
+            });
+            spinners[i].start();
+        }
+        int most = 0;
+        long until = HpetClock.nanos() + 2_000_000_000L;
+        while (most < 4 && HpetClock.nanos() < until) {
+            most = Math.max(most, Scheduler.busyCpus());
+        }
+        stop = true;
+        for (Thread spinner : spinners) {
+            spinner.join();
+        }
+        assertTrue(most >= 2, "at most " + most + " cpus busy at once");
+    }
+
+    // Four threads allocating at once, each checking its own lists, with collections stopping the others.
+    static void testAllocationAndCollectionAcrossCpus() throws InterruptedException {
+        long before = Heap.collections();
+        boolean[] ok = new boolean[4];
+        Thread[] workers = new Thread[ok.length];
+        Heap.stress(2000);
+        try {
+            for (int t = 0; t < workers.length; t++) {
+                int index = t;
+                workers[t] = new Thread(() -> ok[index] = churn(index));
+                workers[t].start();
+            }
+            for (Thread worker : workers) {
+                worker.join();
+            }
+        } finally {
+            Heap.stress(0);
+        }
+        for (int t = 0; t < ok.length; t++) {
+            assertTrue(ok[t], "worker " + t + " saw its own data intact");
+        }
+        assertTrue(Heap.collections() - before >= 100, (Heap.collections() - before) + " collections ran meanwhile");
+    }
+
+    private static boolean churn(int seed) {
+        for (int round = 0; round < 40; round++) {
+            Node head = null;
+            for (int i = 0; i < 2000; i++) {
+                head = new Node(seed * 1_000_000 + i, new byte[256], head);
+            }
+            for (int i = 1999; i >= 0; i--) {
+                if (head.value != seed * 1_000_000 + i || head.padding.length != 256) {
+                    return false;
+                }
+                head = head.next;
+            }
+        }
+        return true;
+    }
+
+    private static final class Node {
+        final int value;
+        final byte[] padding;
+        final Node next;
+
+        Node(int value, byte[] padding, Node next) {
+            this.value = value;
+            this.padding = padding;
+            this.next = next;
+        }
     }
 }

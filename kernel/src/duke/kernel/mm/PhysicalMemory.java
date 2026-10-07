@@ -2,6 +2,7 @@ package duke.kernel.mm;
 
 import duke.boot.Limine;
 import duke.rt.Magic;
+import duke.rt.SpinLock;
 
 /**
  * Physical page frames from the Limine memory map. Frames are named by physical address; the
@@ -13,6 +14,8 @@ public final class PhysicalMemory {
 
     public static final long PAGE_SIZE = 4096;
 
+    /** Guards the bitmap: the heap grows under its own lock and thread stacks under the scheduler's. */
+    private static final int[] LOCK = new int[1];
     private static FrameBitmap frames;
     private static long hhdm;
 
@@ -69,7 +72,9 @@ public final class PhysicalMemory {
 
     /** Like allocate(), but -1 instead of throwing: for paths that can't allocate an exception. */
     public static long tryAllocate() {
+        long flags = SpinLock.lockInterruptsOff(LOCK);
         long page = frames.allocate();
+        SpinLock.unlockInterruptsOff(LOCK, flags);
         return page < 0 ? -1 : page * PAGE_SIZE;
     }
 
@@ -94,7 +99,12 @@ public final class PhysicalMemory {
         if (physical % PAGE_SIZE != 0) {
             throw new IllegalArgumentException("not a frame address: 0x" + Long.toHexString(physical));
         }
-        frames.free(physical / PAGE_SIZE);
+        long flags = SpinLock.lockInterruptsOff(LOCK);
+        try {
+            frames.free(physical / PAGE_SIZE);
+        } finally {
+            SpinLock.unlockInterruptsOff(LOCK, flags);
+        }
     }
 
     public static long toVirtual(long physical) {

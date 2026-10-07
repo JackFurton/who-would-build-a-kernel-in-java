@@ -6,18 +6,17 @@ import duke.kernel.Scheduler;
 /** A kernel thread; duke.kernel.Scheduler does the work. No priorities, daemons or interrupts yet. */
 public class Thread implements Runnable {
 
-    private static int threadNumber;
 
     private final Runnable task;
     private final String name;
     private final Scheduler.Task kernelTask;
 
     public Thread() {
-        this(null, "Thread-" + threadNumber++);
+        this(null, "Thread-" + Scheduler.nextThreadNumber());
     }
 
     public Thread(Runnable task) {
-        this(task, "Thread-" + threadNumber++);
+        this(task, "Thread-" + Scheduler.nextThreadNumber());
     }
 
     public Thread(String name) {

@@ -3,6 +3,7 @@ package duke.kernel.x86;
 import duke.kernel.acpi.Madt;
 import duke.kernel.mm.KernelAddressSpace;
 import duke.rt.Magic;
+import duke.rt.SpinLock;
 
 /** This CPU's local APIC, through its memory-mapped registers. */
 public final class LocalApic {
@@ -16,11 +17,15 @@ public final class LocalApic {
     private static final int TIMER_INITIAL = 0x380;
     private static final int TIMER_CURRENT = 0x390;
     private static final int TIMER_DIVIDE = 0x3E0;
+    private static final int ICR_LOW = 0x300;
+    private static final int ICR_HIGH = 0x310;
 
     private static final int SOFTWARE_ENABLE = 1 << 8;
     private static final int TIMER_PERIODIC = 1 << 17;
     private static final int MASKED = 1 << 16;
     private static final int DIVIDE_BY_16 = 0x3;
+    private static final int LEVEL_ASSERT = 1 << 14;
+    private static final int DELIVERY_PENDING = 1 << 12;
 
     private static long base;
 
@@ -45,6 +50,19 @@ public final class LocalApic {
 
     public static void endOfInterrupt() {
         write(EOI, 0);
+    }
+
+    /** Sends {@code vector} to the CPU with local APIC id {@code apicId}. */
+    public static void sendIpi(int apicId, int vector) {
+        // Interrupts off: a handler's own IPI between the two writes would take our destination.
+        long flags = Magic.flags();
+        Magic.disableInterrupts();
+        while ((read(ICR_LOW) & DELIVERY_PENDING) != 0) {
+            Magic.pause();
+        }
+        write(ICR_HIGH, apicId << 24);
+        write(ICR_LOW, LEVEL_ASSERT | vector);
+        SpinLock.restoreInterrupts(flags);
     }
 
     /** Starts a masked one-shot countdown from 2^32 - 1, for calibration. */

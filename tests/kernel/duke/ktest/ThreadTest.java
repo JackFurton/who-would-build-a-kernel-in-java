@@ -15,7 +15,7 @@ final class ThreadTest {
     private static volatile boolean stop;
     private static volatile long spins;
 
-    // Neither thread yields or sleeps: only the timer can make them take turns.
+    // Neither thread yields or sleeps: only the timer, or running on two CPUs, makes them take turns.
     static void testTwoThreadsInterleave() throws InterruptedException {
         traced = 0;
         Thread a = new Thread(() -> trace('a'), "a");
@@ -43,7 +43,10 @@ final class ThreadTest {
 
     private static void trace(char c) {
         for (int i = 0; i < 200; i++) {
-            TRACE[traced++] = c;
+            // Locked: on two CPUs at once, the increments would race.
+            synchronized (TRACE) {
+                TRACE[traced++] = c;
+            }
             HpetClock.spinNanos(250_000);
         }
     }

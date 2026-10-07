@@ -357,6 +357,12 @@ public final class X64 {
         memOp(false, false, 2, descriptor, 0, 0x0F, 0x01);
     }
 
+    /** {@code lock cmpxchg byte [m], src}: if [m] equals al, stores src and sets ZF; else loads [m] into al. */
+    public void lockCmpxchgByte(Mem m, Reg src) {
+        out.emit8(0xF0);
+        memOp(false, src.code() >= 4 && src.code() < 8, src.code(), m, 0, 0x0F, 0xB0);
+    }
+
     /** {@code xchg [m], src}: atomic without a lock prefix, which xchg with memory implies. */
     public void xchg(boolean wide, Mem m, Reg src) {
         memOp(wide, false, src.code(), m, 0, 0x87);
