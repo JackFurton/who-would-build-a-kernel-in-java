@@ -9,6 +9,7 @@ import duke.kernel.mm.KernelHeap;
 import duke.kernel.mm.PhysicalMemory;
 import duke.kernel.pci.Pci;
 import duke.kernel.time.Timer;
+import duke.kernel.virtio.VirtioBlock;
 import duke.kernel.x86.Gdt;
 import duke.kernel.x86.IoApic;
 import duke.kernel.x86.LocalApic;
@@ -42,6 +43,7 @@ public final class Kernel {
         Madt.init();
         Hpet.init();
         Pci.init();
+        VirtioBlock.init();
         Pic.disable();
         LocalApic.init();
         Timer.init();
@@ -123,6 +125,10 @@ public final class Kernel {
         }
         Console.println("irq overrides: " + overrides + "; hpet at 0x" + Long.toHexString(Hpet.address()));
         Console.println("pci: " + Pci.functions().size() + " functions, ECAM at 0x" + Long.toHexString(Pci.ecamBase()));
+        for (VirtioBlock disk : VirtioBlock.devices()) {
+            Console.println("virtio-blk: " + disk.capacity() + " sectors at " + disk.function().address()
+                    + (disk.readOnly() ? ", read-only" : ""));
+        }
     }
 
     private static void printMemoryMap() {

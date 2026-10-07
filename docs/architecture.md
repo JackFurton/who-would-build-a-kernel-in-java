@@ -125,6 +125,13 @@ of config space only when the scan reaches it, so a q35 machine maps one bus rat
 Each function keeps its ids, class and decoded BARs (I/O or memory, 64-bit ones joined), and the
 `pci` shell command prints one line per function.
 
+`duke.kernel.virtio` drives virtio block devices through the virtio 1.0 PCI interface: vendor
+capabilities point into the BARs for the common config, the doorbells and the disk's capacity. One
+split virtqueue per disk lives in a single frame, with one request in flight, polled with interrupts
+suppressed. Heap arrays aren't physically contiguous, so sectors pass through a staging frame, 8 at a
+time. `make ktest` attaches a 64-sector disk with a known pattern behind a PCIe root port, which also
+gives the PCI scan a bridge to follow.
+
 Time comes from the local APIC timer. `Pic.disable()` remaps the legacy PICs to vectors
 0xE0-0xEF and masks them, so a spurious IRQ can't land on a CPU exception vector. The APIC timer
 is calibrated against the HPET's main counter over 10 ms, then runs periodic at 100 Hz into a

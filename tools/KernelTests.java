@@ -2,6 +2,7 @@ import java.lang.classfile.ClassFile;
 import java.lang.classfile.ClassModel;
 import java.lang.classfile.MethodModel;
 import java.lang.reflect.AccessFlag;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -37,8 +38,13 @@ public class KernelTests {
         Harness.compileKernel(classes, List.of(TESTS, gen));
         Path esp = Harness.buildImage(classes, "duke/ktest/Main.main", OUT);
         Path serial = OUT.resolve("serial.log");
+        Path disk = writeDisk(OUT.resolve("disk.img"));
+        // The disk sits behind a PCIe root port, so the PCI scan has a bridge to follow.
         Process qemu = new ProcessBuilder("tools/qemu.sh", esp.toString(), "-serial", "file:" + serial,
-                "-device", "isa-debug-exit,iobase=0xf4,iosize=0x04")
+                "-device", "isa-debug-exit,iobase=0xf4,iosize=0x04",
+                "-device", "pcie-root-port,id=rp0,chassis=1",
+                "-drive", "if=none,id=disk0,format=raw,file=" + disk,
+                "-device", "virtio-blk-pci,drive=disk0,bus=rp0")
                 .directory(Harness.ROOT.toFile())
                 .redirectErrorStream(true)
                 .redirectOutput(OUT.resolve("qemu.txt").toFile())
@@ -55,6 +61,29 @@ public class KernelTests {
             System.out.println("ktest failed: QEMU exit status " + status + (exited ? "" : " (timed out)"));
             System.exit(1);
         }
+    }
+
+    static final int DISK_SECTORS = 64;
+
+    /**
+     * What VirtioBlockTest expects: sector n starts with "DUKEDISK" and n as a little-endian long,
+     * and byte i after that is (n + i) & 0xFF.
+     */
+    static Path writeDisk(Path file) throws Exception {
+        byte[] image = new byte[DISK_SECTORS * 512];
+        for (int n = 0; n < DISK_SECTORS; n++) {
+            int base = n * 512;
+            byte[] magic = "DUKEDISK".getBytes(StandardCharsets.US_ASCII);
+            System.arraycopy(magic, 0, image, base, 8);
+            for (int b = 0; b < 8; b++) {
+                image[base + 8 + b] = (byte) ((long) n >>> (8 * b));
+            }
+            for (int i = 16; i < 512; i++) {
+                image[base + i] = (byte) (n + i);
+            }
+        }
+        Files.write(file, image);
+        return file;
     }
 
     static List<String> discover(Path dir) throws Exception {
