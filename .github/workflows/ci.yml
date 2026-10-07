@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [master]
   pull_request:
 
 concurrency:
@@ -10,7 +10,7 @@ concurrency:
   cancel-in-progress: true
 
 # Read-only by default: pull requests, including ones from forks, run untrusted code. Only the
-# metrics job, which exists only for pushes to main, can write.
+# metrics job, which exists only for pushes to master, can write.
 permissions:
   contents: read
 
@@ -81,7 +81,7 @@ jobs:
 
   metrics:
     needs: build
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:

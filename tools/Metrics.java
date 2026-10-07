@@ -18,7 +18,7 @@ import javax.tools.ToolProvider;
 /**
  * Prints one CSV row of project metrics for the checked-out commit ({@code --header} prints the
  * column names). Needs build/kernel.elf, build/kernel.map and compiler test results to exist.
- * Suite sizes count tests, not passes: main only moves through green CI, so the two are equal there.
+ * Suite sizes count tests, not passes: master only moves through green CI, so the two are equal there.
  */
 public class Metrics {
 

@@ -70,7 +70,7 @@ jobs:
             if (body.includes('@duke-bot claim')) {
               return;
             }
-            const footer = '\n\n---\nNew here? [CONTRIBUTING.md](https://github.com/JackFurton/who-would-build-a-kernel-in-java/blob/main/CONTRIBUTING.md)'
+            const footer = '\n\n---\nNew here? [CONTRIBUTING.md](https://github.com/JackFurton/who-would-build-a-kernel-in-java/blob/master/CONTRIBUTING.md)'
                 + ' covers setup. Comment `@duke-bot claim` to take this issue.';
             await github.rest.issues.update({
               owner: context.repo.owner, repo: context.repo.repo, issue_number: issue.number, body: body + footer,
