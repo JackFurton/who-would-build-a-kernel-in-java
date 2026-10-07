@@ -98,6 +98,17 @@ word-aligned and are zeroed with `Magic.zeroMemoryWords` before the allocator re
 (about 50,000 collections). A slot missing from a stack map shows up there as a wrong result or a
 GC panic. Interrupt handlers still must not allocate. Other threads' stacks are roots too, and
 because threads only stop at safepoints (see Threads), their frames are scanned just as precisely.
+
+Allocation and collection hold the heap lock (`Heap.LOCK`), whose spin is a safepoint. A
+collection first stops every other CPU (`Smp.stopOthers`): it kicks each with an IPI whose handler
+requests preemption, and each CPU's next safepoint with interrupts on records its frame and waits
+in `Smp.stopIfRequested`. The collector walks those CPUs' running threads from there, then lets
+them go before sweeping, which only touches dead objects and can't race an allocation. A kick that
+lands while a CPU is between threads, with preemption requests ignored, is lost, so the collector
+kicks again every millisecond until every CPU has stopped. Nothing may allocate under the
+scheduler lock: a CPU spinning on it has interrupts off and can't stop, so that collection would
+never start (the heap panics instead). Under `-smp 4` in QEMU the stops cost
+`make conformance-gc` about 40%, with every allocation waking three CPUs.
 Java objects still come from the fixed bump arena in `.bss` (see Objects below).
 
 ## Platform
@@ -160,20 +171,19 @@ stub and the unwinder compute limits from it). Stack checks are off between savi
 limit and the next thread installing its own, so nothing compares one thread's rsp against
 another's limit.
 
-Scheduler and monitor state is guarded by one spinlock (`Scheduler.lock`, an `xchg` loop), taken
-with interrupts off. A switch hands the lock over: whichever thread is switched to releases it,
-possibly on another CPU than the one it last ran on. The allocator and collector are skipped by
-`Runtime.preempt` while they run, since neither is reentrant.
+Every CPU runs threads from one shared run queue, at the same time. Scheduler and monitor state
+is guarded by one spinlock (`Scheduler.lock`, an `xchg` loop in `duke.rt.SpinLock`), taken with
+interrupts off. A switch hands the lock over: whichever thread is switched to releases it,
+possibly on another CPU than the one it last ran on. Queueing a thread kicks an idle CPU with an
+IPI rather than leaving it for that CPU's next tick. The allocator and collector are skipped by
+`Runtime.preempt` while they run on that CPU, since neither is reentrant and a thread holding the
+heap lock mustn't move. Every CPU's local APIC timer ticks, and time comes from the HPET rather
+than from counting those interrupts, so the first CPU whose timer fires after a sleeper's deadline
+wakes it. `threads` in the shell shows which CPU each running thread is on.
 
-Threads move between CPUs, but only one CPU at a time, the runner, runs anything other than its
-idle thread. The heap, the collector and class initialization still assume Java runs on one CPU,
-so this keeps them correct until they stop doing so (#93). A CPU becomes the runner by taking a
-thread off the run queue while no CPU is, and gives it up when it switches back to its idle
-thread. Idle loops allocate nothing, so the collector, which only runs on the runner, skips the
-stacks of idle threads running on other CPUs. Every CPU's local APIC timer ticks, and time comes
-from the HPET rather than from counting those interrupts, so the first CPU whose timer fires after
-a sleeper's deadline wakes it: a thread that sleeps often runs on every CPU in turn. `threads` in
-the shell shows which CPU each running thread is on.
+The rest of the shared kernel state has its own interrupts-off locks: the console (reentrant per
+CPU, so a panic raised while printing can still print), and the physical frame allocator, which
+the heap and thread stacks both draw from.
 
 ### Monitors
 
@@ -293,8 +303,8 @@ Classes initialize lazily, with JVM semantics (JVMS 5.5): on the first `new`, st
 or static call, superclass first. Each class whose initialization runs code gets a one-byte flag
 and a stub. Trigger sites compile to `cmp byte [flag], 1; je skip; call stub`. No check is
 emitted for classes with nothing to run, or inside the class itself or a subclass. The stub moves
-the flag to "initializing" before `<clinit>` runs and records the thread doing it, with no
-safepoint between testing the flag and setting it. Another thread that arrives meanwhile waits in
+the flag from 0 to "initializing" with a `lock cmpxchg` before `<clinit>` runs, so only one
+thread on any CPU wins, and records the thread doing it. Another thread that arrives meanwhile waits in
 `Runtime.awaitInitialization`; the initializing thread itself carries on, so cycles and
 self-references see default values exactly as on HotSpot. That wait path calls into `Runtime`
 and `Scheduler`, so the compiler refuses to give either of them a runtime initializer.

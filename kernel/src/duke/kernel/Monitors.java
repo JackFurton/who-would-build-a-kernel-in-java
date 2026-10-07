@@ -26,7 +26,7 @@ public final class Monitors {
         Monitor nextFree;
     }
 
-    private static Monitor[] active;
+    private static Monitor[] active = new Monitor[16];
     private static int activeCount;
     private static Monitor free;
 
@@ -38,7 +38,7 @@ public final class Monitors {
         if (self == null) {
             return;
         }
-        long flags = Scheduler.lock();
+        long flags = lockWithRoom();
         long address = Magic.addressOf(object);
         Monitor monitor = find(address);
         if (monitor == null) {
@@ -225,24 +225,40 @@ public final class Monitors {
         return null;
     }
 
+    /**
+     * Takes the scheduler lock with a spare monitor and a free table slot ready, so opening one
+     * under the lock never allocates. Allocates them first, without the lock, when either is missing.
+     */
+    private static long lockWithRoom() {
+        while (true) {
+            long flags = Scheduler.lock();
+            if (free != null && activeCount < active.length) {
+                return flags;
+            }
+            int length = active.length;
+            boolean full = activeCount == length;
+            Scheduler.unlock(flags);
+            Monitor spare = new Monitor();
+            Monitor[] grown = full ? new Monitor[length * 2] : null;
+            flags = Scheduler.lock();
+            spare.nextFree = free;
+            free = spare;
+            if (grown != null && grown.length > active.length) {
+                for (int i = 0; i < activeCount; i++) {
+                    grown[i] = active[i];
+                }
+                active = grown;
+            }
+            Scheduler.unlock(flags);
+        }
+    }
+
+    /** Under lockWithRoom, so both the spare and the slot are there. */
     private static Monitor open(long address) {
         Monitor monitor = free;
-        if (monitor != null) {
-            free = monitor.nextFree;
-            monitor.nextFree = null;
-        } else {
-            monitor = new Monitor();
-        }
+        free = monitor.nextFree;
+        monitor.nextFree = null;
         monitor.object = address;
-        if (active == null) {
-            active = new Monitor[16];
-        } else if (activeCount == active.length) {
-            Monitor[] grown = new Monitor[active.length * 2];
-            for (int i = 0; i < activeCount; i++) {
-                grown[i] = active[i];
-            }
-            active = grown;
-        }
         active[activeCount++] = monitor;
         return monitor;
     }

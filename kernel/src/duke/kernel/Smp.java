@@ -7,8 +7,10 @@ import duke.kernel.time.HpetClock;
 import duke.kernel.time.Timer;
 import duke.kernel.x86.Gdt;
 import duke.kernel.x86.Idt;
+import duke.kernel.x86.Interrupts;
 import duke.kernel.x86.LocalApic;
 import duke.rt.Magic;
+import duke.rt.SpinLock;
 
 /**
  * Brings up the other CPUs. Limine starts them and parks each on its limine_mp_info, in
@@ -17,6 +19,12 @@ import duke.rt.Magic;
  * tables and stack before any Java runs. {@link #start} must finish before that memory is
  * reclaimed. Each CPU then loads its tables, starts its local APIC and timer, checks in, and
  * becomes the idle thread the scheduler made for it.
+ *
+ * <p>A collection stops every other CPU first ({@link #stopOthers}): it kicks each with an IPI,
+ * whose handler requests preemption, and the CPU's next safepoint with interrupts on records its
+ * frame and waits ({@link #stopIfRequested}). The collector walks that CPU's running thread from
+ * there, as precisely as a parked one. Nowhere else does a running thread stop: in an interrupt
+ * handler the frame below is wherever the interrupt hit, which has no stack map.
  */
 public final class Smp {
 
@@ -29,11 +37,19 @@ public final class Smp {
     private static final int GDT = 56;
     /** Generous: under emulation on a loaded machine a CPU can take a while to get scheduled at all. */
     private static final long CHECK_IN_NANOS = 5_000_000_000L;
+    /** Makes a CPU look at its preemption request: to stop it for a collection, or wake it for a thread. */
+    public static final int KICK_VECTOR = 0x30;
+    /** A kick can land between threads, while preemption requests are ignored, so kick again until it sticks. */
+    private static final long KICK_INTERVAL_NANOS = 1_000_000;
+    private static final long STOP_TIMEOUT_NANOS = 5_000_000_000L;
 
     /** Blocks for CPUs other than the boot CPU, whose block the compiler emits. Image data, so Limine's page tables map it too. */
     private static final long[] BLOCKS = new long[MAX_CPUS * BLOCK_LONGS];
     private static final boolean[] ONLINE = new boolean[MAX_CPUS];
     private static final int[] APIC_IDS = new int[MAX_CPUS];
+    private static final int[] STOPPING = new int[1];
+    /** Each stopped CPU's frame in stopIfRequested, where the collector starts its walk; 0 while running. */
+    private static final long[] STOPPED_FRAMES = new long[MAX_CPUS];
     private static int cpus = 1;
 
     private Smp() {
@@ -50,6 +66,10 @@ public final class Smp {
         if (response == 0) {
             return true;
         }
+        Interrupts.register(KICK_VECTOR, frame -> {
+            LocalApic.endOfInterrupt();
+            Magic.requestPreemption();
+        });
         int bspApic = Magic.peekInt(response + 12);
         long count = Magic.peekLong(response + 16);
         long infos = Magic.peekLong(response + 24);
@@ -115,6 +135,87 @@ public final class Smp {
             }
         }
         return online;
+    }
+
+    /** Interrupts the CPU so it looks at its run queue and any stop request. */
+    public static void kick(int cpu) {
+        LocalApic.sendIpi(APIC_IDS[cpu], KICK_VECTOR);
+    }
+
+    /** From the collector, holding the heap lock: returns once every other CPU has stopped at a safepoint. */
+    public static void stopOthers() {
+        if (onlineCount() < 2) {
+            return;
+        }
+        STOPPING[0] = 1;
+        long deadline = HpetClock.nanos() + STOP_TIMEOUT_NANOS;
+        long nextKick = 0;
+        int straggler;
+        while ((straggler = stillRunning()) >= 0) {
+            long now = HpetClock.nanos();
+            if (now >= nextKick) {
+                for (int cpu = 0; cpu < cpus; cpu++) {
+                    if (cpu != Magic.cpuIndex() && ONLINE[cpu] && STOPPED_FRAMES[cpu] == 0) {
+                        kick(cpu);
+                    }
+                }
+                nextKick = now + KICK_INTERVAL_NANOS;
+            }
+            if (now > deadline) {
+                Panic.panic("cpu ", Integer.toString(straggler), " never stopped for a collection");
+            }
+            Magic.pause();
+        }
+    }
+
+    /**
+     * Lets the stopped CPUs go, and waits until each has: one that hasn't cleared its frame yet
+     * would look stopped to the next collection.
+     */
+    public static void resumeOthers() {
+        if (STOPPING[0] == 0) {
+            return;
+        }
+        STOPPING[0] = 0;
+        for (int cpu = 0; cpu < cpus; cpu++) {
+            while (STOPPED_FRAMES[cpu] != 0) {
+                Magic.pause();
+            }
+        }
+    }
+
+    /** Where to start walking the stack of the thread running on a stopped CPU; 0 if it isn't stopped. */
+    public static long stoppedFrame(int cpu) {
+        return STOPPED_FRAMES[cpu];
+    }
+
+    /** From Runtime.preempt, at a safepoint: waits out a collection running on another CPU. */
+    public static void stopIfRequested() {
+        if (STOPPING[0] == 0) {
+            return;
+        }
+        long flags = Magic.flags();
+        if (!SpinLock.interruptsOn(flags)) {
+            // An interrupt handler, or a short interrupts-off section; the collector kicks again.
+            return;
+        }
+        Magic.disableInterrupts();
+        int cpu = Magic.cpuIndex();
+        STOPPED_FRAMES[cpu] = Magic.framePointer();
+        while (STOPPING[0] != 0) {
+            Magic.pause();
+        }
+        STOPPED_FRAMES[cpu] = 0;
+        Magic.enableInterrupts();
+    }
+
+    private static int stillRunning() {
+        for (int cpu = 0; cpu < cpus; cpu++) {
+            if (cpu != Magic.cpuIndex() && ONLINE[cpu] && STOPPED_FRAMES[cpu] == 0) {
+                return cpu;
+            }
+        }
+        return -1;
     }
 
     private static boolean allOnline() {

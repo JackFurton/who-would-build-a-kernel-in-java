@@ -2,10 +2,13 @@ package duke.rt;
 
 import duke.kernel.Panic;
 import duke.kernel.Scheduler;
+import duke.kernel.Smp;
 
 /**
- * Non-moving mark-sweep. Roots are static reference fields, build-time reference arrays, and every
- * frame on every thread's stack, read through the compiler's per-call-site stack maps. Marking uses a bit per
+ * Non-moving mark-sweep, stopping the world. Roots are static reference fields, build-time reference
+ * arrays, and every frame on every thread's stack, read through the compiler's per-call-site stack
+ * maps: parked threads' from where they switched out, the threads running on other CPUs' from where
+ * those CPUs stopped (Smp.stopOthers), always at a safepoint. Marking uses a bit per
  * 8 heap bytes and an explicit mark stack. Sweeping walks both heap regions object by object,
  * coalesces dead runs into holes and rebuilds the free list.
  *
@@ -29,6 +32,7 @@ final class Collector {
 
     /** Returns live bytes. */
     static long collect() {
+        Smp.stopOthers();
         clearMarks();
         markStackTop = markStack;
         markStaticRoots();
@@ -40,7 +44,16 @@ final class Collector {
                 markStack(frame);
             }
         }
+        for (int cpu = 0; cpu < Smp.cpuCount(); cpu++) {
+            long frame = Smp.stoppedFrame(cpu);
+            if (frame != 0) {
+                markStack(frame);
+            }
+        }
         drain();
+        // Sweeping touches only dead objects and headers, and nobody can allocate while the heap
+        // lock is held, so the others can run again already.
+        Smp.resumeOthers();
         long live = sweep();
         collections++;
         lastLive = live;

@@ -1,12 +1,48 @@
 package duke.kernel;
 
-/** Kernel text output: the serial port always, the framebuffer once it's up. */
+import duke.rt.Magic;
+import duke.rt.SpinLock;
+
+/**
+ * Kernel text output: the serial port always, the framebuffer once it's up. One CPU at a time, a
+ * whole string at a time. The lock is reentrant on its CPU, so a panic raised while printing can
+ * still print.
+ */
 public final class Console {
+
+    /** The lock word, then the holding CPU plus one. */
+    private static final int[] LOCK = new int[2];
+    private static final long NESTED = -1;
 
     private Console() {
     }
 
     public static void write(int c) {
+        long flags = lock();
+        put(c);
+        unlock(flags);
+    }
+
+    public static void print(String s) {
+        // Before locking: a NullPointerException in here would leave the lock held.
+        if (s == null) {
+            s = "null";
+        }
+        long flags = lock();
+        for (int i = 0; i < s.length(); i++) {
+            put(s.charAt(i));
+        }
+        unlock(flags);
+    }
+
+    public static void println(String s) {
+        long flags = lock();
+        print(s);
+        put('\n');
+        unlock(flags);
+    }
+
+    private static void put(int c) {
         if (c == '\n') {
             Serial.write('\r');
         }
@@ -14,15 +50,21 @@ public final class Console {
         FramebufferConsole.write(c);
     }
 
-    public static void print(String s) {
-        for (int i = 0; i < s.length(); i++) {
-            write(s.charAt(i));
+    private static long lock() {
+        int self = Magic.cpuIndex() + 1;
+        if (LOCK[1] == self) {
+            return NESTED;
         }
+        long flags = SpinLock.lockInterruptsOff(LOCK);
+        LOCK[1] = self;
+        return flags;
     }
 
-    public static void println(String s) {
-        print(s);
-        write('\n');
+    private static void unlock(long flags) {
+        if (flags != NESTED) {
+            LOCK[1] = 0;
+            SpinLock.unlockInterruptsOff(LOCK, flags);
+        }
     }
 
     public static void print(long value) {

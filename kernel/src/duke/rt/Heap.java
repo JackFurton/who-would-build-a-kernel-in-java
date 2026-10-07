@@ -1,6 +1,7 @@
 package duke.rt;
 
 import duke.kernel.Panic;
+import duke.kernel.Scheduler;
 
 /**
  * The Java heap. Early boot bump-allocates from a small arena the compiler reserves in .bss; once
@@ -49,6 +50,11 @@ public final class Heap {
     static long freeList;
     private static long threshold = MIN_THRESHOLD;
     private static boolean collecting;
+    /**
+     * The lock word, then the holding CPU plus one. Allocating and collecting both hold it, and a
+     * CPU waiting for it spins at a safepoint, so it can stop for the collection it's waiting on.
+     */
+    private static final int[] LOCK = new int[2];
     private static int stressInterval;
     private static int allocationsSinceCollection;
 
@@ -143,19 +149,39 @@ public final class Heap {
         }
     }
 
-    /** Inside an allocation or collection, which mustn't be preempted: neither is reentrant. */
+    /**
+     * This CPU is inside an allocation or collection, which mustn't be preempted: neither is
+     * reentrant, and the thread mustn't move to another CPU while it holds the lock.
+     */
     static boolean allocating() {
-        return allocating || collecting;
+        return LOCK[1] == Magic.cpuIndex() + 1;
     }
 
-    private static boolean allocating;
+    /** Takes the lock unless this CPU holds it already; true if it did. */
+    private static boolean lock() {
+        if (allocating()) {
+            return false;
+        }
+        if (Scheduler.lockedHere()) {
+            // A CPU spinning on the scheduler lock can't stop, so the collection would wait forever.
+            Panic.panic("allocating under the scheduler lock");
+        }
+        SpinLock.lock(LOCK);
+        // No safepoint since the lock was taken, so this is still the CPU that took it.
+        LOCK[1] = Magic.cpuIndex() + 1;
+        return true;
+    }
+
+    private static void unlock() {
+        LOCK[1] = 0;
+        SpinLock.unlock(LOCK);
+    }
 
     private static long allocate(long size) {
-        boolean outer = !allocating;
-        allocating = true;
+        boolean outer = lock();
         long address = allocateUnpreempted(size);
         if (outer) {
-            allocating = false;
+            unlock();
         }
         return address;
     }
@@ -267,6 +293,14 @@ public final class Heap {
 
     /** Runs a full collection. Called by allocation, System.gc(), and the stress mode. */
     public static void collect() {
+        boolean outer = lock();
+        collectLocked();
+        if (outer) {
+            unlock();
+        }
+    }
+
+    private static void collectLocked() {
         if (backing == null || collecting) {
             return;
         }

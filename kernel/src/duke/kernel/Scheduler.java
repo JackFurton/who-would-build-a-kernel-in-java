@@ -3,6 +3,7 @@ package duke.kernel;
 import duke.kernel.mm.KernelStacks;
 import duke.kernel.time.Timer;
 import duke.rt.Magic;
+import duke.rt.SpinLock;
 import duke.rt.Tib;
 
 /**
@@ -12,14 +13,13 @@ import duke.rt.Tib;
  * sits at a call site with a stack map, and the collector scans parked stacks as precisely as the
  * running one.
  *
- * <p>Every CPU has an idle thread, but only one CPU at a time, the runner, runs the others: the
- * heap, the collector and class initialization still assume Java runs on one CPU. A CPU becomes
- * the runner by taking a thread off the queue while no CPU is, and stops being it when it goes
- * back to its idle thread. Idle loops allocate nothing, so the collector, which only ever runs on
- * the runner, can skip the stacks of the idle threads running elsewhere.
+ * <p>Every CPU runs threads from one shared queue, and has an idle thread for when the queue is
+ * empty. Queueing a thread kicks an idle CPU (Smp.kick) so it doesn't wait for its next tick.
  *
  * <p>All scheduler state is guarded by {@link #lock}, which also turns interrupts off. A switch
- * hands the lock over: the thread switched to is the one that releases it.
+ * hands the lock over: the thread switched to is the one that releases it. Nothing allocates
+ * under it: a CPU spinning on it with interrupts off can't stop for a collection, so a collection
+ * started under it would wait forever.
  */
 public final class Scheduler {
 
@@ -38,13 +38,12 @@ public final class Scheduler {
         "new", "runnable", "running", "sleeping", "joining", "dead", "blocked", "waiting"};
     private static final long INTERRUPT_FLAG = 1 << 9;
     private static final long MAIN_ID = 1;
-    private static final int NO_CPU = -1;
 
     /** One thread's scheduling state; java.lang.Thread holds one. */
     public static final class Task {
         final Thread thread;
         /** 1 for main; nothing reuses an id. */
-        final long id = ++lastId;
+        final long id;
         int state = NEW;
         /** Lowest address of the stack; the boot stack for main, which is never freed. */
         long stackBottom;
@@ -63,19 +62,26 @@ public final class Scheduler {
 
         public Task(Thread thread) {
             this.thread = thread;
+            long flags = lock();
+            id = ++lastId;
+            unlock(flags);
         }
     }
 
-    private static final int[] LOCK = new int[1];
+    /** The lock word, then the holding CPU plus one. */
+    private static final int[] LOCK = new int[2];
     private static final Task[] CURRENT = new Task[Smp.MAX_CPUS];
     private static final Task[] IDLE = new Task[Smp.MAX_CPUS];
-    /** The CPU running threads other than idle ones, or NO_CPU. */
-    private static int runner = NO_CPU;
     private static long lastId;
+    private static int threadNumber;
+    private static int lastKicked;
     private static Task runHead;
     private static Task runTail;
-    /** Every live thread, including the idle ones: the collector scans their stacks. */
-    private static Task[] tasks;
+    /**
+     * Every live thread, including the idle ones: the collector scans their stacks. Sized for every
+     * stack there can be, plus main's, so adding never allocates under the lock.
+     */
+    private static final Task[] tasks = new Task[KernelStacks.MAX_STACKS + 1];
     private static int taskCount;
     /** Exited, with its stack still to free: it couldn't free the stack it was running on. */
     private static Task zombie;
@@ -88,13 +94,11 @@ public final class Scheduler {
      * off, and the other CPUs not started yet.
      */
     public static void init() {
-        tasks = new Task[8];
         Task main = new Thread("main").kernelTask();
         main.stackBottom = Magic.stackBase();
         main.state = RUNNING;
         main.ran = true;
         CURRENT[0] = main;
-        runner = 0;
         add(main);
         Task idle = new Thread(Scheduler::idleLoop, "idle 0").kernelTask();
         if (!prepare(idle)) {
@@ -129,21 +133,34 @@ public final class Scheduler {
     static long lock() {
         long flags = Magic.flags();
         Magic.disableInterrupts();
-        long word = Magic.addressOf(LOCK) + Tib.ARRAY_DATA;
-        while (Magic.exchangeInt(word, 1) != 0) {
-            while (LOCK[0] != 0) {
-                Magic.pause();
-            }
-        }
+        SpinLock.lock(LOCK);
+        LOCK[1] = Magic.cpuIndex() + 1;
         return flags;
     }
 
     /** Releases the lock and turns interrupts back on if {@code flags} had them on. */
     static void unlock(long flags) {
-        LOCK[0] = 0;
-        if ((flags & INTERRUPT_FLAG) != 0) {
-            Magic.enableInterrupts();
-        }
+        release();
+        SpinLock.restoreInterrupts(flags);
+    }
+
+    /** Releases the lock, leaving interrupts off. */
+    private static void release() {
+        LOCK[1] = 0;
+        SpinLock.unlock(LOCK);
+    }
+
+    /** For java.lang.Thread's default names, Thread-0 onwards. */
+    public static int nextThreadNumber() {
+        long flags = lock();
+        int number = threadNumber++;
+        unlock(flags);
+        return number;
+    }
+
+    /** This CPU holds the lock. */
+    public static boolean lockedHere() {
+        return LOCK[1] == Magic.cpuIndex() + 1;
     }
 
     /** From the timer interrupt, as its last act: anything after would see the request itself. */
@@ -169,12 +186,15 @@ public final class Scheduler {
     }
 
     public static boolean isAlive(long id) {
+        long flags = lock();
+        boolean alive = false;
         for (int i = 0; i < taskCount; i++) {
             if (tasks[i].id == id) {
-                return true;
+                alive = true;
             }
         }
-        return false;
+        unlock(flags);
+        return alive;
     }
 
     public static void start(Task task) {
@@ -199,7 +219,7 @@ public final class Scheduler {
     public static void yield() {
         long flags = lock();
         wakeSleepers();
-        Task next = takeRunnable();
+        Task next = dequeue();
         if (next != null) {
             Task self = current();
             if (self != IDLE[Magic.cpuIndex()]) {
@@ -217,21 +237,18 @@ public final class Scheduler {
         }
     }
 
-    /**
-     * Waits for something to happen: runs other threads if any are ready, else halts until an
-     * interrupt. Still the runner while halted, since this thread is still running here.
-     */
+    /** Waits for something to happen: runs other threads if any are ready, else halts until an interrupt. */
     public static void pause() {
         long flags = lock();
         wakeSleepers();
-        Task next = takeRunnable();
+        Task next = dequeue();
         if (next != null) {
             enqueue(current());
             switchTo(next);
             unlock(flags);
             return;
         }
-        LOCK[0] = 0;
+        release();
         // sti; hlt back to back: an interrupt can't slip in between and leave us halted past it.
         Magic.enableInterrupts();
         Magic.halt();
@@ -291,18 +308,39 @@ public final class Scheduler {
         return false;
     }
 
-    /** One line per thread, for the shell. */
+    /** One line per thread, for the shell. A snapshot taken under the lock, printed after. */
     public static void list() {
-        for (int i = 0; i < taskCount; i++) {
-            Task task = tasks[i];
-            String where = "";
+        Task[] snapshot = new Task[tasks.length];
+        int[] states = new int[tasks.length];
+        int[] cpus = new int[tasks.length];
+        long flags = lock();
+        int count = taskCount;
+        for (int i = 0; i < count; i++) {
+            snapshot[i] = tasks[i];
+            states[i] = tasks[i].state;
+            cpus[i] = -1;
             for (int cpu = 0; cpu < Smp.cpuCount(); cpu++) {
-                if (CURRENT[cpu] == task) {
-                    where = " on cpu " + cpu;
+                if (CURRENT[cpu] == tasks[i]) {
+                    cpus[i] = cpu;
                 }
             }
-            Console.println(task.thread.getName() + ": " + STATE_NAMES[task.state] + where);
         }
+        unlock(flags);
+        for (int i = 0; i < count; i++) {
+            Console.println(snapshot[i].thread.getName() + ": " + STATE_NAMES[states[i]]
+                    + (cpus[i] < 0 ? "" : " on cpu " + cpus[i]));
+        }
+    }
+
+    /** CPUs running a thread other than their idle one, for tests. */
+    public static int busyCpus() {
+        int busy = 0;
+        for (int cpu = 0; cpu < Smp.cpuCount(); cpu++) {
+            if (CURRENT[cpu] != null && CURRENT[cpu] != IDLE[cpu]) {
+                busy++;
+            }
+        }
+        return busy;
     }
 
     /**
@@ -341,12 +379,12 @@ public final class Scheduler {
         while (true) {
             lock();
             wakeSleepers();
-            Task next = takeRunnable();
+            Task next = dequeue();
             if (next != null) {
                 switchTo(next);
                 unlock(INTERRUPT_FLAG);
             } else {
-                LOCK[0] = 0;
+                release();
                 Magic.enableInterrupts();
                 Magic.halt();
             }
@@ -385,9 +423,6 @@ public final class Scheduler {
             previous.state = RUNNING;
             return;
         }
-        if (next == IDLE[cpu]) {
-            runner = NO_CPU;
-        }
         Magic.cancelPreemption();
         previous.stackLimit = Magic.stackLimit();
         // Checks off until the new thread installs its own limit: ours means nothing on its stack.
@@ -420,23 +455,8 @@ public final class Scheduler {
     /** What a thread that can't go on should switch to: a queued thread, or this CPU's idle thread. */
     static Task next() {
         wakeSleepers();
-        Task task = takeRunnable();
+        Task task = dequeue();
         return task != null ? task : IDLE[Magic.cpuIndex()];
-    }
-
-    /** A queued thread, if this CPU is the runner or can become it; else null. */
-    private static Task takeRunnable() {
-        if (runHead == null) {
-            return null;
-        }
-        int cpu = Magic.cpuIndex();
-        if (runner != cpu) {
-            if (runner != NO_CPU) {
-                return null;
-            }
-            runner = cpu;
-        }
-        return dequeue();
     }
 
     private static void wakeSleepers() {
@@ -460,6 +480,21 @@ public final class Scheduler {
             runTail.next = task;
         }
         runTail = task;
+        kickIdleCpu();
+    }
+
+    /** Wakes one other idle CPU, a different one each time, to take what was just queued. */
+    private static void kickIdleCpu() {
+        int self = Magic.cpuIndex();
+        int count = Smp.cpuCount();
+        for (int i = 1; i <= count; i++) {
+            int cpu = (lastKicked + i) % count;
+            if (cpu != self && IDLE[cpu] != null && CURRENT[cpu] == IDLE[cpu]) {
+                lastKicked = cpu;
+                Smp.kick(cpu);
+                return;
+            }
+        }
     }
 
     private static Task dequeue() {
@@ -475,13 +510,6 @@ public final class Scheduler {
     }
 
     private static void add(Task task) {
-        if (taskCount == tasks.length) {
-            Task[] grown = new Task[tasks.length * 2];
-            for (int i = 0; i < taskCount; i++) {
-                grown[i] = tasks[i];
-            }
-            tasks = grown;
-        }
         tasks[taskCount++] = task;
     }
 
