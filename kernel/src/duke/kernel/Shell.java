@@ -1,6 +1,7 @@
 package duke.kernel;
 
 import duke.kernel.acpi.Madt;
+import duke.kernel.fs.Fat;
 import duke.kernel.mm.PhysicalMemory;
 import duke.kernel.pci.Pci;
 import duke.kernel.time.Timer;
@@ -108,7 +109,7 @@ public final class Shell {
         }
         switch (words.get(0)) {
             case "help" -> {
-                Console.println("commands: help, uptime, mem, gc, cpus, threads, pci, echo <text>, clear, panic");
+                Console.println("commands: help, uptime, mem, gc, cpus, threads, pci, ls [path], cat <path>, echo <text>, clear, panic");
                 if (!Commands.names().isEmpty()) {
                     StringBuilder more = new StringBuilder("also:");
                     for (int i = 0; i < Commands.names().size(); i++) {
@@ -137,6 +138,14 @@ public final class Shell {
                     Console.println(f.describe());
                 }
             }
+            case "ls" -> ls(words.size() > 1 ? words.get(1) : "/");
+            case "cat" -> {
+                if (words.size() < 2) {
+                    Console.println("usage: cat <path>");
+                } else {
+                    cat(words.get(1));
+                }
+            }
             case "echo" -> Console.println(line.substring(4).strip());
             case "panic" -> Panic.panic("requested from the shell");
             default -> {
@@ -147,17 +156,72 @@ public final class Shell {
         }
     }
 
+    private static void ls(String path) {
+        Fat fs = Fat.mounted();
+        if (fs == null) {
+            Console.println("ls: no filesystem mounted");
+            return;
+        }
+        try {
+            for (Fat.Entry e : fs.list(path)) {
+                if (!e.name.equals(".") && !e.name.equals("..")) {
+                    Console.println(e.directory ? e.name + "/" : e.name + "  " + e.size);
+                }
+            }
+        } catch (IllegalArgumentException e) {
+            Console.println("ls: " + e.getMessage());
+        }
+    }
+
+    private static void cat(String path) {
+        Fat fs = Fat.mounted();
+        if (fs == null) {
+            Console.println("cat: no filesystem mounted");
+            return;
+        }
+        byte[] contents;
+        try {
+            contents = fs.read(path);
+        } catch (IllegalArgumentException e) {
+            Console.println("cat: " + e.getMessage());
+            return;
+        }
+        StringBuilder text = new StringBuilder();
+        for (byte b : contents) {
+            text.append((char) (b & 0xFF));
+        }
+        Console.print(text.toString());
+        if (contents.length > 0 && contents[contents.length - 1] != '\n') {
+            Console.println("");
+        }
+    }
+
+    /** Words split on spaces, except inside double quotes, which make one word without the quotes. */
     private static List<String> split(String line) {
         List<String> words = new ArrayList<>();
-        int start = -1;
-        for (int i = 0; i <= line.length(); i++) {
-            boolean space = i == line.length() || line.charAt(i) == ' ';
-            if (space && start >= 0) {
-                words.add(line.substring(start, i));
-                start = -1;
-            } else if (!space && start < 0) {
-                start = i;
+        StringBuilder word = null;
+        boolean quoted = false;
+        for (int i = 0; i < line.length(); i++) {
+            char c = line.charAt(i);
+            if (c == '"') {
+                quoted = !quoted;
+                if (word == null) {
+                    word = new StringBuilder();
+                }
+            } else if (c == ' ' && !quoted) {
+                if (word != null) {
+                    words.add(word.toString());
+                    word = null;
+                }
+            } else {
+                if (word == null) {
+                    word = new StringBuilder();
+                }
+                word.append(c);
             }
+        }
+        if (word != null) {
+            words.add(word.toString());
         }
         return words;
     }

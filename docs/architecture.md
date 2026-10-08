@@ -132,6 +132,13 @@ suppressed. Heap arrays aren't physically contiguous, so sectors pass through a 
 time. `make ktest` attaches a 64-sector disk with a known pattern behind a PCIe root port, which also
 gives the PCI scan a bridge to follow.
 
+`duke.kernel.fs.Fat` reads FAT32 and FAT16 volumes, on a whole disk or in the first FAT partition
+of an MBR, and the boot mounts the first one it finds for the shell's `ls` and `cat`. It follows
+cluster chains through the FAT and reads long names, checking each against its short name's
+checksum. A 16-bit FAT size of 0 marks FAT32: the spec decides by cluster count, but QEMU's
+`fat:32:` disks are too small for that. Those disks also get a FAT16 boot sector, so FAT32 tests
+use images from `tools/FatImage.java`, and QEMU's `fat:16:` directories cover FAT16.
+
 Time comes from the local APIC timer. `Pic.disable()` remaps the legacy PICs to vectors
 0xE0-0xEF and masks them, so a spurious IRQ can't land on a CPU exception vector. The APIC timer
 is calibrated against the HPET's main counter over 10 ms, then runs periodic at 100 Hz into a
@@ -153,7 +160,7 @@ its BDF by `tools/GenerateFont.java` into a string literal, so the glyphs are im
 PS/2 keyboard (IRQ 1, scan code set 1, US layout) and COM1's receive interrupt (IRQ 4) both push
 characters into `Input`, a ring buffer of image arrays, so handlers never allocate. After the boot
 log, `Kernel.main` runs `Shell`: line editing plus `help`, `uptime`, `mem`, `gc`, `cpus`,
-`threads`, `pci`, `echo` and `panic`. `make shell-test` boots the real kernel with serial on pipes and the QEMU monitor on a
+`threads`, `pci`, `ls`, `cat`, `echo` and `panic`. `make shell-test` boots the real kernel with serial on pipes and the QEMU monitor on a
 socket. It types over serial and as PS/2 keystrokes (`sendkey`) and checks the replies.
 
 ## Threads
