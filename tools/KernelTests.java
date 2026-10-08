@@ -39,12 +39,20 @@ public class KernelTests {
         Path esp = Harness.buildImage(classes, "duke/ktest/Main.main", OUT);
         Path serial = OUT.resolve("serial.log");
         Path disk = writeDisk(OUT.resolve("disk.img"));
+        Path fat32 = OUT.resolve("fat32.img");
+        FatImage.writeSample(fat32);
+        Path fat16 = OUT.resolve("fat16");
+        FatImage.writeSampleDirectory(fat16);
         // The disk sits behind a PCIe root port, so the PCI scan has a bridge to follow.
         Process qemu = new ProcessBuilder("tools/qemu.sh", esp.toString(), "-serial", "file:" + serial,
                 "-device", "isa-debug-exit,iobase=0xf4,iosize=0x04",
                 "-device", "pcie-root-port,id=rp0,chassis=1",
                 "-drive", "if=none,id=disk0,format=raw,file=" + disk,
-                "-device", "virtio-blk-pci,drive=disk0,bus=rp0")
+                "-device", "virtio-blk-pci,drive=disk0,bus=rp0",
+                "-drive", "if=none,id=fat32,format=raw,file=" + fat32,
+                "-device", "virtio-blk-pci,drive=fat32",
+                "-drive", "if=none,id=fat16,format=raw,snapshot=on,file=fat:16:" + fat16,
+                "-device", "virtio-blk-pci,drive=fat16")
                 .directory(Harness.ROOT.toFile())
                 .redirectErrorStream(true)
                 .redirectOutput(OUT.resolve("qemu.txt").toFile())

@@ -40,7 +40,11 @@ public class ShellTest {
         Files.createDirectories(OUT);
         // Unix socket paths max out at 108 bytes, which a CI checkout path alone can come close to.
         Path monitor = Files.createTempDirectory("duke").resolve("monitor.sock");
+        Path fat32 = OUT.resolve("fat32.img");
+        FatImage.writeSample(fat32);
         Process qemu = new ProcessBuilder("tools/qemu.sh", ESP.toString(), "-serial", "stdio",
+                "-drive", "if=none,id=fat32,format=raw,snapshot=on,file=" + fat32,
+                "-device", "virtio-blk-pci,drive=fat32",
                 "-monitor", "unix:" + monitor + ",server=on,wait=off",
                 // QEMU's own account of guest errors and CPU resets, for boots that die before the kernel runs.
                 "-d", "guest_errors,cpu_reset,unimp", "-D", OUT.resolve("qemu.log").toString())
@@ -79,6 +83,9 @@ public class ShellTest {
             failures += check("threads", () -> type(serial, "threads\n"), "main: running");
             failures += check("pci host bridge", () -> type(serial, "pci\n"), "00:00.0 8086:29c0 class 06.00.00");
             failures += check("pci ahci", () -> type(serial, "pci\n"), "00:1f.2 8086:2922 class 01.06.01");
+            failures += check("ls", () -> type(serial, "ls\n"), "A Long File Name.md  16");
+            failures += check("cat", () -> type(serial, "cat hello.txt\n"), "hello from FAT32");
+            failures += check("cat nested", () -> type(serial, "cat docs/deeper/notes.txt\n"), "nested");
             failures += check("ps/2 insert", () -> keys(monitor, "e c h o spc d u e left k ret"), "duke");
             failures += check("javascript command", () -> type(serial, "hello\n"),
                     "hello from JavaScript running in the Duke kernel");

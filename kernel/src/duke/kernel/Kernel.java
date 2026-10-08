@@ -4,6 +4,7 @@ import duke.boot.Limine;
 import duke.kernel.acpi.Acpi;
 import duke.kernel.acpi.Hpet;
 import duke.kernel.acpi.Madt;
+import duke.kernel.fs.Fat;
 import duke.kernel.mm.KernelAddressSpace;
 import duke.kernel.mm.KernelHeap;
 import duke.kernel.mm.PhysicalMemory;
@@ -43,11 +44,13 @@ public final class Kernel {
         Madt.init();
         Hpet.init();
         Pci.init();
-        VirtioBlock.init();
         Pic.disable();
         LocalApic.init();
         Timer.init();
         Scheduler.init();
+        // Disk requests time out against the HPET clock, and the disk lock is a monitor.
+        VirtioBlock.init();
+        Fat.init();
         // Not before: the boot CPU's old GDT and page tables, and the other CPUs while Limine had
         // them parked, all lived in this memory. A CPU that never checked in might still be there.
         if (Smp.start()) {
@@ -128,6 +131,9 @@ public final class Kernel {
         for (VirtioBlock disk : VirtioBlock.devices()) {
             Console.println("virtio-blk: " + disk.capacity() + " sectors at " + disk.function().address()
                     + (disk.readOnly() ? ", read-only" : ""));
+        }
+        if (Fat.mounted() != null) {
+            Console.println("fat: " + (Fat.mounted().fat32() ? "FAT32" : "FAT16") + " on " + Fat.mounted().disk().function().address());
         }
     }
 

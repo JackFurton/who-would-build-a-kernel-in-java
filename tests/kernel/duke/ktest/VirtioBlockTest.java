@@ -10,8 +10,12 @@ import duke.kernel.virtio.VirtioBlock;
 final class VirtioBlockTest {
 
     private static VirtioBlock disk() {
-        assertEquals(1, VirtioBlock.devices().size(), "one virtio disk");
-        return VirtioBlock.devices().get(0);
+        for (VirtioBlock disk : VirtioBlock.devices()) {
+            if (disk.capacity() == 64) {
+                return disk;
+            }
+        }
+        throw new AssertionError("no 64-sector virtio disk among " + VirtioBlock.devices().size());
     }
 
     private static void assertSector(long n, byte[] buffer, int offset) {
@@ -32,10 +36,9 @@ final class VirtioBlockTest {
         }
     }
 
-    static void testCapacityMatchesTheImage() {
-        VirtioBlock disk = disk();
-        assertEquals(64, disk.capacity(), "sectors");
-        assertTrue(!disk.readOnly(), "writable");
+    static void testFoundEveryDiskAndTheTestDiskIsWritable() {
+        assertEquals(3, VirtioBlock.devices().size(), "the test disk and two FAT disks");
+        assertTrue(!disk().readOnly(), "writable");
     }
 
     // Behind the harness's root port, so the scan found it by following a bridge.
