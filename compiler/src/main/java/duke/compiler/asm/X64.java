@@ -397,6 +397,18 @@ public final class X64 {
         out.emit8(0xCF);
     }
 
+    public void swapgs() {
+        out.emit8(0x0F);
+        out.emit8(0x01);
+        out.emit8(0xF8);
+    }
+
+    public void sysretq() {
+        out.emit8(0x48);
+        out.emit8(0x0F);
+        out.emit8(0x07);
+    }
+
     public void cpuid() {
         out.emit8(0x0F);
         out.emit8(0xA2);

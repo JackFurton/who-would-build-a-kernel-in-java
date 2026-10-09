@@ -140,6 +140,8 @@ class X64Test {
                 c("rdmsr", "0f 32", X64::rdmsr),
                 c("wrmsr", "0f 30", X64::wrmsr),
                 c("iretq", "48 cf", X64::iretq),
+                c("sysretq", "48 0f 07", X64::sysretq),
+                c("swapgs", "0f 01 f8", X64::swapgs),
                 c("cpuid", "0f a2", X64::cpuid),
                 c("rdtsc", "0f 31", X64::rdtsc),
                 c("pushfq", "9c", X64::pushfq),

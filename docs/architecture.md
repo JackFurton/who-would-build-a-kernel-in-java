@@ -26,7 +26,7 @@ common path. That path clears DF, saves every general-purpose register, and call
 `duke.kernel.x86.Interrupts.dispatch(frame)` with the address of the saved state. It restores
 after, and returns with `iretq`. `Idt` writes the gates in Java and loads them with `lidt`.
 
-We load our own GDT (`Gdt`: kernel code 0x08, data 0x10, and a TSS) before the IDT. Limine's lives in
+We load our own GDT (`Gdt`: kernel code 0x08, data 0x10, a TSS, user data 0x33 and code 0x3B) before the IDT. Limine's lives in
 bootloader-reclaimable memory, and the CPU reads the GDT on every interrupt. The TSS provides IST 1,
 a separate stack for double faults. A page below the boot stack is left unmapped, so running off the
 stack faults. That fault can't push its frame, so it escalates to a double fault, which lands on
@@ -204,6 +204,31 @@ wakes it. `threads` in the shell shows which CPU each running thread is on.
 The rest of the shared kernel state has its own interrupts-off locks: the console (reentrant per
 CPU, so a panic raised while printing can still print), and the physical frame allocator, which
 the heap and thread stacks both draw from.
+
+### User mode
+
+`duke.kernel.user.UserMode.run(entry, stack)` runs ring 3 code on the calling thread and returns
+its exit status. `Magic.enterUser` leaves a frame record at a 16-byte-aligned kernel stack top, a
+saved rbp under a return address back into `run`, and points the TSS's rsp0 and the CPU block at
+it, then `iretq`s to ring 3. Interrupts and system calls from ring 3 land just below that record.
+`Magic.leaveUser` cuts back to it, which is how exit and user faults return from `run`. An
+exception in ring 3 (anything under vector 32 but NMI and machine checks) comes back as a thrown
+`UserMode.Fault`, not a panic.
+
+`syscall` goes to a compiler-emitted stub (`IA32_LSTAR`) that switches to the recorded kernel
+stack, saves registers in the interrupt frame's layout and calls `SystemCalls.dispatch`, which
+uses Linux's numbers and registers. So far that's `write` to fd 1 or 2 (checking every page of
+the buffer is mapped for ring 3) and `exit`. Ring 3 can load its own GS (one `mov gs` used to
+take the machine down), so both entry paths and `enterUser` `swapgs` at the boundary. Each `run`
+starts ring 3 with a GS base of 0, but nothing saves it per thread yet, so a thread that moves
+CPUs picks up whatever that CPU's last user left there.
+
+The return address in that record is a safepoint. Both entry stubs point rbp at the record, so the
+collector and the unwinder walk from a handler straight into `run`'s frame and on up. User code
+never reaches a prologue, so preemption and stop-the-world requests are taken on the way back:
+after a handler for an interrupt from ring 3, `Interrupts.dispatch` turns interrupts back on and
+calls `UserMode.interrupted`, whose prologue can yield. The thread may come back on another CPU,
+so every return to ring 3 re-points that CPU's rsp0 at the thread's kernel stack first.
 
 ### Monitors
 

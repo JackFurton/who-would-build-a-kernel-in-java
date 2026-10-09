@@ -10,6 +10,7 @@ import duke.kernel.mm.KernelHeap;
 import duke.kernel.mm.PhysicalMemory;
 import duke.kernel.pci.Pci;
 import duke.kernel.time.Timer;
+import duke.kernel.user.UserMode;
 import duke.kernel.virtio.VirtioBlock;
 import duke.kernel.x86.Gdt;
 import duke.kernel.x86.IoApic;
@@ -36,6 +37,7 @@ public final class Kernel {
         Limine.snapshot();
         Gdt.ensureLoaded();
         Idt.load();
+        UserMode.initOnThisCpu();
         PhysicalMemory.init();
         KernelAddressSpace.activate();
         KernelHeap.init();

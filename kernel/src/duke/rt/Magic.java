@@ -78,7 +78,8 @@ public final class Magic {
 
     /**
      * This CPU's block, which GS points at: its own address, then the stack limit, the saved limit,
-     * the stack base and the CPU index, 8 bytes each (Compiler.CPU_BLOCK_SIZE in all).
+     * the stack base and the CPU index, 8 bytes each, then slots for starting the CPU and for user
+     * mode (Compiler.CPU_BLOCK_SIZE in all).
      */
     public static native long cpuBlock();
 
@@ -119,6 +120,22 @@ public final class Magic {
      * duke.kernel.Smp.apMain.
      */
     public static native long apEntry();
+
+    /**
+     * Runs user code at {@code rip} in ring 3 on the stack at {@code rsp}, with interrupts on,
+     * until something calls {@link #leaveUser} with the kernel stack top this sets; returns the
+     * status passed there. Call with interrupts off. Only duke.kernel.user.UserMode should call this.
+     */
+    public static native long enterUser(long rip, long rsp);
+
+    /** Abandons every frame below {@code kernelStack} and makes the {@link #enterUser} that set it return {@code status}. */
+    public static native void leaveUser(long kernelStack, long status);
+
+    /** Points this CPU's TSS and block at {@code rsp}, where the next interrupt or system call from ring 3 lands. */
+    public static native void setKernelStack(long rsp);
+
+    /** Address of the compiler's syscall entry stub, for IA32_LSTAR. It calls duke.kernel.user.SystemCalls.dispatch. */
+    public static native long syscallEntry();
 
     /** Address of duke.kernel.Scheduler.threadMain, where a new thread's first switch lands. */
     public static native long threadEntry();

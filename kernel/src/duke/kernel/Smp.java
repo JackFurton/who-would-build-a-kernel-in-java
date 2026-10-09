@@ -5,6 +5,7 @@ import duke.kernel.mm.KernelAddressSpace;
 import duke.kernel.mm.KernelStacks;
 import duke.kernel.time.HpetClock;
 import duke.kernel.time.Timer;
+import duke.kernel.user.UserMode;
 import duke.kernel.x86.Gdt;
 import duke.kernel.x86.Idt;
 import duke.kernel.x86.Interrupts;
@@ -29,7 +30,7 @@ import duke.rt.SpinLock;
 public final class Smp {
 
     public static final int MAX_CPUS = 64;
-    private static final int BLOCK_LONGS = 8;
+    private static final int BLOCK_LONGS = 16;
     private static final int STACK_BASE = 24;
     private static final int INDEX = 32;
     private static final int STACK_TOP = 40;
@@ -109,6 +110,7 @@ public final class Smp {
         Magic.resetStackLimit();
         Gdt.install(Magic.peekLong(Magic.cpuBlock() + GDT));
         Idt.loadOnThisCpu();
+        UserMode.initOnThisCpu();
         LocalApic.enableOnThisCpu();
         Timer.startOnThisCpu();
         ONLINE[Magic.cpuIndex()] = true;

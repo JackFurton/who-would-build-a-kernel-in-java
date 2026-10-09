@@ -1080,6 +1080,24 @@ final class MethodCompiler {
                 a.mov(RSP, RSI);
                 a.pop(RBP);
             }
+            case "enterUser" -> enterUser();
+            case "leaveUser" -> {
+                // leaveUser(kernelStack, status): pops the frame record enterUser left at kernelStack
+                // and returns into it, where enterUser's result is the status.
+                popLong(RAX);
+                popLong(RCX);
+                a.mov(RSP, RCX);
+                a.pop(RBP);
+                a.ret();
+            }
+            case "setKernelStack" -> {
+                popLong(RAX);
+                setKernelStack(RAX);
+            }
+            case "syscallEntry" -> {
+                a.lea(RAX, Mem.rip(program.requireSyscallEntry()));
+                pushLong(RAX);
+            }
             case "apEntry" -> {
                 a.lea(RAX, Mem.rip(program.requireApEntry()));
                 pushLong(RAX);
@@ -1126,6 +1144,55 @@ final class MethodCompiler {
             case "pause" -> a.pause();
             default -> throw error("unknown intrinsic " + MAGIC + "." + name);
         }
+    }
+
+    /**
+     * enterUser(rip, rsp). Leaves a frame record at a 16-byte-aligned kernel stack top, a saved rbp
+     * under a return address into this method, the way a call would, and points the TSS and the
+     * CPU block there: interrupts and system calls from ring 3 arrive just below it, and
+     * leaveUser returns through it. Then swapgs and iretq to ring 3 with interrupts on and every
+     * register cleared. The return address is a safepoint, so a stack walk from a handler below carries on
+     * into this frame.
+     */
+    private void enterUser() {
+        popLong(RSI);
+        popLong(Reg.RDI);
+        consumed = 4;
+        X64.Label resume = new X64.Label();
+        a.mov(RDX, RSP);
+        a.aluImm(Alu.AND, true, RSP, -16);
+        a.push(RDX);
+        a.push(RDX);
+        a.lea(RAX, resume);
+        a.push(RAX);
+        a.push(RBP);
+        setKernelStack(RSP);
+        a.pushImm(Compiler.USER_DATA);
+        a.push(RSI);
+        a.pushImm(INTERRUPT_FLAG);
+        a.pushImm(Compiler.USER_CODE);
+        a.push(Reg.RDI);
+        a.swapgs();
+        for (Reg r : Reg.values()) {
+            if (r != RSP) {
+                a.alu(Alu.XOR, false, r, r);
+            }
+        }
+        a.iretq();
+        a.bind(resume);
+        safepoint();
+        // leaveUser popped the record; the original rsp is above the padding.
+        a.load(8, false, RSP, Mem.at(RSP, 8));
+        pushLong(RAX);
+    }
+
+    private static final int INTERRUPT_FLAG = 0x200;
+
+    /** Where this CPU switches to on an interrupt or system call from ring 3: the TSS's rsp0 and the CPU block. */
+    private void setKernelStack(Reg top) {
+        a.store(8, Compiler.CPU_KERNEL_STACK, top);
+        a.load(8, false, RCX, Compiler.CPU_TSS);
+        a.store(8, Mem.at(RCX, Compiler.TSS_RSP0), top);
     }
 
     /** memmove in words, then bytes; neither end may be rounded out into an unmapped page. */
