@@ -2,6 +2,7 @@ package duke.kernel.x86;
 
 import duke.kernel.Console;
 import duke.kernel.Panic;
+import duke.kernel.user.UserMode;
 import duke.rt.Backtrace;
 import duke.rt.Magic;
 
@@ -16,6 +17,8 @@ public final class Interrupts {
     }
 
     private static final Handler[] HANDLERS = new Handler[256];
+    private static final int NMI = 2;
+    private static final int MACHINE_CHECK = 18;
 
     private static final String[] EXCEPTIONS = {
         "#DE divide error", "#DB debug", "NMI", "#BP breakpoint", "#OF overflow", "#BR bound range",
@@ -31,15 +34,29 @@ public final class Interrupts {
         HANDLERS[vector] = handler;
     }
 
+    public static String exceptionName(int vector) {
+        return vector < EXCEPTIONS.length ? EXCEPTIONS[vector] : vector < 32 ? "reserved exception" : "interrupt";
+    }
+
     /** Called by the compiler's interrupt stubs (Compiler.emitInterruptStubs). */
     static void dispatch(long frame) {
         int vector = Frame.vector(frame);
+        boolean fromUser = Frame.cs(frame) != Gdt.KERNEL_CODE;
+        // An exception in ring 3 is the user program's; NMIs and machine checks are the machine's.
+        if (fromUser && vector < 32 && vector != NMI && vector != MACHINE_CHECK) {
+            UserMode.fault(frame);
+        }
         Handler handler = HANDLERS[vector];
         if (handler != null) {
             handler.handle(frame);
+            if (fromUser) {
+                // On, as they were in ring 3, so the call's prologue can switch threads if the handler asked.
+                Magic.enableInterrupts();
+                UserMode.interrupted(frame);
+            }
             return;
         }
-        String name = vector < EXCEPTIONS.length ? EXCEPTIONS[vector] : vector < 32 ? "reserved exception" : "interrupt";
+        String name = exceptionName(vector);
         String detail = vector == 14 ? " at address 0x" + Long.toHexString(Magic.readCr2())
                 : vector == 8 ? ", likely the stack running into its guard page" : "";
         Panic.begin(name, " (vector ", Integer.toString(vector), ", error 0x", Long.toHexString(Frame.errorCode(frame)), ")", detail);

@@ -43,6 +43,8 @@ public final class Compiler {
     static final String INTERRUPTS = "duke/kernel/x86/Interrupts";
     static final String RUNTIME = "duke/rt/Runtime";
     static final String INTERRUPT_STUBS = "interrupt.stubs";
+    static final String SYSTEM_CALLS = "duke/kernel/user/SystemCalls";
+    static final String SYSCALL_ENTRY = "syscall.entry";
     /** Vectors where the CPU pushes an error code; every other stub pushes a 0 in its place. */
     private static final int DOUBLE_FAULT = 8;
     private static final Set<Integer> ERROR_CODE_VECTORS = Set.of(8, 10, 11, 12, 13, 14, 17, 21, 29, 30);
@@ -54,15 +56,25 @@ public final class Compiler {
      * Each CPU's own block, which GS points at (IA32_GS_BASE). Layout: the block's own address, the
      * stack limit every prologue checks, the real limit while a preemption request replaces it, the
      * running thread's stack base (the limits are offsets from it), the CPU's index, then for a
-     * starting application processor its stack top, CR3 and GDT descriptor address.
+     * starting application processor its stack top, CR3 and GDT descriptor address, then the
+     * address of the CPU's TSS, the kernel stack top for leaving user mode, and a scratch slot for
+     * the user's rsp on the way in.
      */
-    static final int CPU_BLOCK_SIZE = 64;
+    static final int CPU_BLOCK_SIZE = 128;
     static final Mem CPU_SELF = Mem.gs(0);
     static final Mem STACK_LIMIT = Mem.gs(8);
     /** The real limit while STACK_LIMIT holds {@link #PREEMPT}. */
     static final Mem STACK_LIMIT_SAVED = Mem.gs(16);
     static final Mem STACK_BASE = Mem.gs(24);
     static final Mem CPU_INDEX = Mem.gs(32);
+    static final Mem CPU_TSS = Mem.gs(64);
+    static final Mem CPU_KERNEL_STACK = Mem.gs(72);
+    static final Mem CPU_USER_STACK = Mem.gs(80);
+    static final int TSS_RSP0 = 4;
+    /** Ring 3 selectors, RPL 3; must match duke.kernel.x86.Gdt. */
+    static final int USER_CODE = 0x3B;
+    static final int USER_DATA = 0x33;
+    static final int KERNEL_CODE = 0x08;
     static final String BSP_CPU_BLOCK = "cpu.bsp";
     private static final int IA32_GS_BASE = 0xC0000101;
     /**
@@ -108,6 +120,7 @@ public final class Compiler {
     private final LambdaCompiler lambdas;
     private int multiArraySites;
     private boolean interruptStubs;
+    private boolean syscallEntry;
     private boolean stackOverflowStub;
     private boolean apEntry;
     private final Map<String, LineInfo> lineInfo = new LinkedHashMap<>();
@@ -212,6 +225,9 @@ public final class Compiler {
         emitInitializers();
         if (interruptStubs) {
             emitInterruptStubs();
+        }
+        if (syscallEntry) {
+            emitSyscallEntry();
         }
         if (stackOverflowStub) {
             emitStackOverflowStub();
@@ -607,7 +623,7 @@ public final class Compiler {
     static final int METHOD_SYNCHRONIZED = 4;
 
     private int methodFlags(String symbol) {
-        if (symbol.equals("interrupt.common")) {
+        if (symbol.equals("interrupt.common") || symbol.equals(SYSCALL_ENTRY)) {
             return METHOD_INTERRUPT_ENTRY;
         }
         if (symbol.equals(STACK_OVERFLOW)) {
@@ -739,7 +755,8 @@ public final class Compiler {
 
     /**
      * One entry stub per vector, then a common path that saves every general-purpose register,
-     * calls the Java dispatcher with the frame address, restores and returns with iretq.
+     * calls the Java dispatcher with the frame address, restores and returns with iretq. From
+     * ring 3 it swaps GS in and out around that, so the kernel's per-CPU block is GS throughout.
      * Frame layout from the address passed: r15 ... rax (15 slots, r15 lowest), vector, error code,
      * then the CPU's rip, cs, rflags, rsp, ss.
      */
@@ -748,10 +765,22 @@ public final class Compiler {
         X64 a = new X64(text);
         text.align(16);
         int common = text.size();
+        X64.Label enteredFromKernel = new X64.Label();
+        a.cmpByte(Mem.at(Reg.RSP, 24), KERNEL_CODE);
+        a.jcc(Cond.E, enteredFromKernel);
+        a.swapgs();
+        a.bind(enteredFromKernel);
         a.cld();
         for (Reg r : SAVED_REGISTERS) {
             a.push(r);
         }
+        // From ring 3, rbp is the user's. Point it at the frame record Magic.enterUser left at the
+        // kernel stack top instead, so stack walks go from the handler to the code that entered.
+        X64.Label fromKernel = new X64.Label();
+        a.cmpByte(Mem.at(Reg.RSP, 8 * SAVED_REGISTERS.length + 24), KERNEL_CODE);
+        a.jcc(Cond.E, fromKernel);
+        a.lea(Reg.RBP, Mem.at(Reg.RSP, 8 * SAVED_REGISTERS.length + 56));
+        a.bind(fromKernel);
         a.mov(Reg.RAX, Reg.RSP);
         a.push(Reg.RAX);
         a.push(Reg.RAX);
@@ -761,6 +790,11 @@ public final class Compiler {
             a.pop(SAVED_REGISTERS[i]);
         }
         a.aluImm(X64.Alu.ADD, true, Reg.RSP, 16);
+        X64.Label returnToKernel = new X64.Label();
+        a.cmpByte(Mem.at(Reg.RSP, 8), KERNEL_CODE);
+        a.jcc(Cond.E, returnToKernel);
+        a.swapgs();
+        a.bind(returnToKernel);
         a.iretq();
         image.define("interrupt.common", text, common, text.size() - common, Image.SymbolType.FUNC);
 
@@ -790,6 +824,49 @@ public final class Compiler {
             rodata.emitReloc(Reloc.Kind.ABS64, "interrupt." + vector, 0);
         }
         image.define(INTERRUPT_STUBS, rodata, table, rodata.size() - table, Image.SymbolType.OBJECT);
+    }
+
+    String requireSyscallEntry() {
+        if (!syscallEntry) {
+            syscallEntry = true;
+            requireMethod(SYSTEM_CALLS, "dispatch", "(J)V");
+        }
+        return SYSCALL_ENTRY;
+    }
+
+    /**
+     * Where the syscall instruction lands (IA32_LSTAR), still on the user's stack and GS with
+     * interrupts masked. Swaps in the kernel's GS, moves to the kernel stack top Magic.enterUser recorded, saves the user's rsp and every
+     * general-purpose register in the interrupt frame's order, and calls
+     * duke.kernel.user.SystemCalls.dispatch with the frame address. rcx holds the user's rip and r11
+     * its rflags, which sysretq restores. sysretq trusts rcx: it's the address after a syscall
+     * instruction, which is canonical as long as nothing maps the lower half's last page.
+     */
+    private void emitSyscallEntry() {
+        Section text = image.text;
+        text.align(16);
+        int start = text.size();
+        X64 a = new X64(text);
+        a.swapgs();
+        a.store(8, CPU_USER_STACK, Reg.RSP);
+        a.load(8, false, Reg.RSP, CPU_KERNEL_STACK);
+        a.push(CPU_USER_STACK);
+        for (Reg r : SAVED_REGISTERS) {
+            a.push(r);
+        }
+        a.lea(Reg.RBP, Mem.at(Reg.RSP, 8 * SAVED_REGISTERS.length + 8));
+        a.mov(Reg.RAX, Reg.RSP);
+        a.push(Reg.RAX);
+        a.push(Reg.RAX);
+        a.call(methodSymbol(SYSTEM_CALLS, "dispatch", "(J)V"));
+        a.aluImm(X64.Alu.ADD, true, Reg.RSP, 16);
+        for (int i = SAVED_REGISTERS.length - 1; i >= 0; i--) {
+            a.pop(SAVED_REGISTERS[i]);
+        }
+        a.pop(Reg.RSP);
+        a.swapgs();
+        a.sysretq();
+        image.define(SYSCALL_ENTRY, text, start, text.size() - start, Image.SymbolType.FUNC);
     }
 
     /** A TIB for a type named the way class entries name it: internal name, or descriptor for arrays. */

@@ -4,8 +4,8 @@ import duke.rt.Magic;
 
 /**
  * An x86-64 4-level page table (PML4 -> PDPT -> PD -> PT). Tables are physical frames, read and
- * written through the direct map. Intermediate entries are present and writable with no NX, so
- * the leaf entry alone decides a page's permissions.
+ * written through the direct map. Intermediate entries are present and writable with no NX, and
+ * user-accessible once anything under them is, so the leaf entry alone decides a page's permissions.
  */
 public final class PageTable {
 
@@ -40,13 +40,13 @@ public final class PageTable {
 
     public void map(long virtual, long physical, long flags) {
         checkAligned(virtual, physical, PhysicalMemory.PAGE_SIZE);
-        long entry = entry(virtual, 1, true);
+        long entry = entry(virtual, 1, true, flags & USER);
         Magic.pokeLong(entry, physical | flags | PRESENT);
     }
 
     public void mapHuge(long virtual, long physical, long flags) {
         checkAligned(virtual, physical, HUGE_PAGE_SIZE);
-        long entry = entry(virtual, 2, true);
+        long entry = entry(virtual, 2, true, flags & USER);
         Magic.pokeLong(entry, physical | flags | PRESENT | HUGE);
     }
 
@@ -68,7 +68,7 @@ public final class PageTable {
 
     /** Removes a 4 KiB mapping and flushes it from this CPU's TLB. */
     public void unmap(long virtual) {
-        long entry = entry(virtual, 1, false);
+        long entry = entry(virtual, 1, false, 0);
         if (entry != 0) {
             Magic.pokeLong(entry, 0);
             Magic.invalidatePage(virtual);
@@ -111,8 +111,9 @@ public final class PageTable {
     /**
      * Virtual address of the entry for {@code virtual} at {@code level} (1 = PT, 2 = PD), creating
      * missing intermediate tables when {@code create}, else returning 0 where one is missing.
+     * {@code user} is {@link #USER} or 0, added to every intermediate entry on the way.
      */
-    private long entry(long virtual, int level, boolean create) {
+    private long entry(long virtual, int level, boolean create, long user) {
         long table = root;
         for (int l = 4; l > level; l--) {
             long slot = PhysicalMemory.toVirtual(table) + 8 * index(virtual, l);
@@ -121,9 +122,12 @@ public final class PageTable {
                 if (!create) {
                     return 0;
                 }
-                value = PhysicalMemory.allocateZeroed() | PRESENT | WRITABLE;
+                value = PhysicalMemory.allocateZeroed() | PRESENT | WRITABLE | user;
                 Magic.pokeLong(slot, value);
                 tables++;
+            } else if ((value & user) != user) {
+                value |= user;
+                Magic.pokeLong(slot, value);
             } else if ((value & HUGE) != 0) {
                 throw new IllegalStateException("0x" + Long.toHexString(virtual) + " is inside a huge page");
             }

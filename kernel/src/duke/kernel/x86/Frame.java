@@ -12,7 +12,11 @@ public final class Frame {
     public static final String[] REGISTERS = {
         "r15", "r14", "r13", "r12", "r11", "r10", "r9", "r8", "rdi", "rsi", "rbp", "rbx", "rdx", "rcx", "rax"};
 
+    public static final int RDI = 8;
+    public static final int RSI = 9;
     public static final int RBP = 10;
+    public static final int RDX = 12;
+    public static final int RAX = 14;
 
     private static final int VECTOR = 120;
     private static final int ERROR_CODE = 128;
@@ -26,6 +30,10 @@ public final class Frame {
 
     public static long register(long frame, int index) {
         return Magic.peekLong(frame + 8L * index);
+    }
+
+    public static void setRegister(long frame, int index, long value) {
+        Magic.pokeLong(frame + 8L * index, value);
     }
 
     public static int vector(long frame) {
