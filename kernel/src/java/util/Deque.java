@@ -11,6 +11,8 @@ public interface Deque<E> extends Queue<E> {
     E pollLast();
     E peekFirst();
     E peekLast();
+    E getFirst();
+    E getLast();
     void push(E e);
     E pop();
 }
