@@ -67,6 +67,9 @@ public final class Main {
             return;
         }
         Files.write(output, ElfWriter.write(linked, linked.address(Compiler.ENTRY_SYMBOL)));
+        if (user && !output.toFile().setExecutable(true)) {
+            System.err.println("dukec: warning: could not mark " + output + " executable");
+        }
         if (map != null) {
             Files.write(map, mapLines(linked));
         }
