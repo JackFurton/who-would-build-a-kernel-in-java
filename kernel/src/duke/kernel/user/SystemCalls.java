@@ -116,7 +116,6 @@ public final class SystemCalls {
     public static final int CLOCK_MONOTONIC = 1;
     private static final long NANOS_PER_SECOND = 1_000_000_000L;
     private static final long NANOS_PER_MILLISECOND = 1_000_000L;
-    private static final long TIMER_RESOLUTION_NANOS = NANOS_PER_SECOND / Timer.HZ;
 
     private SystemCalls() {
     }
@@ -194,7 +193,6 @@ public final class SystemCalls {
             Magic.disableInterrupts();
             Magic.leaveUser(frame + FRAME_BYTES, (int) a0);
             return;
-
         } else if (number == CLOCK_GETTIME) {
             result = clockGettime(a0, a1);
         } else if (number == NANOSLEEP) {
