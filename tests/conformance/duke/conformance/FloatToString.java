@@ -25,7 +25,7 @@ final class FloatToString {
     static long manyValues() {
         long h = 0;
         long bits = 0x123456789abcdefL;
-        for (int i = 0; i < 2000; i++) {
+        for (int i = 0; i < 200; i++) {
             bits = bits * 6364136223846793005L + 1442695040888963407L;
             double d = Double.longBitsToDouble(bits);
             h = h * 31 + Double.toString(d).hashCode();

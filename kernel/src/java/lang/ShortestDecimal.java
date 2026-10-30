@@ -70,7 +70,8 @@ final class ShortestDecimal {
             mPlus.multiplyPow10(-k);
         }
         // Now r / s = value / 10^k; make k the least with the upper bound under 10^k.
-        while (reachesHigh(r, mPlus, s, inclusive)) {
+        Big scratch = new Big();
+        while (reachesHigh(r, mPlus, s, inclusive, scratch)) {
             s.multiplySmall(10);
             k++;
         }
@@ -87,7 +88,7 @@ final class ShortestDecimal {
             int d = r.divideSmallQuotient(s);
             int low = Big.compare(r, mMinus);
             boolean lowOk = inclusive ? low <= 0 : low < 0;
-            boolean highOk = reachesHigh(r, mPlus, s, inclusive);
+            boolean highOk = reachesHigh(r, mPlus, s, inclusive, scratch);
             if (!lowOk && !highOk) {
                 digits[n++] = (byte) d;
                 continue;
@@ -126,8 +127,9 @@ final class ShortestDecimal {
         return out.toString();
     }
 
-    private static boolean reachesHigh(Big r, Big mPlus, Big s, boolean inclusive) {
-        int c = Big.compare(Big.sum(r, mPlus), s);
+    /** Whether r + mPlus reaches s, using {@code scratch} rather than allocating once per digit. */
+    private static boolean reachesHigh(Big r, Big mPlus, Big s, boolean inclusive, Big scratch) {
+        int c = Big.compare(Big.sumInto(r, mPlus, scratch), s);
         return inclusive ? c >= 0 : c > 0;
     }
 
@@ -288,7 +290,10 @@ final class ShortestDecimal {
         }
 
         static Big sum(Big a, Big b) {
-            Big result = new Big();
+            return sumInto(a, b, new Big());
+        }
+
+        static Big sumInto(Big a, Big b, Big result) {
             int n = Math.max(a.length, b.length);
             long carry = 0;
             for (int i = 0; i < n; i++) {
