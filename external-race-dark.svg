@@ -15,28 +15,28 @@
 <line x1="56" x2="650" y1="356" y2="356" stroke="#2c2c2a"/>
 <text x="56.0" y="374.0" fill="#898781" font-size="10" font-weight="400" text-anchor="start">Oct 3</text>
 <text x="650.0" y="374.0" fill="#898781" font-size="10" font-weight="400" text-anchor="end">Dec 1</text>
-<path d="M208.5,356.0 H208.5 V335.2 H213.0 V324.9 H345.3 V302.3 H345.4" fill="none" stroke="#3987e5" stroke-width="3.5" stroke-linejoin="round"/>
+<path d="M208.5,356.0 H208.5 V335.2 H213.0 V324.9 H345.2 V302.3 H345.4" fill="none" stroke="#3987e5" stroke-width="3.5" stroke-linejoin="round"/>
 <line x1="345.4" x2="650" y1="302.3" y2="182.7" stroke="#3987e5" stroke-width="3" stroke-dasharray="6 5"/>
 <circle cx="345.4" cy="302.3" r="5" fill="#3987e5" stroke="#1a1a19" stroke-width="2"/>
-<path d="M218.6,356.0 H218.6 V338.4 H233.0 V309.0 H345.4" fill="none" stroke="#d95926" stroke-width="2" stroke-linejoin="round"/>
+<path d="M218.5,356.0 H218.5 V338.4 H233.0 V309.0 H345.4" fill="none" stroke="#d95926" stroke-width="2" stroke-linejoin="round"/>
 <line x1="345.4" x2="650" y1="309.0" y2="195.7" stroke="#d95926" stroke-width="2" stroke-dasharray="6 5"/>
 <circle cx="345.4" cy="309.0" r="4" fill="#d95926" stroke="#1a1a19" stroke-width="2"/>
 <path d="M73.3,356.0 H73.3 V315.1 H345.4" fill="none" stroke="#199e70" stroke-width="2" stroke-linejoin="round"/>
 <line x1="345.4" x2="650" y1="315.1" y2="269.2" stroke="#199e70" stroke-width="2" stroke-dasharray="6 5"/>
 <circle cx="345.4" cy="315.1" r="4" fill="#199e70" stroke="#1a1a19" stroke-width="2"/>
-<path d="M254.9,356.0 H254.9 V327.8 H345.4" fill="none" stroke="#9a7ef0" stroke-width="2" stroke-linejoin="round"/>
-<line x1="345.4" x2="650" y1="327.8" y2="232.5" stroke="#9a7ef0" stroke-width="2" stroke-dasharray="6 5"/>
+<path d="M254.8,356.0 H254.8 V327.8 H345.4" fill="none" stroke="#9a7ef0" stroke-width="2" stroke-linejoin="round"/>
+<line x1="345.4" x2="650" y1="327.8" y2="233.0" stroke="#9a7ef0" stroke-width="2" stroke-dasharray="6 5"/>
 <circle cx="345.4" cy="327.8" r="4" fill="#9a7ef0" stroke="#1a1a19" stroke-width="2"/>
 <path d="M151.6,356.0 H151.6 V330.1 H345.4" fill="none" stroke="#e0457f" stroke-width="2" stroke-linejoin="round"/>
-<line x1="345.4" x2="650" y1="330.1" y2="289.2" stroke="#e0457f" stroke-width="2" stroke-dasharray="6 5"/>
+<line x1="345.4" x2="650" y1="330.1" y2="289.3" stroke="#e0457f" stroke-width="2" stroke-dasharray="6 5"/>
 <circle cx="345.4" cy="330.1" r="4" fill="#e0457f" stroke="#1a1a19" stroke-width="2"/>
 <path d="M155.0,356.0 H155.0 V330.8 H345.4" fill="none" stroke="#3987e5" stroke-width="2" stroke-linejoin="round"/>
-<line x1="345.4" x2="650" y1="330.8" y2="290.4" stroke="#3987e5" stroke-width="2" stroke-dasharray="6 5"/>
+<line x1="345.4" x2="650" y1="330.8" y2="290.5" stroke="#3987e5" stroke-width="2" stroke-dasharray="6 5"/>
 <circle cx="345.4" cy="330.8" r="4" fill="#3987e5" stroke="#1a1a19" stroke-width="2"/>
-<path d="M153.5,356.0 H153.5 V332.6 H345.4" fill="none" stroke="#d95926" stroke-width="2" stroke-linejoin="round"/>
+<path d="M153.4,356.0 H153.4 V332.6 H345.4" fill="none" stroke="#d95926" stroke-width="2" stroke-linejoin="round"/>
 <line x1="345.4" x2="650" y1="332.6" y2="295.3" stroke="#d95926" stroke-width="2" stroke-dasharray="6 5"/>
 <circle cx="345.4" cy="332.6" r="4" fill="#d95926" stroke="#1a1a19" stroke-width="2"/>
-<path d="M324.8,356.0 H324.8 V334.4 H345.4" fill="none" stroke="#199e70" stroke-width="2" stroke-linejoin="round"/>
+<path d="M324.7,356.0 H324.7 V334.4 H345.4" fill="none" stroke="#199e70" stroke-width="2" stroke-linejoin="round"/>
 <line x1="345.4" x2="650" y1="334.4" y2="242.0" stroke="#199e70" stroke-width="2" stroke-dasharray="6 5"/>
 <circle cx="345.4" cy="334.4" r="4" fill="#199e70" stroke="#1a1a19" stroke-width="2"/>
 <path d="M66.1,356.0 H66.1 V334.9 H345.4" fill="none" stroke="#9a7ef0" stroke-width="2" stroke-linejoin="round"/>
@@ -45,13 +45,13 @@
 <path d="M84.0,356.0 H84.0 V335.5 H345.4" fill="none" stroke="#e0457f" stroke-width="2" stroke-linejoin="round"/>
 <line x1="345.4" x2="650" y1="335.5" y2="311.5" stroke="#e0457f" stroke-width="2" stroke-dasharray="6 5"/>
 <circle cx="345.4" cy="335.5" r="4" fill="#e0457f" stroke="#1a1a19" stroke-width="2"/>
-<path d="M154.9,356.0 H154.9 V336.6 H345.4" fill="none" stroke="#3987e5" stroke-width="2" stroke-linejoin="round"/>
+<path d="M154.8,356.0 H154.8 V336.6 H345.4" fill="none" stroke="#3987e5" stroke-width="2" stroke-linejoin="round"/>
 <line x1="345.4" x2="650" y1="336.6" y2="305.6" stroke="#3987e5" stroke-width="2" stroke-dasharray="6 5"/>
 <circle cx="345.4" cy="336.6" r="4" fill="#3987e5" stroke="#1a1a19" stroke-width="2"/>
-<path d="M173.5,356.0 H173.5 V338.4 H345.4" fill="none" stroke="#d95926" stroke-width="2" stroke-linejoin="round"/>
+<path d="M173.4,356.0 H173.4 V338.4 H345.4" fill="none" stroke="#d95926" stroke-width="2" stroke-linejoin="round"/>
 <line x1="345.4" x2="650" y1="338.4" y2="307.1" stroke="#d95926" stroke-width="2" stroke-dasharray="6 5"/>
 <circle cx="345.4" cy="338.4" r="4" fill="#d95926" stroke="#1a1a19" stroke-width="2"/>
-<path d="M259.7,356.0 H259.7 V345.1 H345.4" fill="none" stroke="#199e70" stroke-width="2" stroke-linejoin="round"/>
+<path d="M259.6,356.0 H259.6 V345.1 H345.4" fill="none" stroke="#199e70" stroke-width="2" stroke-linejoin="round"/>
 <line x1="345.4" x2="650" y1="345.1" y2="306.3" stroke="#199e70" stroke-width="2" stroke-dasharray="6 5"/>
 <circle cx="345.4" cy="345.1" r="4" fill="#199e70" stroke="#1a1a19" stroke-width="2"/>
 <text x="660.0" y="183.7" fill="#f0c040" font-size="13" font-weight="700" text-anchor="start">♛ Aaqibhafeez Khan</text>
