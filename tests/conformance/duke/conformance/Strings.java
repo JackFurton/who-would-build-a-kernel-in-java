@@ -18,6 +18,19 @@ final class Strings {
         return "\u00ff".charAt(0);
     }
 
+    static String indexOfString() {
+        return "ababa".indexOf("ba") + " " + "ababa".indexOf("z") + " " + "ababa".indexOf("")
+                + " " + "".indexOf("") + " " + "abc".indexOf("c");
+    }
+
+    static String indexOfStringFromIndex() {
+        return "ababa".indexOf("ba", 2) + " " + "ababa".indexOf("ba", -1) + " "
+                + "ababa".indexOf("ba", 5) + " " + "ababa".indexOf("ba", 8) + " "
+                + "ababa".indexOf("", -1) + " "
+                + "ababa".indexOf("", 3) + " " + "ababa".indexOf("", 5) + " "
+                + "ababa".indexOf("", 8);
+    }
+
     static int checksum() {
         String s = "The quick brown fox jumps over the lazy dog";
         int h = 0;
