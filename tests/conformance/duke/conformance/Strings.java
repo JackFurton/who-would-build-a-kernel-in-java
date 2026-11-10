@@ -69,4 +69,23 @@ final class Strings {
         return join("a,b,c".split(",", 2)) + " " + join("a,b,c".split(",", 1)) + " " + join("a,b,c".split(",", 10))
                 + " " + join("a,,".split(",", -1)) + " " + join("a,,".split(",", 0)) + " " + join("a,,".split(",", 3));
     }
+
+    static String lastIndexOfString() {
+        return "ababa".lastIndexOf("ba") + " " + "ababa".lastIndexOf("z") + " "
+                + "ababa".lastIndexOf("") + " " + "".lastIndexOf("") + " "
+                + "ababa".lastIndexOf("ababa") + " " + "ababa".lastIndexOf("ababaa");
+    }
+
+    static String containsString() {
+        return "ababa".contains("bab") + " " + "ababa".contains("z") + " "
+                + "ababa".contains("") + " " + "".contains("");
+    }
+
+    static String startsWithAtIndex() {
+        return "ababa".startsWith("ab", 0) + " " + "ababa".startsWith("ba", 1) + " "
+                + "ababa".startsWith("ba", 3) + " " + "ababa".startsWith("aa", 1) + " "
+                + "ababa".startsWith("ba", -1) + " " + "ababa".startsWith("ba", 5) + " "
+                + "ababa".startsWith("", 5) + " " + "ababa".startsWith("", 8) + " "
+                + "ababa".startsWith("", -1);
+    }
 }
