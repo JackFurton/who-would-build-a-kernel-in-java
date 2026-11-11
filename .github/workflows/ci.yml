@@ -56,6 +56,9 @@ jobs:
               exit 0
             fi
             getent hosts azure.archive.ubuntu.com archive.ubuntu.com github.com || true
+            # Every pocket goes through this list. kernel.org's copy is off Canonical's DNS,
+            # which is what has failed so far.
+            echo http://mirrors.edge.kernel.org/ubuntu/ | sudo tee /etc/apt/apt-mirrors.txt
             [ "$attempt" = 3 ] || sleep 60
           done
           exit 1
