@@ -30,7 +30,7 @@ jobs:
 
   build:
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
 
@@ -42,9 +42,19 @@ jobs:
       - uses: gradle/actions/setup-gradle@v6
 
       - name: Install QEMU and OVMF
+        # A failed attempt spends about two minutes on DNS timeouts before giving up.
+        timeout-minutes: 10
         run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends qemu-system-x86 ovmf
+          # The runners' apt mirror has stopped resolving for half an hour at a time, failing
+          # the run before anything of ours is built.
+          for attempt in 1 2 3; do
+            if sudo apt-get update && sudo apt-get install -y --no-install-recommends qemu-system-x86 ovmf; then
+              exit 0
+            fi
+            getent hosts azure.archive.ubuntu.com archive.ubuntu.com github.com || true
+            [ "$attempt" = 3 ] || sleep 60
+          done
+          exit 1
 
       - name: Compiler unit tests
         run: make unit-test
