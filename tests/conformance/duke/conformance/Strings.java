@@ -88,7 +88,8 @@ final class Strings {
 
     static String replaceChar() {
         return "\u00e9t\u00e9".replace('\u00e9', 'E') + " " + "hello".replace('l', 'l') + " "
-                + "hello".replace('z', 'x') + " " + "".replace('a', 'b');
+                + "hello".replace('z', 'x') + " " + "hello".replace('z', '\u0100') + " "
+                + "".replace('a', 'b');
     }
 
     static String join(String[] parts) {

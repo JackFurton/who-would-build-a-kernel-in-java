@@ -256,8 +256,11 @@ public final class String implements Comparable<String> {
         boolean changed = false;
         for (int i = 0; i < value.length; i++) {
             char c = (char) (value[i] & 0xFF);
-            // A Latin-1 String cannot encode a replacement outside its byte range.
-            if (c == oldChar && newChar <= 0xFF) {
+            if (c == oldChar) {
+                if (newChar > 0xFF) {
+                    throw new IllegalArgumentException(
+                            "non-Latin-1 char " + (int) newChar + " (Strings are Latin-1 only for now)");
+                }
                 replaced[i] = (byte) newChar;
                 changed |= oldChar != newChar;
             } else {
