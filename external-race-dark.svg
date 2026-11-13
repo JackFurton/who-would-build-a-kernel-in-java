@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="820" height="400" viewBox="0 0 820 400" role="img" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif">
 <title>The external race</title>
-<desc>Aaqibhafeez Khan: L5, Senior Software Engineer, Standard Library, 82 merged, 0 in review. PUSHPAK-JAISWAL: L4, Software Engineer II, Standard Library, 52 merged, 0 in review. amalsaidov: L3, Software Engineer, Generalist, 0 merged, 41 in review. Ashish Sharma: L4, Software Engineer II, Standard Library, 38 merged, 0 in review. Aryan_Gupta: L4, Software Engineer II, Device Drivers, 35 merged, 0 in review. Kethankumar99: L4, Software Engineer II, Device Drivers, 31 merged, 0 in review. Sanjay K: L3, Software Engineer, Standard Library, 21 merged, 0 in review. danielstack: L3, Software Engineer, Standard Library, 20 merged, 0 in review. PIYUSH BIPIN VARULE: L3, Software Engineer, Device Drivers, 19 merged, 0 in review. Aseel012: L3, Software Engineer, Standard Library, 18 merged, 0 in review. Sarthak Gupta: L3, Software Engineer, Standard Library, 16 merged, 0 in review. senthilkumar-r: L3, Software Engineer, Device Drivers, 16 merged, 0 in review. GalaktusSK: L3, Software Engineer, Standard Library, 15 merged, 0 in review. kelseyben10: L3, Software Engineer, Device Drivers, 15 merged, 0 in review. Ashish Gupta: L3, Software Engineer, Standard Library, 13 merged, 0 in review. jjinacio: L3, Software Engineer, Standard Library, 12 merged, 0 in review. !HuerteDev: L3, Software Engineer, Quality, 8 merged, 0 in review. </desc>
+<desc>Aaqibhafeez Khan: L5, Senior Software Engineer, Standard Library, 91 merged, 0 in review. PUSHPAK-JAISWAL: L4, Software Engineer II, Standard Library, 52 merged, 0 in review. amalsaidov: L3, Software Engineer, Generalist, 0 merged, 41 in review. Ashish Sharma: L4, Software Engineer II, Standard Library, 38 merged, 0 in review. Aryan_Gupta: L4, Software Engineer II, Device Drivers, 35 merged, 0 in review. Kethankumar99: L4, Software Engineer II, Device Drivers, 31 merged, 0 in review. Sanjay K: L3, Software Engineer, Standard Library, 21 merged, 0 in review. danielstack: L3, Software Engineer, Standard Library, 20 merged, 0 in review. PIYUSH BIPIN VARULE: L3, Software Engineer, Device Drivers, 19 merged, 0 in review. Aseel012: L3, Software Engineer, Standard Library, 18 merged, 0 in review. Sarthak Gupta: L3, Software Engineer, Standard Library, 16 merged, 0 in review. senthilkumar-r: L3, Software Engineer, Device Drivers, 16 merged, 0 in review. GalaktusSK: L3, Software Engineer, Standard Library, 15 merged, 0 in review. kelseyben10: L3, Software Engineer, Device Drivers, 15 merged, 0 in review. Ashish Gupta: L3, Software Engineer, Standard Library, 13 merged, 0 in review. jjinacio: L3, Software Engineer, Standard Library, 12 merged, 0 in review. !HuerteDev: L3, Software Engineer, Quality, 8 merged, 0 in review. </desc>
 <rect x="0.0" y="0.0" width="820.0" height="400.0" rx="0" fill="#1a1a19"/>
 <text x="16.0" y="28.0" fill="#ffffff" font-size="18" font-weight="700" text-anchor="start">The external race</text>
 <text x="16.0" y="48.0" fill="#c3c2b7" font-size="12" font-weight="400" text-anchor="start">Everyone outside the founding team. Dashed: 30 days at today's pace, open PRs merged.</text>
@@ -12,94 +12,94 @@
 <text x="50.0" y="328.1" fill="#3987e5" font-size="10" font-weight="700" text-anchor="end">L5</text>
 <line x1="56" x2="650" y1="342.7" y2="342.7" stroke="#199e70" stroke-dasharray="2 4"/>
 <text x="50.0" y="346.7" fill="#199e70" font-size="10" font-weight="700" text-anchor="end">L4</text>
-<line x1="395.1" x2="395.1" y1="82" y2="356" stroke="#2c2c2a"/>
-<text x="395.1" y="78.0" fill="#898781" font-size="10" font-weight="400" text-anchor="middle">today</text>
+<line x1="398.4" x2="398.4" y1="82" y2="356" stroke="#2c2c2a"/>
+<text x="398.4" y="78.0" fill="#898781" font-size="10" font-weight="400" text-anchor="middle">today</text>
 <line x1="56" x2="650" y1="356" y2="356" stroke="#2c2c2a"/>
 <text x="56.0" y="374.0" fill="#898781" font-size="10" font-weight="400" text-anchor="start">Oct 3</text>
-<text x="650.0" y="374.0" fill="#898781" font-size="10" font-weight="400" text-anchor="end">Dec 12</text>
-<path d="M183.7,356.0 H183.7 V347.7 H187.4 V343.5 H298.1 V334.5 H326.9 V322.6 H369.8 V312.5 H395.1" fill="none" stroke="#3987e5" stroke-width="2" stroke-linejoin="round"/>
-<line x1="395.1" x2="650" y1="312.5" y2="260.0" stroke="#3987e5" stroke-width="2" stroke-dasharray="6 5"/>
-<circle cx="395.1" cy="312.5" r="4" fill="#3987e5" stroke="#1a1a19" stroke-width="2"/>
-<path d="M379.0,356.0 H379.0 V347.2 H387.8 V337.9 H394.7 V328.3 H395.1" fill="none" stroke="#d95926" stroke-width="3.5" stroke-linejoin="round"/>
-<line x1="395.1" x2="650" y1="328.3" y2="209.5" stroke="#d95926" stroke-width="3" stroke-dasharray="6 5"/>
-<circle cx="395.1" cy="328.3" r="5" fill="#d95926" stroke="#1a1a19" stroke-width="2"/>
-<path d="M395.1,356.0" fill="none" stroke="#199e70" stroke-width="2" stroke-linejoin="round"/>
-<line x1="395.1" x2="650" y1="356.0" y2="334.0" stroke="#199e70" stroke-width="2" stroke-dasharray="6 5"/>
-<circle cx="395.1" cy="356.0" r="4" fill="#199e70" stroke="#1a1a19" stroke-width="2"/>
-<path d="M311.4,356.0 H311.4 V345.2 H369.8 V335.8 H395.1" fill="none" stroke="#9a7ef0" stroke-width="2" stroke-linejoin="round"/>
-<line x1="395.1" x2="650" y1="335.8" y2="274.1" stroke="#9a7ef0" stroke-width="2" stroke-dasharray="6 5"/>
-<circle cx="395.1" cy="335.8" r="4" fill="#9a7ef0" stroke="#1a1a19" stroke-width="2"/>
-<path d="M192.1,356.0 H192.1 V348.9 H204.1 V337.2 H395.1" fill="none" stroke="#e0457f" stroke-width="2" stroke-linejoin="round"/>
-<line x1="395.1" x2="650" y1="337.2" y2="313.5" stroke="#e0457f" stroke-width="2" stroke-dasharray="6 5"/>
-<circle cx="395.1" cy="337.2" r="4" fill="#e0457f" stroke="#1a1a19" stroke-width="2"/>
-<path d="M70.5,356.0 H70.5 V339.6 H395.1" fill="none" stroke="#3987e5" stroke-width="2" stroke-linejoin="round"/>
-<line x1="395.1" x2="650" y1="339.6" y2="326.7" stroke="#3987e5" stroke-width="2" stroke-dasharray="6 5"/>
-<circle cx="395.1" cy="339.6" r="4" fill="#3987e5" stroke="#1a1a19" stroke-width="2"/>
-<path d="M222.4,356.0 H222.4 V344.7 H395.1" fill="none" stroke="#d95926" stroke-width="2" stroke-linejoin="round"/>
-<line x1="395.1" x2="650" y1="344.7" y2="328.1" stroke="#d95926" stroke-width="2" stroke-dasharray="6 5"/>
-<circle cx="395.1" cy="344.7" r="4" fill="#d95926" stroke="#1a1a19" stroke-width="2"/>
-<path d="M136.0,356.0 H136.0 V345.6 H395.1" fill="none" stroke="#199e70" stroke-width="2" stroke-linejoin="round"/>
-<line x1="395.1" x2="650" y1="345.6" y2="335.4" stroke="#199e70" stroke-width="2" stroke-dasharray="6 5"/>
-<circle cx="395.1" cy="345.6" r="4" fill="#199e70" stroke="#1a1a19" stroke-width="2"/>
-<path d="M138.8,356.0 H138.8 V345.9 H395.1" fill="none" stroke="#9a7ef0" stroke-width="2" stroke-linejoin="round"/>
-<line x1="395.1" x2="650" y1="345.9" y2="335.9" stroke="#9a7ef0" stroke-width="2" stroke-dasharray="6 5"/>
-<circle cx="395.1" cy="345.9" r="4" fill="#9a7ef0" stroke="#1a1a19" stroke-width="2"/>
-<path d="M137.6,356.0 H137.6 V346.6 H395.1" fill="none" stroke="#e0457f" stroke-width="2" stroke-linejoin="round"/>
-<line x1="395.1" x2="650" y1="346.6" y2="337.3" stroke="#e0457f" stroke-width="2" stroke-dasharray="6 5"/>
-<circle cx="395.1" cy="346.6" r="4" fill="#e0457f" stroke="#1a1a19" stroke-width="2"/>
-<path d="M280.9,356.0 H280.9 V347.4 H395.1" fill="none" stroke="#3987e5" stroke-width="2" stroke-linejoin="round"/>
-<line x1="395.1" x2="650" y1="347.4" y2="328.1" stroke="#3987e5" stroke-width="2" stroke-dasharray="6 5"/>
-<circle cx="395.1" cy="347.4" r="4" fill="#3987e5" stroke="#1a1a19" stroke-width="2"/>
-<path d="M64.5,356.0 H64.5 V347.5 H395.1" fill="none" stroke="#d95926" stroke-width="2" stroke-linejoin="round"/>
-<line x1="395.1" x2="650" y1="347.5" y2="341.0" stroke="#d95926" stroke-width="2" stroke-dasharray="6 5"/>
-<circle cx="395.1" cy="347.5" r="4" fill="#d95926" stroke="#1a1a19" stroke-width="2"/>
-<path d="M79.5,356.0 H79.5 V347.8 H395.1" fill="none" stroke="#199e70" stroke-width="2" stroke-linejoin="round"/>
-<line x1="395.1" x2="650" y1="347.8" y2="341.2" stroke="#199e70" stroke-width="2" stroke-dasharray="6 5"/>
-<circle cx="395.1" cy="347.8" r="4" fill="#199e70" stroke="#1a1a19" stroke-width="2"/>
-<path d="M138.7,356.0 H138.7 V348.2 H395.1" fill="none" stroke="#9a7ef0" stroke-width="2" stroke-linejoin="round"/>
-<line x1="395.1" x2="650" y1="348.2" y2="340.5" stroke="#9a7ef0" stroke-width="2" stroke-dasharray="6 5"/>
-<circle cx="395.1" cy="348.2" r="4" fill="#9a7ef0" stroke="#1a1a19" stroke-width="2"/>
-<path d="M154.3,356.0 H154.3 V349.0 H395.1" fill="none" stroke="#e0457f" stroke-width="2" stroke-linejoin="round"/>
-<line x1="395.1" x2="650" y1="349.0" y2="341.5" stroke="#e0457f" stroke-width="2" stroke-dasharray="6 5"/>
-<circle cx="395.1" cy="349.0" r="4" fill="#e0457f" stroke="#1a1a19" stroke-width="2"/>
-<path d="M343.9,356.0 H343.9 V349.8 H395.1" fill="none" stroke="#3987e5" stroke-width="2" stroke-linejoin="round"/>
-<line x1="395.1" x2="650" y1="349.8" y2="323.5" stroke="#3987e5" stroke-width="2" stroke-dasharray="6 5"/>
-<circle cx="395.1" cy="349.8" r="4" fill="#3987e5" stroke="#1a1a19" stroke-width="2"/>
-<path d="M226.5,356.0 H226.5 V351.6 H395.1" fill="none" stroke="#d95926" stroke-width="2" stroke-linejoin="round"/>
-<line x1="395.1" x2="650" y1="351.6" y2="345.1" stroke="#d95926" stroke-width="2" stroke-dasharray="6 5"/>
-<circle cx="395.1" cy="351.6" r="4" fill="#d95926" stroke="#1a1a19" stroke-width="2"/>
+<text x="650.0" y="374.0" fill="#898781" font-size="10" font-weight="400" text-anchor="end">Dec 13</text>
+<path d="M182.0,356.0 H182.0 V347.7 H185.7 V343.5 H294.9 V334.5 H323.3 V322.6 H365.7 V312.5 H398.4 V307.4 H398.4" fill="none" stroke="#3987e5" stroke-width="2" stroke-linejoin="round"/>
+<line x1="398.4" x2="650" y1="307.4" y2="250.9" stroke="#3987e5" stroke-width="2" stroke-dasharray="6 5"/>
+<circle cx="398.4" cy="307.4" r="4" fill="#3987e5" stroke="#1a1a19" stroke-width="2"/>
+<path d="M374.7,356.0 H374.7 V347.2 H383.4 V337.9 H390.3 V328.3 H398.4" fill="none" stroke="#d95926" stroke-width="3.5" stroke-linejoin="round"/>
+<line x1="398.4" x2="650" y1="328.3" y2="209.5" stroke="#d95926" stroke-width="3" stroke-dasharray="6 5"/>
+<circle cx="398.4" cy="328.3" r="5" fill="#d95926" stroke="#1a1a19" stroke-width="2"/>
+<path d="M398.4,356.0" fill="none" stroke="#199e70" stroke-width="2" stroke-linejoin="round"/>
+<line x1="398.4" x2="650" y1="356.0" y2="334.0" stroke="#199e70" stroke-width="2" stroke-dasharray="6 5"/>
+<circle cx="398.4" cy="356.0" r="4" fill="#199e70" stroke="#1a1a19" stroke-width="2"/>
+<path d="M308.0,356.0 H308.0 V345.2 H365.7 V335.8 H398.4" fill="none" stroke="#9a7ef0" stroke-width="2" stroke-linejoin="round"/>
+<line x1="398.4" x2="650" y1="335.8" y2="279.3" stroke="#9a7ef0" stroke-width="2" stroke-dasharray="6 5"/>
+<circle cx="398.4" cy="335.8" r="4" fill="#9a7ef0" stroke="#1a1a19" stroke-width="2"/>
+<path d="M190.3,356.0 H190.3 V348.9 H202.2 V337.2 H398.4" fill="none" stroke="#e0457f" stroke-width="2" stroke-linejoin="round"/>
+<line x1="398.4" x2="650" y1="337.2" y2="314.4" stroke="#e0457f" stroke-width="2" stroke-dasharray="6 5"/>
+<circle cx="398.4" cy="337.2" r="4" fill="#e0457f" stroke="#1a1a19" stroke-width="2"/>
+<path d="M70.3,356.0 H70.3 V339.6 H398.4" fill="none" stroke="#3987e5" stroke-width="2" stroke-linejoin="round"/>
+<line x1="398.4" x2="650" y1="339.6" y2="327.1" stroke="#3987e5" stroke-width="2" stroke-dasharray="6 5"/>
+<circle cx="398.4" cy="339.6" r="4" fill="#3987e5" stroke="#1a1a19" stroke-width="2"/>
+<path d="M220.3,356.0 H220.3 V344.7 H398.4" fill="none" stroke="#d95926" stroke-width="2" stroke-linejoin="round"/>
+<line x1="398.4" x2="650" y1="344.7" y2="328.8" stroke="#d95926" stroke-width="2" stroke-dasharray="6 5"/>
+<circle cx="398.4" cy="344.7" r="4" fill="#d95926" stroke="#1a1a19" stroke-width="2"/>
+<path d="M135.0,356.0 H135.0 V345.6 H398.4" fill="none" stroke="#199e70" stroke-width="2" stroke-linejoin="round"/>
+<line x1="398.4" x2="650" y1="345.6" y2="335.7" stroke="#199e70" stroke-width="2" stroke-dasharray="6 5"/>
+<circle cx="398.4" cy="345.6" r="4" fill="#199e70" stroke="#1a1a19" stroke-width="2"/>
+<path d="M137.7,356.0 H137.7 V345.9 H398.4" fill="none" stroke="#9a7ef0" stroke-width="2" stroke-linejoin="round"/>
+<line x1="398.4" x2="650" y1="345.9" y2="336.2" stroke="#9a7ef0" stroke-width="2" stroke-dasharray="6 5"/>
+<circle cx="398.4" cy="345.9" r="4" fill="#9a7ef0" stroke="#1a1a19" stroke-width="2"/>
+<path d="M136.5,356.0 H136.5 V346.6 H398.4" fill="none" stroke="#e0457f" stroke-width="2" stroke-linejoin="round"/>
+<line x1="398.4" x2="650" y1="346.6" y2="337.6" stroke="#e0457f" stroke-width="2" stroke-dasharray="6 5"/>
+<circle cx="398.4" cy="346.6" r="4" fill="#e0457f" stroke="#1a1a19" stroke-width="2"/>
+<path d="M278.0,356.0 H278.0 V347.4 H398.4" fill="none" stroke="#3987e5" stroke-width="2" stroke-linejoin="round"/>
+<line x1="398.4" x2="650" y1="347.4" y2="329.3" stroke="#3987e5" stroke-width="2" stroke-dasharray="6 5"/>
+<circle cx="398.4" cy="347.4" r="4" fill="#3987e5" stroke="#1a1a19" stroke-width="2"/>
+<path d="M64.4,356.0 H64.4 V347.5 H398.4" fill="none" stroke="#d95926" stroke-width="2" stroke-linejoin="round"/>
+<line x1="398.4" x2="650" y1="347.5" y2="341.2" stroke="#d95926" stroke-width="2" stroke-dasharray="6 5"/>
+<circle cx="398.4" cy="347.5" r="4" fill="#d95926" stroke="#1a1a19" stroke-width="2"/>
+<path d="M79.1,356.0 H79.1 V347.8 H398.4" fill="none" stroke="#199e70" stroke-width="2" stroke-linejoin="round"/>
+<line x1="398.4" x2="650" y1="347.8" y2="341.3" stroke="#199e70" stroke-width="2" stroke-dasharray="6 5"/>
+<circle cx="398.4" cy="347.8" r="4" fill="#199e70" stroke="#1a1a19" stroke-width="2"/>
+<path d="M137.7,356.0 H137.7 V348.2 H398.4" fill="none" stroke="#9a7ef0" stroke-width="2" stroke-linejoin="round"/>
+<line x1="398.4" x2="650" y1="348.2" y2="340.8" stroke="#9a7ef0" stroke-width="2" stroke-dasharray="6 5"/>
+<circle cx="398.4" cy="348.2" r="4" fill="#9a7ef0" stroke="#1a1a19" stroke-width="2"/>
+<path d="M153.0,356.0 H153.0 V349.0 H398.4" fill="none" stroke="#e0457f" stroke-width="2" stroke-linejoin="round"/>
+<line x1="398.4" x2="650" y1="349.0" y2="341.7" stroke="#e0457f" stroke-width="2" stroke-dasharray="6 5"/>
+<circle cx="398.4" cy="349.0" r="4" fill="#e0457f" stroke="#1a1a19" stroke-width="2"/>
+<path d="M340.1,356.0 H340.1 V349.8 H398.4" fill="none" stroke="#3987e5" stroke-width="2" stroke-linejoin="round"/>
+<line x1="398.4" x2="650" y1="349.8" y2="323.5" stroke="#3987e5" stroke-width="2" stroke-dasharray="6 5"/>
+<circle cx="398.4" cy="349.8" r="4" fill="#3987e5" stroke="#1a1a19" stroke-width="2"/>
+<path d="M224.2,356.0 H224.2 V351.6 H398.4" fill="none" stroke="#d95926" stroke-width="2" stroke-linejoin="round"/>
+<line x1="398.4" x2="650" y1="351.6" y2="345.4" stroke="#d95926" stroke-width="2" stroke-dasharray="6 5"/>
+<circle cx="398.4" cy="351.6" r="4" fill="#d95926" stroke="#1a1a19" stroke-width="2"/>
 <text x="660.0" y="210.5" fill="#f0c040" font-size="13" font-weight="700" text-anchor="start">♛ PUSHPAK-JAISWAL</text>
 <text x="660.0" y="224.5" fill="#c3c2b7" font-size="10" font-weight="400" text-anchor="start">L4 → L6 · alpha</text>
-<text x="660.0" y="261.0" fill="#3987e5" font-size="13" font-weight="700" text-anchor="start">Aaqibhafeez Khan</text>
-<text x="660.0" y="275.0" fill="#c3c2b7" font-size="10" font-weight="400" text-anchor="start">L5 → L6</text>
-<text x="660.0" y="291.0" fill="#9a7ef0" font-size="13" font-weight="700" text-anchor="start">Ashish Sharma</text>
-<text x="660.0" y="305.0" fill="#c3c2b7" font-size="10" font-weight="400" text-anchor="start">L4 → L6</text>
-<text x="660.0" y="321.0" fill="#e0457f" font-size="13" font-weight="700" text-anchor="start">Aryan_Gupta</text>
-<text x="660.0" y="335.0" fill="#c3c2b7" font-size="10" font-weight="400" text-anchor="start">L4 → L5</text>
-<text x="660.0" y="351.0" fill="#3987e5" font-size="13" font-weight="700" text-anchor="start">jjinacio</text>
-<text x="660.0" y="365.0" fill="#c3c2b7" font-size="10" font-weight="400" text-anchor="start">L3 → L5</text>
-<text x="660.0" y="381.0" fill="#3987e5" font-size="13" font-weight="700" text-anchor="start">Kethankumar99</text>
-<text x="660.0" y="395.0" fill="#c3c2b7" font-size="10" font-weight="400" text-anchor="start">L4 → L4</text>
-<text x="660.0" y="411.0" fill="#d95926" font-size="13" font-weight="700" text-anchor="start">Sanjay K</text>
-<text x="660.0" y="425.0" fill="#c3c2b7" font-size="10" font-weight="400" text-anchor="start">L3 → L4</text>
-<text x="660.0" y="441.0" fill="#3987e5" font-size="13" font-weight="700" text-anchor="start">Sarthak Gupta</text>
-<text x="660.0" y="455.0" fill="#c3c2b7" font-size="10" font-weight="400" text-anchor="start">L3 → L4</text>
-<text x="660.0" y="471.0" fill="#199e70" font-size="13" font-weight="700" text-anchor="start">amalsaidov</text>
-<text x="660.0" y="485.0" fill="#c3c2b7" font-size="10" font-weight="400" text-anchor="start">L3 → L4</text>
-<text x="660.0" y="501.0" fill="#199e70" font-size="13" font-weight="700" text-anchor="start">danielstack</text>
-<text x="660.0" y="515.0" fill="#c3c2b7" font-size="10" font-weight="400" text-anchor="start">L3 → L4</text>
-<text x="660.0" y="531.0" fill="#9a7ef0" font-size="13" font-weight="700" text-anchor="start">PIYUSH BIPIN VARULE</text>
-<text x="660.0" y="545.0" fill="#c3c2b7" font-size="10" font-weight="400" text-anchor="start">L3 → L4</text>
-<text x="660.0" y="561.0" fill="#e0457f" font-size="13" font-weight="700" text-anchor="start">Aseel012</text>
-<text x="660.0" y="575.0" fill="#c3c2b7" font-size="10" font-weight="400" text-anchor="start">L3 → L4</text>
-<text x="660.0" y="591.0" fill="#9a7ef0" font-size="13" font-weight="700" text-anchor="start">kelseyben10</text>
-<text x="660.0" y="605.0" fill="#c3c2b7" font-size="10" font-weight="400" text-anchor="start">L3 → L4</text>
-<text x="660.0" y="621.0" fill="#d95926" font-size="13" font-weight="700" text-anchor="start">senthilkumar-r</text>
-<text x="660.0" y="635.0" fill="#c3c2b7" font-size="10" font-weight="400" text-anchor="start">L3 → L4</text>
-<text x="660.0" y="651.0" fill="#199e70" font-size="13" font-weight="700" text-anchor="start">GalaktusSK</text>
-<text x="660.0" y="665.0" fill="#c3c2b7" font-size="10" font-weight="400" text-anchor="start">L3 → L4</text>
-<text x="660.0" y="681.0" fill="#e0457f" font-size="13" font-weight="700" text-anchor="start">Ashish Gupta</text>
-<text x="660.0" y="695.0" fill="#c3c2b7" font-size="10" font-weight="400" text-anchor="start">L3 → L4</text>
-<text x="660.0" y="711.0" fill="#d95926" font-size="13" font-weight="700" text-anchor="start">!HuerteDev</text>
-<text x="660.0" y="725.0" fill="#c3c2b7" font-size="10" font-weight="400" text-anchor="start">L3 → L3</text>
+<text x="660.0" y="251.9" fill="#3987e5" font-size="13" font-weight="700" text-anchor="start">Aaqibhafeez Khan</text>
+<text x="660.0" y="265.9" fill="#c3c2b7" font-size="10" font-weight="400" text-anchor="start">L5 → L6</text>
+<text x="660.0" y="281.9" fill="#9a7ef0" font-size="13" font-weight="700" text-anchor="start">Ashish Sharma</text>
+<text x="660.0" y="295.9" fill="#c3c2b7" font-size="10" font-weight="400" text-anchor="start">L4 → L5</text>
+<text x="660.0" y="315.4" fill="#e0457f" font-size="13" font-weight="700" text-anchor="start">Aryan_Gupta</text>
+<text x="660.0" y="329.4" fill="#c3c2b7" font-size="10" font-weight="400" text-anchor="start">L4 → L5</text>
+<text x="660.0" y="345.4" fill="#3987e5" font-size="13" font-weight="700" text-anchor="start">jjinacio</text>
+<text x="660.0" y="359.4" fill="#c3c2b7" font-size="10" font-weight="400" text-anchor="start">L3 → L5</text>
+<text x="660.0" y="375.4" fill="#3987e5" font-size="13" font-weight="700" text-anchor="start">Kethankumar99</text>
+<text x="660.0" y="389.4" fill="#c3c2b7" font-size="10" font-weight="400" text-anchor="start">L4 → L4</text>
+<text x="660.0" y="405.4" fill="#d95926" font-size="13" font-weight="700" text-anchor="start">Sanjay K</text>
+<text x="660.0" y="419.4" fill="#c3c2b7" font-size="10" font-weight="400" text-anchor="start">L3 → L4</text>
+<text x="660.0" y="435.4" fill="#3987e5" font-size="13" font-weight="700" text-anchor="start">Sarthak Gupta</text>
+<text x="660.0" y="449.4" fill="#c3c2b7" font-size="10" font-weight="400" text-anchor="start">L3 → L4</text>
+<text x="660.0" y="465.4" fill="#199e70" font-size="13" font-weight="700" text-anchor="start">amalsaidov</text>
+<text x="660.0" y="479.4" fill="#c3c2b7" font-size="10" font-weight="400" text-anchor="start">L3 → L4</text>
+<text x="660.0" y="495.4" fill="#199e70" font-size="13" font-weight="700" text-anchor="start">danielstack</text>
+<text x="660.0" y="509.4" fill="#c3c2b7" font-size="10" font-weight="400" text-anchor="start">L3 → L4</text>
+<text x="660.0" y="525.4" fill="#9a7ef0" font-size="13" font-weight="700" text-anchor="start">PIYUSH BIPIN VARULE</text>
+<text x="660.0" y="539.4" fill="#c3c2b7" font-size="10" font-weight="400" text-anchor="start">L3 → L4</text>
+<text x="660.0" y="555.4" fill="#e0457f" font-size="13" font-weight="700" text-anchor="start">Aseel012</text>
+<text x="660.0" y="569.4" fill="#c3c2b7" font-size="10" font-weight="400" text-anchor="start">L3 → L4</text>
+<text x="660.0" y="585.4" fill="#9a7ef0" font-size="13" font-weight="700" text-anchor="start">kelseyben10</text>
+<text x="660.0" y="599.4" fill="#c3c2b7" font-size="10" font-weight="400" text-anchor="start">L3 → L4</text>
+<text x="660.0" y="615.4" fill="#d95926" font-size="13" font-weight="700" text-anchor="start">senthilkumar-r</text>
+<text x="660.0" y="629.4" fill="#c3c2b7" font-size="10" font-weight="400" text-anchor="start">L3 → L4</text>
+<text x="660.0" y="645.4" fill="#199e70" font-size="13" font-weight="700" text-anchor="start">GalaktusSK</text>
+<text x="660.0" y="659.4" fill="#c3c2b7" font-size="10" font-weight="400" text-anchor="start">L3 → L4</text>
+<text x="660.0" y="675.4" fill="#e0457f" font-size="13" font-weight="700" text-anchor="start">Ashish Gupta</text>
+<text x="660.0" y="689.4" fill="#c3c2b7" font-size="10" font-weight="400" text-anchor="start">L3 → L4</text>
+<text x="660.0" y="705.4" fill="#d95926" font-size="13" font-weight="700" text-anchor="start">!HuerteDev</text>
+<text x="660.0" y="719.4" fill="#c3c2b7" font-size="10" font-weight="400" text-anchor="start">L3 → L3</text>
 </svg>
