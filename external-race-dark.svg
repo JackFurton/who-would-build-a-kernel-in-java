@@ -17,10 +17,10 @@
 <line x1="56" x2="650" y1="356" y2="356" stroke="#2c2c2a"/>
 <text x="56.0" y="374.0" fill="#898781" font-size="10" font-weight="400" text-anchor="start">Oct 3</text>
 <text x="650.0" y="374.0" fill="#898781" font-size="10" font-weight="400" text-anchor="end">Dec 15</text>
-<path d="M178.9,356.0 H178.9 V347.7 H182.5 V343.5 H289.0 V334.5 H316.8 V322.6 H358.1 V312.5 H390.0 V307.4 H404.6" fill="none" stroke="#3987e5" stroke-width="2" stroke-linejoin="round"/>
+<path d="M178.9,356.0 H178.9 V347.7 H182.5 V343.5 H289.0 V334.5 H316.7 V322.6 H358.1 V312.5 H389.9 V307.4 H404.6" fill="none" stroke="#3987e5" stroke-width="2" stroke-linejoin="round"/>
 <line x1="404.6" x2="650" y1="307.4" y2="254.5" stroke="#3987e5" stroke-width="2" stroke-dasharray="6 5"/>
 <circle cx="404.6" cy="307.4" r="4" fill="#3987e5" stroke="#1a1a19" stroke-width="2"/>
-<path d="M366.9,356.0 H366.9 V347.2 H375.4 V337.9 H382.1 V328.3 H390.0 V319.1 H403.9 V314.4 H404.6" fill="none" stroke="#d95926" stroke-width="3.5" stroke-linejoin="round"/>
+<path d="M366.9,356.0 H366.9 V347.2 H375.3 V337.9 H382.1 V328.3 H389.9 V319.1 H403.9 V314.4 H404.6" fill="none" stroke="#d95926" stroke-width="3.5" stroke-linejoin="round"/>
 <line x1="404.6" x2="650" y1="314.4" y2="136.2" stroke="#d95926" stroke-width="3" stroke-dasharray="6 5"/>
 <circle cx="404.6" cy="314.4" r="5" fill="#d95926" stroke="#1a1a19" stroke-width="2"/>
 <path d="M403.9,356.0 H403.9 V345.6 H403.9 V333.5 H404.6" fill="none" stroke="#199e70" stroke-width="2" stroke-linejoin="round"/>
