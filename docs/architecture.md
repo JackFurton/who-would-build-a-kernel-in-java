@@ -140,7 +140,9 @@ time. `make ktest` attaches a 64-sector disk with a known pattern behind a PCIe 
 gives the PCI scan a bridge to follow.
 
 The same transport drives a virtio-net device: a receive queue kept full of 2 KiB buffers and a
-transmit queue that sends one frame at a time, both polled. `duke.kernel.net` sits on top with
+transmit queue that never waits, both polled. A frame is dropped when all 16 transmit descriptors
+are in flight, since QEMU's loopback netdev holds a send until the guest empties its receive queue,
+and the sender is often the thread that would. `duke.kernel.net` sits on top with
 Ethernet, ARP, IPv4 (no options or fragments), ICMP echo and UDP. A `net` kernel thread asks for an
 address by DHCP at boot, falling back to 10.0.2.15/24 behind 10.0.2.2 (what QEMU's user-mode network
 hands out) when no server answers, then drains the receive queue every tick. The shell's `ping`
