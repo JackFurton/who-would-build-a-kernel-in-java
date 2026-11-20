@@ -149,6 +149,15 @@ its gateway itself, so `make shell-test` pings it with no root or tap device, on
 QEMU's default so only an address from DHCP gets there. ktest's NIC hears only its own frames,
 which covers the fallback.
 
+TCP keeps a 64 KiB buffer each way per connection, so it offers a window without scaling. It drops
+segments that arrive out of order and resends from the first unacknowledged byte after an RFC 6298
+timeout or three duplicate acknowledgments, with no congestion control. A connection's segments go
+back to the MAC its peer's came from, so nothing waits on ARP under the lock that reads frames. ktest
+connects to a listener on its own address, which its looped-back NIC turns into a real exchange of
+frames, and drops every seventh segment to make the retransmission happen. The shell's `nc` connects
+out, and `make shell-test` points it at a server on the host, which QEMU reaches through the
+gateway's address.
+
 `duke.kernel.fs.Fat` reads FAT32 and FAT16 volumes, on a whole disk or in the first FAT partition
 of an MBR, and the boot mounts the first one it finds for the shell's `ls` and `cat`. It follows
 cluster chains through the FAT and reads long names, checking each against its short name's
