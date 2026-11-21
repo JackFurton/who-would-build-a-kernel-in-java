@@ -348,10 +348,6 @@ public final class Tcp {
     }
 
     /**
-     * Reads frames until {@code done}, or until {@code deadline} (0 for none) passes: 0, -ETIMEDOUT
-     * or -EINTR. Reading them here rather than waiting for the net thread saves up to a tick a round trip.
-     */
-    /**
      * Asked by each thread waiting here, every millisecond or so: true ends its wait with EINTR. For
      * a process that's been killed, which can't be woken any other way. Returns the check it replaces.
      */
@@ -361,6 +357,10 @@ public final class Tcp {
         return previous;
     }
 
+    /**
+     * Reads frames until {@code done}, or until {@code deadline} (0 for none) passes: 0, -ETIMEDOUT
+     * or -EINTR. Reading them here rather than waiting for the net thread saves up to a tick a round trip.
+     */
     private static int await(Condition done, long deadline) {
         Supplier<Boolean> interrupted = interrupt;
         while (true) {
