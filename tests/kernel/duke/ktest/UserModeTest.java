@@ -258,7 +258,9 @@ final class UserModeTest {
         Program p = new Program();
         int offset = 64;
         p.load(new Code()
-                .call(SystemCalls.IOCTL, 1, 0x5401, 0, p.data + offset)
+                .call(SystemCalls.IOCTL, 1, 0x5401, p.data + 192, p.data + offset)
+                .call(SystemCalls.IOCTL, 1, 0x5413, p.data + 240, p.data + offset + 56)
+                .call(SystemCalls.IOCTL, 99, 0x5401, p.data + 192, p.data + offset + 72)
                 .call(SystemCalls.SET_TID_ADDRESS, p.data + 128, 0, 0, p.data + offset + 8)
                 .call(SystemCalls.SCHED_YIELD, 0, 0, 0, p.data + offset + 16)
                 .call(SystemCalls.GETUID, 0, 0, 0, p.data + offset + 24)
@@ -268,7 +270,12 @@ final class UserModeTest {
                 .exit(0));
         try {
             assertEquals(0, p.run(), "startup syscalls program");
-            assertEquals(-SystemCalls.ENOTTY, Magic.peekLong(p.kernelView(offset)), "ioctl");
+            assertEquals(0, Magic.peekLong(p.kernelView(offset)), "TCGETS on the console");
+            // c_lflag: ICANON and ECHO, as Duke's line editor works.
+            assertEquals(012, Magic.peekLong(p.kernelView(192 + 12)) & 012, "canonical and echoing");
+            assertEquals(0, Magic.peekLong(p.kernelView(offset + 56)), "TIOCGWINSZ on the console");
+            assertTrue((Magic.peekLong(p.kernelView(240)) & 0xFFFF) > 0, "some rows");
+            assertEquals(-SystemCalls.EBADF, Magic.peekLong(p.kernelView(offset + 72)), "ioctl on fd 99");
             assertEquals(Scheduler.currentId(), Magic.peekLong(p.kernelView(offset + 8)), "set_tid_address");
             assertEquals(0, Magic.peekLong(p.kernelView(offset + 16)), "sched_yield");
             assertEquals(0, Magic.peekLong(p.kernelView(offset + 24)), "getuid");

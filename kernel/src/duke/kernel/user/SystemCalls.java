@@ -197,7 +197,8 @@ public final class SystemCalls {
         } else if (number == BRK) {
             result = Scheduler.addressSpace().setBreakEnd(a0);
         } else if (number == IOCTL) {
-            result = -ENOTTY;
+            OpenFile file = files().get(a0);
+            result = file == null ? -EBADF : file.ioctl(a1, a2);
         } else if (number == SET_TID_ADDRESS) {
             result = Scheduler.currentId();
         } else if (number == SCHED_YIELD) {

@@ -25,9 +25,19 @@ public class BusyboxTest {
     static final String TARBALL = "busybox-" + VERSION + ".tar.bz2";
     static final String SHA256 = "3311dff32e746499f4df0d5df04d7eb396382d7e108bb9250e7b519b837043a4";
     static final String ALPINE = CTests.ALPINE;
-    // tc needs the CBQ definitions Linux 6.8's headers dropped.
+    // tc needs the CBQ definitions Linux 6.8's headers dropped. Without its own line editor, which
+    // wants raw mode and ANSI escapes the console doesn't draw, ash reads lines Duke's editor has
+    // edited. Standalone, it runs applets with no links in PATH, which FAT can't hold, by running
+    // /bin/busybox rather than /proc/self/exe. ls leaves out color unless asked, since the console
+    // would show the escapes as text.
     static final String CONFIG = "sed -i 's/^CONFIG_TC=y/# CONFIG_TC is not set/; "
-            + "s/^# CONFIG_STATIC is not set/CONFIG_STATIC=y/' .config";
+            + "s/^# CONFIG_STATIC is not set/CONFIG_STATIC=y/; "
+            + "s/^CONFIG_FEATURE_EDITING=y/# CONFIG_FEATURE_EDITING is not set/; "
+            + "s/^# CONFIG_FEATURE_PREFER_APPLETS is not set/CONFIG_FEATURE_PREFER_APPLETS=y/; "
+            + "s/^# CONFIG_FEATURE_SH_STANDALONE is not set/CONFIG_FEATURE_SH_STANDALONE=y/; "
+            + "s/^CONFIG_FEATURE_LS_COLOR_IS_DEFAULT=y/# CONFIG_FEATURE_LS_COLOR_IS_DEFAULT is not set/; "
+            + "s|^CONFIG_BUSYBOX_EXEC_PATH=.*|CONFIG_BUSYBOX_EXEC_PATH=\"/bin/busybox\"|' .config; "
+            + "yes '' | make -s oldconfig >/dev/null";
 
     /** Each one argv after "busybox". No argument may hold a double quote, which the shell can't type. */
     static final List<List<String>> CASES = List.of(
@@ -76,6 +86,15 @@ public class BusyboxTest {
             // httpd goes into the background, and wget reaches it over loopback.
             List.of("sh", "-c", "/bin/busybox httpd -p 8081 -h /docs && /bin/busybox wget -qO- http://127.0.0.1:8081/deeper/NOTES.TXT"));
 
+    /** Lines typed into an interactive busybox sh, each with what it prints. */
+    static final List<List<String>> SESSION = List.of(
+            List.of("echo hello from an interactive sh", "hello from an interactive sh\n"),
+            List.of("cd /docs", ""),
+            List.of("pwd", "/docs\n"),
+            List.of("ls", "deeper\n"),
+            List.of("cd deeper; cat NOTES.TXT", "nested\n"),
+            List.of("exit", ""));
+
     public static void main(String[] args) throws Exception {
         Path busybox = build();
         Path root = OUT.resolve("root");
@@ -96,6 +115,15 @@ public class BusyboxTest {
             }
             lines.add(line.toString());
         }
+        StringBuilder typed = new StringBuilder("run /bin/busybox sh");
+        // ash has no job control without process groups, and says so. Duke's line editor echoes
+        // each key as the key, a space and a backspace, which the harness keeps.
+        StringBuilder shown = new StringBuilder("sh: can't access tty; job control turned off\n");
+        for (List<String> step : SESSION) {
+            typed.append('\n').append(step.get(0));
+            shown.append("# ").append(step.get(0).replaceAll("(.)", "$1 \b")).append('\n').append(step.get(1));
+        }
+        lines.add(typed.toString());
         Path dukeDir = OUT.resolve("duke");
         Files.createDirectories(dukeDir);
         List<JsTests.Result> onDuke = JsTests.runLinesOnDuke(dukeDir, "busybox.img", files, lines);
@@ -108,7 +136,10 @@ public class BusyboxTest {
                     () -> at < onDuke.size() ? onDuke.get(at)
                             : new JsTests.Result("not run: an earlier command hung the kernel\n", -1));
         }
-        System.out.println("busybox-test: " + CASES.size() + " commands, " + failures + " failures");
+        failures += JsTests.check("interactive sh", "expected", "duke", new JsTests.Result(shown.toString(), 0),
+                () -> onDuke.size() > CASES.size() ? onDuke.get(CASES.size())
+                        : new JsTests.Result("not run: an earlier command hung the kernel\n", -1));
+        System.out.println("busybox-test: " + CASES.size() + " commands and a session, " + failures + " failures");
         if (failures > 0) {
             System.exit(1);
         }

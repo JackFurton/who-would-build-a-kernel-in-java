@@ -317,7 +317,10 @@ too, as Linux has them. `stat` and `lstat` are the same, since FAT has no symlin
 inode number is its first cluster. Each process has a working directory, which a fork copies and
 `execve` keeps. Relative paths start there, or at the directory `openat` or `newfstatat` is given,
 and ".." is worked out from the path alone, which is right as long as there are no symlinks. Reading the console runs the shell's line editor, so a program gets a line at a time,
-echoed and editable, as from a terminal in canonical mode. The shell is waiting on the process
+echoed and editable, as from a terminal in canonical mode. `ioctl` says as much: the console
+answers TCGETS with ICANON and ECHO set and TIOCGWINSZ with the framebuffer's size, so `isatty` is
+true for it and false for everything else, and TCSETS succeeds only if it asks for what the console
+already does. The shell is waiting on the process
 meanwhile, so the two never read the keyboard at once.
 
 `pipe` and `pipe2` make a 64 KiB buffer with a read end and a write end. A read waits while it's
