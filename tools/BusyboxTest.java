@@ -72,7 +72,9 @@ public class BusyboxTest {
             List.of("sh", "-c", "cd /docs && /bin/busybox find ."),
             List.of("sh", "-c", "cd /bin && ./busybox echo run by a relative path"),
             List.of("sh", "-c", "cd /nope"),
-            List.of("sh", "-c", "cd /hello.txt"));
+            List.of("sh", "-c", "cd /hello.txt"),
+            // httpd goes into the background, and wget reaches it over loopback.
+            List.of("sh", "-c", "/bin/busybox httpd -p 8081 -h /docs && /bin/busybox wget -qO- http://127.0.0.1:8081/deeper/NOTES.TXT"));
 
     public static void main(String[] args) throws Exception {
         Path busybox = build();
