@@ -129,7 +129,9 @@ public class BusyboxTest {
             }
         }
         command.add(ALPINE);
-        command.add("/bin/busybox");
+        // Docker carries stdout and stderr as two streams and interleaves them as they arrive, so
+        // a line of each can come out swapped. Joined inside the container, they keep their order.
+        command.addAll(List.of("/bin/busybox", "sh", "-c", "exec \"$0\" \"$@\" 2>&1", "/bin/busybox"));
         command.addAll(argv);
         return command;
     }
