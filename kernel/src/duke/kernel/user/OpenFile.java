@@ -51,6 +51,11 @@ abstract class OpenFile {
         return 0;
     }
 
+    /** Only the console is a terminal. */
+    long ioctl(long request, long argument) {
+        return -SystemCalls.ENOTTY;
+    }
+
     /** linux_dirent64 records into user memory at {@code buffer}, already checked writable. */
     long getdents(long buffer, long count) {
         return -SystemCalls.ENOTDIR;
